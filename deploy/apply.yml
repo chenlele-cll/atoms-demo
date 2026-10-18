@@ -1,0 +1,27 @@
+- name: Atoms deployment framework
+  hosts: atoms
+  gather_facts: false
+  vars_files: [defaults.yml, integrations.yml]
+  pre_tasks:
+    - name: Check integration boundary before any connection
+      ansible.builtin.import_tasks: tasks/require-integrations.yml
+  tasks:
+    - name: Deploy a verified release through owned stages
+      block:
+        - name: Confirm target prerequisites and ownership
+          ansible.builtin.import_tasks: tasks/preflight.yml
+        - name: Stage the immutable release
+          ansible.builtin.import_tasks: tasks/stage-release.yml
+        - name: Stage managed configuration
+          ansible.builtin.import_tasks: tasks/configure.yml
+          become: true
+        - name: Back up and activate compatible release
+          ansible.builtin.import_tasks: tasks/activate.yml
+        - name: Verify actual application and public access
+          ansible.builtin.import_tasks: tasks/health.yml
+      rescue:
+        - name: Recover only a compatible retained release
+          ansible.builtin.import_tasks: tasks/recover.yml
+      always:
+        - name: Report bounded deployment outcome
+          ansible.builtin.import_tasks: tasks/report.yml

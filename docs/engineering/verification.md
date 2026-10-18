@@ -13,7 +13,7 @@
 | 进程起停与基础设施 | 运行真实服务验证本文件 Lifecycle scenarios 中适用的场景 |
 | 技能安装与更新 | 核对固定来源、资源、许可证和发现路径；按技能职责验证实际场景，具体来源维护在 [skills.md](./skills.md) |
 | OpenSpec 配置、CLI 或生成技能 | 验证项目版本及配置范围、工件状态推进、上下文与规则注入、严格校验和更新后发现路径；结构校验不替代实现验证 |
-| 部署与反向代理 | 在目标服务器和最终域名验证健康接口、API 转发与持久目录；流式接口接入后验证代理缓冲、超时及断线行为 |
+| 部署与反向代理 | 在目标服务器和最终访问地址（域名或 IP+端口）验证健康接口、API 转发与持久目录；流式接口接入后验证代理缓冲、超时及断线行为 |
 | 只推送已有提交 | 按 [Git workflow](./git-workflow.md#push-procedure) 核对提交、远端和未提交内容；提交未变且证据仍适用时复用已有验证 |
 
 为有意义的边界与失败处理添加聚焦测试，不为纯文字编写断言，也不以重复实现细节的测试代替行为验证。检查通过后，只因新的改动、失败或未解决疑点才扩大或重复测试。
@@ -208,6 +208,14 @@ pnpm smoke:projects
 串行执行；smoke 已含 build，两个专项消费该产物。浏览器专项需要现有 playwright-core、本机 Chrome、npx 和空闲 3001/5173/4173；从现有首页用相对 /api，dev 和 preview 各验证 gate 前首帧、真实候选终态、取消、浏览器 abort 经代理传播、按 requestId 查询和所属后端重启，核对 currentVersionId/digest 不变。捕获真实帧逐字节重解码，并以明确的 UTF-8 注释夹具覆盖中文/emoji 跨块；不向生产事件添加虚假活动。只清理所属进程/数据；异常与 SIGINT/SIGTERM 同样执行有界清理，外部端口占用者保持运行。
 
 报告在忽略的 test-results/generation-stream/<id>/report.json，只记录 fixture 场景、计数和状态，不保存 cookie、正文或数据库。测试启动器只供本地自动化，不列为生产命令。默认 check/CI 不消耗真实额度；本轮不把 fixture 传输通过当作真实模型、候选预览、完整 Top 1 或最终线上反代通过。实施结果见 [GEN-005 tasks](../../openspec/changes/gen-005-generation-stream-control/tasks.md)。
+
+## Deployment framework
+
+`DEP-002` 的 `./deploy.sh bootstrap` 显式准备固定 Ansible/Python 依赖；`./deploy.sh validate` 用真实 Ansible 做语法检查和离线模板渲染。`./deploy.sh test` 使用标准库 unittest：帮助/apply 无工具副本与含空格路径、离线重复 bootstrap、私有文件/字面密码/权限/重复 YAML 键/非法字段保护、真实 Ansible 官方传密与 SSH 失败脱敏、受控本地模块的前提通过/端口冲突/运行/未知状态、重复模板渲染、SIGINT/SIGTERM/超时下独立会话子进程清理与无关进程保护。
+
+DEP-003 将同一入口扩展为离线 plan 文本/JSON、原生分阶段流程及显式依赖门禁；增加同包无操作/代码切换/配置独立更新/健康恢复决策、直接 playbook 空声明仍失败、原生 rescue/always 保留失败状态，以及配置暂存重复无变化、既有秘密 env 保留/过期暂存清理/符号链接拒绝测试。实际 Ansible 模块在隔离目录运行，未给产品增加测试开关，也不解析假 release.json 作为生产契约。
+
+这些测试只用隔离配置、命令/SSH 替身和本地 builtin 模块，不读取真实 inventory、连接真实服务器或调用模型；不将 fixture 结果当成服务器通过。plan/check/status 与接入说明见 [Deployment](./deployment.md)，缺依赖的 apply 仍明确失败。本次框架证据在忽略的 test-results/dep-003/framework/；真实 Nginx/systemd、公网 TLS/流、更新/回退和数据保留仍待后续接点及 DEP-004 目标验收，DEP-001 连接问题保持独立记录。默认 check/verify/CI 不自动安装 Python 工具或执行部署检查。
 
 ## Lifecycle scenarios
 

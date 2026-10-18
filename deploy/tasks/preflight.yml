@@ -1,0 +1,3 @@
+- name: Require target ownership and serialization integration
+  ansible.builtin.fail:
+    msg: Pending ownership integration; no target resources or processes are assumed to belong to Atoms.

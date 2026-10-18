@@ -1,0 +1,22 @@
+# Shared template/inspection inputs; paths match the GEN-009 release layout.
+atoms_root: /srv/atoms
+atoms_service_user: atoms
+atoms_service_group: atoms
+atoms_config:
+  https_port: "{{ atoms_https_port | default(8443) }}"
+  backend_port: "{{ atoms_backend_port | default(3001) }}"
+  node_binary: "{{ atoms_node_binary | default('/usr/bin/node') }}"
+  pnpm_binary: "{{ atoms_pnpm_binary | default('/usr/bin/pnpm') }}"
+  nginx_binary: "{{ atoms_nginx_binary | default('/usr/sbin/nginx') }}"
+  tls_certificate: "{{ atoms_tls_certificate | default('/etc/letsencrypt/live/' ~ ansible_host ~ '/fullchain.pem') }}"
+  tls_key: "{{ atoms_tls_key | default('/etc/letsencrypt/live/' ~ ansible_host ~ '/privkey.pem') }}"
+atoms_expected_node: "{{ lookup('ansible.builtin.file', '../.nvmrc') | trim }}"
+atoms_expected_pnpm: "{{ (lookup('ansible.builtin.file', '../package.json') | from_json).packageManager.split('@')[1] }}"
+# Declarative inputs for DEP-003, never applied by check/status/validate.
+atoms_directories:
+  - {path: "{{ atoms_root }}", owner: root, group: root, mode: '0755'}
+  - {path: "{{ atoms_root }}/releases", owner: root, group: root, mode: '0755'}
+  - {path: "{{ atoms_root }}/shared", owner: root, group: "{{ atoms_service_group }}", mode: '0750'}
+  - {path: "{{ atoms_root }}/shared/data", owner: "{{ atoms_service_user }}", group: "{{ atoms_service_group }}", mode: '0700'}
+  - {path: "{{ atoms_root }}/shared/config", owner: root, group: "{{ atoms_service_group }}", mode: '0750'}
+  - {path: "{{ atoms_root }}/backups", owner: root, group: root, mode: '0700'}

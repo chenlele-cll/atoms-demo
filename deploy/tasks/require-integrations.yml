@@ -1,0 +1,8 @@
+# Deliberately unconditional. Extra vars or an empty dependency map cannot
+# turn an absent release adapter into authorization to mutate the server.
+- name: Require the real release adapter and deployment integrations
+  ansible.builtin.fail:
+    msg: >-
+      DEP-003 framework only. GEN-009 release adapter and deployment integrations
+      are pending: {{ atoms_pending_integrations.keys() | list | join(', ') }}.
+      No remote deployment operations were run.

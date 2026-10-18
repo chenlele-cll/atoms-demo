@@ -1,0 +1,17 @@
+- name: Render production templates offline without using private inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files: [defaults.yml]
+  vars:
+    ansible_host: 203.0.113.10
+  tasks:
+    - name: Validate templates through the real Ansible template engine
+      ansible.builtin.assert:
+        that: "lookup('ansible.builtin.template', item) | length > 0"
+        quiet: true
+      loop:
+        - templates/nginx-site.conf.j2
+        - templates/atoms-backend.service.j2
+        - templates/backend.env.j2
+      no_log: true

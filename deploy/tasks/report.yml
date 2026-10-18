@@ -1,0 +1,6 @@
+- name: Report framework state without publishing raw failed results
+  ansible.builtin.debug:
+    msg:
+      stage: framework
+      deployment_verified: false
+      note: Inspect bounded private evidence; no successful deployment is asserted by this framework.

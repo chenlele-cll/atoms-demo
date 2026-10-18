@@ -221,24 +221,11 @@ pnpm --filter @atoms/backend start
 
 前端将 `frontend/dist/` 交给已有 Web 服务器提供静态文件访问；将 `/api/` 原样转发到 `127.0.0.1:3001`。API 的 404 必须由后端返回，不能回退成前端 HTML。
 
-如使用 Nginx，可参考以下路径规则并合入服务器已有配置，替换实际静态目录：
+`DEP-002/003` 已提供 [deploy.sh](./deploy.sh) 与固定 Ansible Core：`bootstrap` 准备本地工具，`plan`/`plan --json` 查看离线阶段与待接入点，`validate`/`test` 验证框架，`check`/`status` 只读检查服务器。私有 inventory 从 [server.example](./server.example) 准备，已有私有文件不覆盖；真实配置不入库。具体命令、字段和检查范围见 [部署指南](./docs/engineering/deployment.md)。
 
-```nginx
-root /srv/atoms/frontend/dist;
+部署框架已定义预检、发布暂存、配置暂存、激活、健康、失败恢复和收尾，包含配置暂存保护与幂等决策。生产模板采用已有 Nginx + systemd，支持 IP HTTPS、API 流转发和外置 SQLite/配置。依赖未接入时 `apply` 列出缺项后返回非零，尚无真实上传、切换、服务操作或部署通过记录；后续补齐接点，DEP-004 再做目标验收。
 
-location / {
-    try_files $uri $uri/ /index.html;
-}
-
-location /api/ {
-    proxy_pass http://127.0.0.1:3001;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
-
-后端可交给服务器已有进程管理设施维护。具体域名、TLS 与进程管理配置待实际服务器接入时核对。将来添加流式接口时，还需配置反向代理缓冲和读取超时，并实测断线和取消。
+releaseId 创建、复用、配置更新与回滚规则统一维护在 [发布版本标识](./docs/engineering/lifecycle.md#deployment-release-identity)。发布包不可变，重复部署不得隐式重建；发布构建继续由 GEN-009 实现。
 
 本地检查生产前端产物可运行 `pnpm --filter @atoms/frontend preview`，访问 <http://127.0.0.1:4173>；该命令同样代理 `/api`，仅用于本地验收，不替代生产静态服务器。
 

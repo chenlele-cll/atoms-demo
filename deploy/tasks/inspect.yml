@@ -1,0 +1,44 @@
+- name: Read only distribution and supervisor facts
+  ansible.builtin.setup:
+    gather_subset: ['!all', '!min', distribution, service_mgr]
+  when: atoms_inspection_mode | default('check') == 'check'
+  no_log: true
+
+- name: Read tool and service observations without changing managed state
+  ansible.builtin.command:
+    argv: "{{ item.argv }}"
+  environment:
+    COREPACK_ENABLE_NETWORK: '0'
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+    COREPACK_ENABLE_AUTO_PIN: '0'
+    NODE_OPTIONS: ''
+    NODE_PATH: ''
+  loop:
+    - {name: node, argv: ["{{ atoms_config.node_binary }}", --version]}
+    - {name: pnpm, argv: ["{{ atoms_config.pnpm_binary }}", --version]}
+    - {name: sudo, argv: [sudo, -n, 'true']}
+    - {name: nginx_test, argv: [sudo, -n, "{{ atoms_config.nginx_binary }}", -t]}
+    - {name: nginx_state, argv: [systemctl, is-active, nginx.service]}
+    - {name: backend_state, argv: [systemctl, is-active, atoms-backend.service]}
+    - {name: listeners, argv: [ss, -H, -lnt]}
+    - {name: certificate_expiry, argv: [sudo, -n, openssl, x509, -noout, -checkend, '86400', -in, "{{ atoms_config.tls_certificate }}"]}
+    - {name: certificate_ip, argv: [sudo, -n, openssl, verify, -purpose, sslserver, -verify_ip, "{{ ansible_host }}", -untrusted, "{{ atoms_config.tls_certificate }}", "{{ atoms_config.tls_certificate }}"]}
+    - {name: private_key_readable, argv: [sudo, -n, test, -r, "{{ atoms_config.tls_key }}"]}
+  changed_when: false
+  failed_when: false
+  when: atoms_inspection_mode | default('check') != 'status' or item.name in ['backend_state', 'nginx_state']
+  register: atoms_command_results
+  no_log: true
+
+- name: Index private observations
+  ansible.builtin.set_fact:
+    atoms_observed: "{{ dict(atoms_command_results.results | map(attribute='item.name') | zip(atoms_command_results.results)) }}"
+  no_log: true
+
+- name: Inspect the current pointer without reading application files
+  ansible.builtin.stat:
+    path: "{{ atoms_root }}/current"
+    follow: false
+  register: atoms_current
+  failed_when: false
+  no_log: true

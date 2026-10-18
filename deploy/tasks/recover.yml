@@ -1,0 +1,3 @@
+- name: Refuse an unverified automatic rollback
+  ansible.builtin.fail:
+    msg: Recovery integration is pending; no database restore or schema downgrade was attempted. Deployment remains failed.

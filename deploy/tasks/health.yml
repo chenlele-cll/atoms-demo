@@ -1,0 +1,3 @@
+- name: Require actual health and persistence observations
+  ansible.builtin.fail:
+    msg: Pending health integration; no successful deployment state is recorded from a template or release ID alone.

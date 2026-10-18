@@ -1,0 +1,28 @@
+- name: Observe installed state without claiming deployment health
+  hosts: atoms
+  gather_facts: false
+  vars_files: [defaults.yml]
+  vars:
+    atoms_inspection_mode: status
+  tasks:
+    - name: Collect private observations
+      ansible.builtin.import_tasks: tasks/inspect.yml
+
+    - name: Report bounded observed state
+      ansible.builtin.debug:
+        msg:
+          current_pointer_exists: "{{ atoms_current.stat.exists | default(none) }}"
+          current_pointer_is_symlink: "{{ atoms_current.stat.islnk | default(false) }}"
+          backend_active: "{{ (atoms_observed.backend_state.rc == 0) if atoms_observed.backend_state.rc | default(-1) in [0, 3, 4] else none }}"
+          nginx_active: "{{ (atoms_observed.nginx_state.rc == 0) if atoms_observed.nginx_state.rc | default(-1) in [0, 3, 4] else none }}"
+          deployment_verified: false
+          note: These observations do not certify a release, API health or public HTTPS.
+
+    - name: Fail if installed state could not be observed
+      ansible.builtin.assert:
+        that:
+          - atoms_current.stat.exists is defined
+          - atoms_observed.backend_state.rc | default(-1) in [0, 3, 4]
+          - atoms_observed.nginx_state.rc | default(-1) in [0, 3, 4]
+        quiet: true
+        fail_msg: Some status queries failed; unknown state was not reported as stopped.

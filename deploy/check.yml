@@ -1,0 +1,38 @@
+- name: Inspect deployment prerequisites without configuring the server
+  hosts: atoms
+  gather_facts: false
+  vars_files: [defaults.yml]
+  tasks:
+    - name: Collect private observations
+      ansible.builtin.import_tasks: tasks/inspect.yml
+
+    - name: Classify prerequisites without publishing raw output
+      ansible.builtin.set_fact:
+        atoms_checks:
+          ubuntu: "{{ ansible_facts.distribution == 'Ubuntu' }}"
+          systemd: "{{ ansible_facts.service_mgr == 'systemd' }}"
+          node_version: "{{ atoms_observed.node.rc | default(-1) == 0 and atoms_observed.node.stdout | default('') | trim == 'v' ~ atoms_expected_node }}"
+          pnpm_version: "{{ atoms_observed.pnpm.rc | default(-1) == 0 and atoms_observed.pnpm.stdout | default('') | trim == atoms_expected_pnpm }}"
+          noninteractive_sudo: "{{ atoms_observed.sudo.rc | default(-1) == 0 }}"
+          nginx_config: "{{ atoms_observed.nginx_test.rc | default(-1) == 0 }}"
+          nginx_active: "{{ atoms_observed.nginx_state.rc | default(-1) == 0 }}"
+          socket_inspection: "{{ atoms_observed.listeners.rc | default(-1) == 0 }}"
+          current_pointer_observable: "{{ atoms_current.stat.exists is defined }}"
+          certificate_valid_next_day: "{{ atoms_observed.certificate_expiry.rc | default(-1) == 0 }}"
+          certificate_ip_and_system_trust: "{{ atoms_observed.certificate_ip.rc | default(-1) == 0 }}"
+          private_key_readable_by_root: "{{ atoms_observed.private_key_readable.rc | default(-1) == 0 }}"
+          first_deploy_ports_free: "{{ atoms_current.stat.exists | default(false) or not (atoms_observed.listeners.stdout | default('') | regex_search(':(?:' ~ atoms_config.https_port ~ '|' ~ atoms_config.backend_port ~ ')\\s')) }}"
+      no_log: true
+
+    - name: Report prerequisite checks only
+      ansible.builtin.debug:
+        msg:
+          checks: "{{ atoms_checks }}"
+          deployment_verified: false
+          note: Existing listener ownership, actual public TLS/client trust and application health still require deployment validation.
+
+    - name: Fail when a prerequisite is missing
+      ansible.builtin.assert:
+        that: "false not in atoms_checks.values()"
+        quiet: true
+        fail_msg: Required prerequisites are missing; no configuration was applied.

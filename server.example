@@ -1,0 +1,20 @@
+# Public Ansible inventory template; do not put real credentials in this file.
+# Copy to server.local.yml and restrict that private file to mode 0600.
+# Passwords are literal YAML values, not shell assignments; do not source this file.
+all:
+  hosts:
+    atoms:
+      ansible_host: "203.0.113.10"
+      ansible_port: 22
+      ansible_user: "ubuntu"
+      ansible_password: "REPLACE_IN_PRIVATE_FILE"
+      # For key authentication, remove ansible_password and set:
+      # ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+      # Optional overrides; see docs/engineering/deployment.md.
+      # atoms_https_port: 8443
+      # atoms_backend_port: 3001
+      # atoms_node_binary: "/usr/bin/node"
+      # atoms_pnpm_binary: "/usr/bin/pnpm"
+      # atoms_nginx_binary: "/usr/sbin/nginx"
+      # atoms_tls_certificate: "/etc/letsencrypt/live/203.0.113.10/fullchain.pem"
+      # atoms_tls_key: "/etc/letsencrypt/live/203.0.113.10/privkey.pem"

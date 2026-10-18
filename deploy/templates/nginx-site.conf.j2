@@ -1,0 +1,38 @@
+# Standalone site inside the existing Nginx http context; never replace nginx.conf.
+server {
+    listen {{ atoms_config.https_port }} ssl;
+    server_name {{ ansible_host }};
+    ssl_certificate {{ atoms_config.tls_certificate }};
+    ssl_certificate_key {{ atoms_config.tls_key }};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    root {{ atoms_root }}/current/frontend;
+    index index.html;
+    client_max_body_size 32k;
+
+    location = /api {
+{% include 'nginx-api.conf.j2' %}
+    }
+    location ^~ /api/ {
+{% include 'nginx-api.conf.j2' %}
+    }
+    location ~ (^|/)\. {
+        return 404;
+    }
+    location ~* \.(?:env|sqlite(?:-wal|-shm)?|db|pem|key)$ {
+        return 404;
+    }
+    location /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+    location /template-assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "no-cache";
+    }
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

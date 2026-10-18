@@ -1,0 +1,3 @@
+- name: Require private configuration and compatible activation integration
+  ansible.builtin.fail:
+    msg: Pending runtime configuration, cold backup and compatibility checks; no service is stopped or current pointer changed.

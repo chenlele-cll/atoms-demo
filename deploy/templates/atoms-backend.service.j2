@@ -1,0 +1,29 @@
+[Unit]
+Description=Atoms Demo backend
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User={{ atoms_service_user }}
+Group={{ atoms_service_group }}
+WorkingDirectory={{ atoms_root }}/current/backend
+EnvironmentFile={{ atoms_root }}/shared/config/backend.env
+UnsetEnvironment=NODE_OPTIONS NODE_PATH
+ExecStart={{ atoms_config.node_binary }} {{ atoms_root }}/current/backend/dist/server.js
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths={{ atoms_root }}/shared/data
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

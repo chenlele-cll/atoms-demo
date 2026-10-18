@@ -10,6 +10,7 @@
 | `backend/` | Fastify HTTP 服务，拥有自己的依赖、配置、启动入口和构建产物 |
 | 根目录 | workspace 命令、唯一 lockfile、公共开发工具配置与 Agent 入口 |
 | `scripts/` | 仓库级运行和验证脚本；包含端口预检、manager/setup、行为测试、官方安装器副本与浏览器冒烟脚本 |
+| `deploy/` | 固定控制端 Python/Ansible 依赖、只读 playbook 与生产配置模板；不属于 workspace 应用，不提供产品运行依赖 |
 | `templates/` | 固定来源的公开模板资产；company-landing 保存适配源码/许可/清单，bundle.mjs 是准备与浏览器共用的纯格式校验，不是 workspace 应用 |
 | `docs/` | 产品参考、技术决策和工程规范，按英文子目录组织 |
 | `.agents/skills/` | 所有仓库技能及资源的唯一目录；宿主通过原生发现或路径适配读取，来源和职责见 [skills.md](../engineering/skills.md) |

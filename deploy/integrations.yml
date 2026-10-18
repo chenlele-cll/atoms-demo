@@ -1,0 +1,24 @@
+# Pending integration contracts, not feature flags or fake implementations.
+# Replace the corresponding fail tasks with reviewed implementations later.
+atoms_pending_integrations:
+  release:
+    owner: GEN-009
+    contract: Select and verify an immutable release; validate contents and target platform/ABI using the real producer contract.
+  ownership:
+    owner: DEP-003
+    contract: Confirm target identity, service/site/port ownership and deployment serialization before managed changes.
+  transfer:
+    owner: DEP-003
+    contract: Transfer the verified package into an owned temporary directory and publish atomically without overwriting a release ID.
+  runtime_config:
+    owner: DEP-003
+    contract: Preserve existing secrets, merge allowed settings and supply private backend/proxy fingerprints without logging values.
+  activation:
+    owner: DEP-003
+    contract: Stop only the owned backend, verify a cold backup and schema compatibility, then activate the complete package and configuration.
+  health:
+    owner: DEP-003
+    contract: Observe backend health, final IP HTTPS, static/API routing and persistence before recording successful state.
+  recovery:
+    owner: DEP-003
+    contract: Recover a compatible retained package without downgrading schema or restoring an old database over current data.
