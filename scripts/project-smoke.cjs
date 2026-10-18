@@ -98,10 +98,8 @@ async function api(page, method, url, body) {
 }
 async function setup() {
   // Deployment layout deliberately has no frontend or root template source.
-  await mkdir(deploy, { recursive: true });
-  await cp(path.join(root, 'backend/dist'), path.join(deploy, 'dist'), { recursive: true });
-  await cp(path.join(root, 'backend/package.json'), path.join(deploy, 'package.json'));
-  await symlink(path.join(root, 'backend/node_modules'), path.join(deploy, 'node_modules'), 'dir');
+  const { prepareBackendRuntime } = await import('./prepare-backend-runtime.mjs');
+  await prepareBackendRuntime(root, deploy);
   await assert.rejects(access(path.join(runtime, 'deploy/frontend')));
   await assert.rejects(access(path.join(runtime, 'deploy/templates')));
   await mkdir(browserRepo, { recursive: true });

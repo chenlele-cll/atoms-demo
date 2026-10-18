@@ -29,8 +29,9 @@ async function fixture(name, { install = true, tools = true } = {}) {
   await mkdir(dest, { recursive: true });
   for (const file of ['manager.sh', '.nvmrc', '.process-compose-version', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.base.json', 'process-compose.yaml']) await cp(path.join(root, file), path.join(dest, file));
   await mkdir(path.join(dest, 'scripts'));
-  for (const file of ['manager.mjs', 'setup.mjs', 'check-dev-port.cjs', 'prepare-company-template.mjs']) await cp(path.join(root, 'scripts', file), path.join(dest, 'scripts', file));
+  for (const file of ['manager.mjs', 'setup.mjs', 'check-dev-port.cjs', 'prepare-company-template.mjs', 'prepare-contracts.mjs']) await cp(path.join(root, 'scripts', file), path.join(dest, 'scripts', file));
   await cp(path.join(root, 'templates'), path.join(dest, 'templates'), { recursive: true });
+  await cp(path.join(root, 'packages/contracts'), path.join(dest, 'packages/contracts'), { recursive: true, filter: source => !['node_modules', 'dist', 'template-assets'].includes(path.basename(source)) && !/^\.(?:build|previous)-/.test(path.basename(source)) });
   await cp(path.join(root, 'scripts/vendor'), path.join(dest, 'scripts/vendor'), { recursive: true });
   if (tools) await symlink(path.join(root, '.tools'), path.join(dest, '.tools'), 'dir');
   for (const app of ['backend', 'frontend']) {
