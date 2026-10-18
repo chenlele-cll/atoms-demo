@@ -27,3 +27,6 @@ test-results/
 
 # Local-only assignment source material; do not publish.
 /docs/product/assignment.md
+
+# Private deployment connection configuration and its local backups.
+/server.local*
