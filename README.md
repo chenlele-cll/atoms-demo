@@ -12,13 +12,14 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 - pnpm `12.11.2`，见根目录 `package.json`。
 - 使用 nvm 时先运行 `nvm use`。首次安装可运行 `corepack enable`，由 Corepack 使用项目指定的 pnpm 版本。
 
-在根目录安装依赖：
+选择上述工具链后，在根目录初始化开发环境：
 
 ```sh
-pnpm install --frozen-lockfile
+./manager.sh bootstrap
+./manager.sh doctor
 ```
 
-依赖安装共用根目录 lockfile。框架依赖分别声明在前后端的 package.json 中，不需要分别执行安装。
+bootstrap 复用官方安装器安装固定版 Process Compose，并执行 `pnpm install --frozen-lockfile`；不修改全局工具、环境文件或启动服务。重复执行复用已安装工具。Node/pnpm 需要预先可用；仅安装应用依赖仍可使用 `pnpm install --frozen-lockfile`。前后端共用根 lockfile，不需要分别安装。
 
 OpenSpec 使用仓库固定版本，通过 `pnpm openspec` 运行；安装的工作流和变更使用方式见 [OpenSpec 指南](./docs/engineering/openspec.md)。该入口使用项目范围的 CLI 设置，不改变个人全局配置。
 
@@ -40,16 +41,17 @@ pnpm dev:frontend
 - 页面上的“检查后端连接”按钮验证 HTTP 状态与响应结构；后端不可用时显示失败反馈。
 - 两个进程相互独立，后端关闭时前端页面仍可加载。Vite 固定端口，冲突时直接报错。
 
-完成固定版 Process Compose 安装后，也可通过 [manager.sh](./manager.sh) 一键管理两个开发进程：
+完成 bootstrap 后，也可通过 [manager.sh](./manager.sh) 一键管理两个开发进程：
 
 ```sh
 ./manager.sh start
 ./manager.sh status
+./manager.sh logs backend --tail 50
 ./manager.sh restart
 ./manager.sh stop
 ```
 
-健康实例重复 start 不重建，重复 stop 成功；并发修改串行执行，启动失败或中断会回滚。使用、JSON 状态、超时、固定工具安装及原生调试方式见 [生命周期指南](./docs/engineering/lifecycle.md#manager-commands)。托管 profile 使用固定本地端口和代理值；bootstrap、doctor、logs 与基础设施命令尚未实现。
+健康实例重复 start 不重建，重复 stop 成功；并发修改串行执行，启动失败或中断会回滚。`logs backend --follow` 在另一个终端持续读取，Ctrl+C 只结束读取；停止后仍可读取当前保存的应用日志。JSON 诊断、超时、来源及原生调试方式见 [生命周期指南](./docs/engineering/lifecycle.md#manager-commands)。托管 profile 使用固定本地端口和代理值。
 
 ## 配置
 
@@ -159,9 +161,11 @@ docs/
 scripts/
   check-dev-port.cjs   托管服务启动前检查固定端口，不终止占用者
   manager.mjs          短时运行的生命周期命令，调用 Process Compose
+  setup.mjs            无需 node_modules 的 bootstrap / doctor 入口
   manager.test.mjs     隔离副本上的真实进程行为回归
+  vendor/process-compose/         原样固定的官方安装器及许可证
   smoke.cjs            浏览器端到端冒烟脚本（pnpm smoke）
-manager.sh            一键本地 start/stop/restart/status 入口
+manager.sh            本地 bootstrap/doctor/start/stop/restart/status/logs 入口
 process-compose.yaml  原生本地开发进程与就绪、退出、日志配置
 .process-compose-version        固定 Process Compose 工具版本
 AGENTS.md              开发与交付约定
@@ -204,7 +208,7 @@ Skills 的完整文件保存在本仓库中：复用上游的 Git、Playwright �
 - [Git 工作流](./docs/engineering/git-workflow.md)：任务编号、分支命名、提交格式、验证及合并约定。
 - [OpenSpec 指南](./docs/engineering/openspec.md)：项目 CLI、上下文、技能与变更工件。
 - [Skills 说明](./docs/engineering/skills.md)：上游技能来源、固定版本、触发条件和升级方式。
-- [生命周期指南](./docs/engineering/lifecycle.md)：Process Compose 开发编排、现有起停入口与后续 manager、基础设施契约。
+- [生命周期指南](./docs/engineering/lifecycle.md)：manager 命令、Process Compose 开发编排与基础设施接入边界。
 - [文档索引](./docs/README.md)：产品参考、技术决策及 Monorepo、开发、验证和生命周期规范的职责与阅读时机。
 - [技术栈调研与初始化建议](./docs/architecture/stack-decisions.md)：选型依据及适用边界。
 - [设计入口](./DESIGN.md)：平台采用 Lovable 风格的暖色极简 AI 创作工作台；详细规范位于项目级 [atoms-frontend-design skill](./.opencode/skills/atoms-frontend-design/SKILL.md)。规范已确定，产品工作台尚未实现。

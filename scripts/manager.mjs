@@ -329,6 +329,7 @@ async function logs(opts) {
     const lines = createInterface({ input: createReadStream(filename), crlfDelay: Infinity });
     const tail = new Map(selected.map((name) => [name, []]));
     for await (const text of lines) {
+      interrupted.signal.throwIfAborted();
       let record;
       try { record = JSON.parse(text); } catch { continue; }
       if (!object(record) || typeof record.message !== 'string' || !tail.has(record.process)) continue;
@@ -342,28 +343,40 @@ async function logs(opts) {
   const version = (await readFile(path.join(root, '.process-compose-version'), 'utf8')).trim();
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid .process-compose-version.');
   const binary = path.join(root, '.tools/process-compose', version, 'process-compose');
-  const args = ['--log-file', path.join(runtime, 'logs-client.log'), '--unix-socket', socketPath, '--token-file', tokenPath(state), 'process', 'logs', selected.join(','), '--tail', String(opts.tail)];
-  if (opts.follow) args.push('--follow');
-  const child = spawn(binary, args, { cwd: root, env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('PC_'))), stdio: ['ignore', 'pipe', 'pipe'] });
-  let forced;
+  interrupted.signal.throwIfAborted();
+  const clients = new Map();
+  let failure = 0;
   const cancel = () => {
-    child.kill(signalCode === 130 ? 'SIGINT' : 'SIGTERM');
-    forced ??= setTimeout(() => child.kill('SIGKILL'), 2000);
+    for (const [child, record] of clients) {
+      child.kill(signalCode === 130 ? 'SIGINT' : 'SIGTERM');
+      record.forced ??= setTimeout(() => child.kill('SIGKILL'), 2000);
+    }
   };
   interrupted.signal.addEventListener('abort', cancel, { once: true });
-  let timedOut = false;
-  const timer = opts.follow ? null : setTimeout(() => { timedOut = true; cancel(); }, 10000);
-  const pump = async (input, output) => {
-    const reader = createInterface({ input, crlfDelay: Infinity });
-    for await (const text of reader) output.write(`${redact(text)}\n`);
+  const readService = async (name) => {
+    const args = ['--log-file', path.join(runtime, `${name}-logs-client.log`), '--unix-socket', socketPath, '--token-file', tokenPath(state), 'process', 'logs', name, '--tail', String(opts.tail)];
+    if (opts.follow) args.push('--follow');
+    const child = spawn(binary, args, { cwd: root, env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('PC_'))), stdio: ['ignore', 'pipe', 'pipe'] });
+    const record = {};
+    clients.set(child, record);
+    const timer = opts.follow ? null : setTimeout(() => { failure = 1; cancel(); console.error(`Application log request timed out: ${name}.`); }, 10000);
+    const pump = async (input, output) => {
+      const reader = createInterface({ input, crlfDelay: Infinity });
+      for await (const text of reader) output.write(`${selected.length > 1 ? `[${name}] ` : ''}${redact(text)}\n`);
+    };
+    try {
+      const [exit] = await Promise.all([once(child, 'close'), pump(child.stdout, process.stdout), pump(child.stderr, process.stderr)]);
+      if (!signalCode && (exit[0] !== 0 || exit[1])) { failure = 1; cancel(); }
+    } catch (err) { failure = 1; cancel(); throw err; }
+    finally { clearTimeout(timer); clearTimeout(record.forced); clients.delete(child); }
   };
   try {
-    const [exit] = await Promise.all([once(child, 'close'), pump(child.stdout, process.stdout), pump(child.stderr, process.stderr)]);
-    process.exitCode = signalCode || (timedOut ? 1 : exit[0] || (exit[1] ? 1 : 0));
-    if (timedOut) console.error('Application log request timed out.');
-  } finally {
-    clearTimeout(timer); clearTimeout(forced); interrupted.signal.removeEventListener('abort', cancel);
-  }
+    // Separate native subscriptions avoid truncation observed in multi-service snapshots.
+    const results = await Promise.allSettled(selected.map(readService));
+    const rejected = results.find((item) => item.status === 'rejected');
+    if (rejected) throw rejected.reason;
+    process.exitCode = signalCode || failure;
+  } finally { interrupted.signal.removeEventListener('abort', cancel); }
 }
 
 function options(args) {
@@ -418,6 +431,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(signalCode ? 'Manager interrupted; owned startup was rolled back where possible.' : `Manager: ${err.message}`);
+  console.error(signalCode ? 'Manager command interrupted.' : `Manager: ${err.message}`);
   process.exitCode = signalCode || 1;
 });

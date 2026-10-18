@@ -31,7 +31,7 @@
 - 不符合契约的响应提示、后端离线提示及按钮恢复可点击。
 - 生产后端与前端本地 preview 连通，以及浏览器未捕获运行错误。
 
-脚本需要 3001、5173、4173 端口空闲，产物写入忽略目录 `test-results/smoke/`。它不覆盖模型生成、持久化、流式取消、计划中的 manager 或线上部署。
+脚本需要 3001、5173、4173 端口空闲，产物写入忽略目录 `test-results/smoke/`。它不覆盖模型生成、持久化、流式取消、manager 或线上部署。
 
 交互式浏览器验收复用仓库内官方 Playwright Skill，通过 `pnpm playwright` 使用独立具名会话。调用、Chrome 前提与固定版本见 [Browser verification](./skills.md#browser-verification)；先读快照再引用元素，覆盖相关状态、窄屏与错误路径，记录实际观察，不能只凭截图命令成功就声称布局正确。交互产物写入忽略的 `output/playwright/`，不替代上述固定 smoke 回归。
 
@@ -39,9 +39,11 @@
 
 `OPS-001` 的原生配置验收使用真实进程，检查双服务与单服务启动、HTTP readiness、健康响应及前端 API 代理、所属进程故障恢复、就绪持续失败、外部端口冲突和停止后的进程清理。核对状态时同时检查是否运行、就绪、退出码与重试次数，不把 `process list` 命令成功当作项目健康；注意 [原生状态及就绪限制](./lifecycle.md#behavior-and-limits)，退出码可能属于前一轮进程。原生记录见 [OPS-001](../../openspec/changes/ops-001-process-compose/tasks.md)。
 
-`pnpm test:manager` 执行 [manager.test.mjs](../../scripts/manager.test.mjs)，在含空格和深路径的隔离副本中使用真实前后端及固定工具，验证重复/并发调用、重启、原生故障恢复后的状态、外部端口保护、就绪超时、中断回滚、调用者硬杀后的锁恢复、supervisor 退出、陈旧 PID、跨副本隔离、未知 socket 和强制停止。它需要 3001/5173 空闲、项目 Node/pnpm、固定 Process Compose 和本机 pnpm 依赖缓存；隔离副本以 offline frozen install 安装，不复制环境文件。产物在忽略的 `test-results/manager/`，需等待 stale 锁和停止截止时间；不会自动安装缺失工具。`pnpm check` 仍只含 lint、类型与后端单元测试，生命周期变更额外执行本命令。`VER-001` 后续整合更完整验收。
+`pnpm test:manager` 执行 [manager.test.mjs](../../scripts/manager.test.mjs)，在含空格和深路径的隔离副本中使用真实前后端及固定工具，验证重复/并发调用、重启、原生故障恢复后的状态、外部端口保护、就绪超时、中断回滚、调用者硬杀后的锁恢复、supervisor 退出、陈旧 PID、跨副本隔离、未知 socket 和强制停止。它需要 3001/5173 空闲、项目 Node/pnpm、固定 Process Compose 和本机 pnpm 依赖缓存；隔离副本以 offline frozen install 安装，不复制环境文件。产物在忽略的 `test-results/manager/`，需等待 stale 锁和停止截止时间；不会在工作副本自动安装缺失工具，首次安装场景仅操作隔离副本。`pnpm check` 仍只含 lint、类型与后端单元测试，生命周期变更额外执行本命令。`VER-001` 后续整合更完整验收。
 
-以下是实现对应能力时的验收要求，不能作为 manager 或基础设施已经完成的证据：
+该回归还包含 OPS-003：无 node_modules/工具的副本使用真实官方网络下载安装，验证重复 bootstrap、环境文件及 lockfile 保护；受控下载替身验证校验失败和中断清理。doctor 覆盖缺失/错误版本、配置、端口和健康实例，不输出环境值；logs 覆盖服务/行数限制、在线读取、跟随取消及停止后读取。首次安装场景需要 GitHub 网络；其他副本安装复用 pnpm 缓存。测试不访问开发者的真实环境文件，fixture 内只创建测试值。
+
+以下仍是后续扩展对应能力时的验收要求，具体已验证范围以上述记录为准；不能将其当作尚未实现的基础设施或流式能力的证据：
 
 - 重复启动不会增加实例，停止后可以再次停止，重启后恢复到一组健康实例。
 - 部分进程退出可恢复或明确报错；端口冲突、依赖缺失和就绪超时返回失败，且不影响其他程序。

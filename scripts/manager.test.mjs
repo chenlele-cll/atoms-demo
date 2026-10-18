@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID, createHash } from 'node:crypto';
-import { chmod, cp, lstat, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, cp, lstat, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
@@ -131,6 +131,21 @@ test('manager lifecycle with real Process Compose and applications', { timeout: 
     const diagnostic = await success(fresh, 'doctor', '--json');
     assert.equal(diagnostic.ok, true);
     assert.ok(!JSON.stringify(diagnostic).includes(secret));
+    const executable = await readFile(binary);
+    const incorrectTool = '#!/bin/sh\nprintf "Version: v0.0.0\\n"\n';
+    await writeFile(binary, incorrectTool);
+    await chmod(binary, 0o755);
+    assert.equal((await command(fresh, 'doctor', '--json')).code, 1);
+    const refused = await command(fresh, 'bootstrap', '--json');
+    assert.notEqual(refused.code, 0);
+    assert.equal(await readFile(binary, 'utf8'), incorrectTool);
+    await writeFile(binary, executable);
+    await chmod(binary, 0o755);
+    const shims = path.join(fresh, 'version-shim');
+    await mkdir(shims);
+    await writeFile(path.join(shims, 'pnpm'), '#!/bin/sh\nprintf "0.0.0\\n"\n');
+    await chmod(path.join(shims, 'pnpm'), 0o755);
+    assert.notEqual((await launch(fresh, ['bootstrap', '--json'], { ...process.env, PATH: `${shims}${path.delimiter}${process.env.PATH}` }).result).code, 0);
     for (const port of [3001, 5173]) await portFree(port);
     report.bootstrap_fresh_idempotent_environment = true;
   });
@@ -148,6 +163,7 @@ test('manager lifecycle with real Process Compose and applications', { timeout: 
     assert.match(bad.stderr, /Official installer failed/);
     assert.ok((await readFile(path.join(broken, '.runtime/setup/installer.log'), 'utf8')).includes('did not verify'));
     await assert.rejects(lstat(path.join(broken, '.tools/process-compose/1.122.0')));
+    assert.ok(!(await readdir(path.join(broken, '.runtime/setup'))).some((name) => name.startsWith('install-')));
     const marker = path.join(broken, 'download-pid');
     const stalled = launch(broken, ['bootstrap', '--json'], { ...env, ATOMS_FIXTURE_STALL: marker });
     await until(async () => Boolean(await lstat(marker).catch(() => null)));
@@ -156,6 +172,7 @@ test('manager lifecycle with real Process Compose and applications', { timeout: 
     assert.equal((await stalled.result).code, 143);
     await until(async () => !isAlive(pid));
     await assert.rejects(lstat(path.join(broken, '.tools/process-compose/1.122.0')));
+    assert.ok(!(await readdir(path.join(broken, '.runtime/setup'))).some((name) => name.startsWith('install-')));
     report.bootstrap_checksum_and_cancel = true;
   });
 
@@ -296,6 +313,9 @@ test('manager lifecycle with real Process Compose and applications', { timeout: 
     try {
       assert.notEqual((await command(cwd, 'start', '--json')).code, 0);
       assert.notEqual((await command(cwd, 'stop', '--json')).code, 0);
+      const diagnosis = await command(cwd, 'doctor', '--json');
+      assert.equal(diagnosis.code, 1);
+      assert.ok(JSON.parse(diagnosis.stdout).checks.some((item) => item.name === 'instance' && item.status === 'error'));
       assert.equal(requests, 0);
     } finally { await new Promise((resolve) => server.close(resolve)); }
     report.checkout_and_socket_isolation = true;
@@ -329,8 +349,14 @@ test('manager lifecycle with real Process Compose and applications', { timeout: 
     assert.equal(logs.code, 0, logs.stderr);
     assert.ok(logs.stdout.length > 0 && !logs.stdout.includes(before.token));
     assert.ok(!logs.stdout.includes('@atoms/frontend'));
+    const combined = await command(cwd, 'logs', 'all', '--tail', '10');
+    assert.equal(combined.code, 0, combined.stderr);
+    assert.ok(combined.stdout.includes('[backend]') && combined.stdout.includes('[frontend]'));
+    const frontend = await command(cwd, 'logs', 'frontend', '--tail', '10');
+    assert.equal(frontend.code, 0, frontend.stderr);
+    assert.ok(frontend.stdout.includes('5173'));
     for (const args of [['logs', '../state.json'], ['logs', 'backend', '--tail', '0']]) assert.notEqual((await command(cwd, ...args)).code, 0);
-    const follower = launch(cwd, ['logs', 'backend', '--tail', '1', '--follow']);
+    const follower = launch(cwd, ['logs', 'all', '--tail', '1', '--follow']);
     await delay(700);
     follower.child.kill('SIGINT');
     assert.equal((await follower.result).code, 130);
@@ -341,11 +367,19 @@ test('manager lifecycle with real Process Compose and applications', { timeout: 
     assert.equal(saved.code, 0, saved.stderr);
     assert.equal(saved.stdout.trim().split('\n').length, 1);
     assert.ok(saved.stdout.startsWith('[backend] '));
+    const savedCombined = await command(cwd, 'logs', 'all', '--tail', '1');
+    assert.equal(savedCombined.code, 0, savedCombined.stderr);
+    assert.ok(savedCombined.stdout.includes('[backend]') && savedCombined.stdout.includes('[frontend]'));
     assert.notEqual((await command(cwd, 'logs', '--follow')).code, 0);
     const temporary = path.join(cwd, 'backend/.env');
     await writeFile(temporary, 'PRIVATE_FIXTURE=not-printed\n');
     assert.ok(!(await command(cwd, 'doctor', '--json')).stdout.includes('not-printed'));
     await rm(temporary);
+    await mkdir(temporary);
+    const invalidEnvironment = await command(cwd, 'doctor', '--json');
+    assert.equal(invalidEnvironment.code, 1);
+    assert.ok(JSON.parse(invalidEnvironment.stdout).checks.some((item) => item.name === 'environment:backend' && item.status === 'error'));
+    await rm(temporary, { recursive: true });
     report.doctor_and_logs = true;
   });
 
