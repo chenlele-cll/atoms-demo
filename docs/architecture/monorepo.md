@@ -23,7 +23,7 @@
 - 路由负责 HTTP 边界。生成和存储职责随首次实现形成实际模块，不持续堆入路由，也不预建空的 service、repository 或通用依赖注入层。
 - backend/src/model 维护单供应商客户端、延迟配置、独立探针和安全错误，AI SDK/OpenAI/Zod 仅在 backend 声明。探针文件和工具不依赖模板或项目模块，不新增浏览器可用的计费接口；真实调用与替身测试分别记录。
 - backend/src/contracts、storage、projects、templates 分别维护公开 Zod 契约、SQLite 存储/迁移、配置/安全错误及后端目录。项目 routes 通过注入调用这些具体模块，不把 SQL 放入 HTTP handler；浏览器目前尚未消费这些契约，不新增共享 workspace 包。
-- backend/src/generation 维护内部生成契约、冻结文件工具、显式有界编排和隔离验收，复用 model 单步传输与 storage 事务；不增加依赖、公开路由、框架 Agent 或默认启动副作用。生成工具只持有快照/策略，模型调用在事务之外，候选不会原地覆盖当前版本。
+- backend/src/generation 维护内部生成契约、冻结文件工具、显式有界编排和隔离验收，复用 model 单步传输与 storage 事务；GEN-005 在具体 manager/stream 和 generation 路由中接入公开执行及生命周期，不增加框架 Agent。生成工具只持有快照/策略，模型调用在事务之外，候选不会原地覆盖当前版本。
 
 ## Workspace and toolchain
 
@@ -36,6 +36,8 @@
 - 前端 dev/build 先运行 scripts/prepare-company-template.mjs，从模板源生成忽略的 frontend/public/template-assets/company-landing.bundle.json；Vite 将它复制到 dist。模板源码不导入宿主 React 树，预览运行依赖与宿主安装依赖分开，样式提前编译。来源及改动见 [模板适配说明](../../templates/company-landing/ADAPTATIONS.md)。
 - 同一准备脚本支持 frontend/backend-src/backend-dist 三个独立目标。后端准备目录含 bundle JSON 与同源中立校验模块/类型，不维护第二套文件规则；src 资源被忽略，构建会准备 src 并将对应副本放入 dist，编译产物独立于前端目录。typecheck/test 也先准备 src，使全新安装可独立运行检查。
 - 后端固定 better-sqlite3 13.0.3、@types/better-sqlite3 9.6.0、@fastify/cookie 11.1.3、@fastify/rate-limit 11.2.1，复用现有 Zod 4.6.7。SQLite 13 自带 N-API 平台预构建且没有安装脚本，本次无需新增 pnpm 脚本许可；保留已有 esbuild 许可和 es5-ext 拒绝。目标平台 frozen install 后必须执行真实绑定读写，不能以声明或复制别处 node_modules 代替。
+
+后端显式使用运行依赖 proper-lockfile 4.1.2，类型 @types/proper-lockfile 4.1.4 仅开发使用；根已有同版本工具依赖继续独立声明。后端独立部署安装自身运行依赖，不依赖根 node_modules 偶然可见。所有权模块只处理规范数据文件与 release，Fastify 的 preClose/onClose 协调生成→存储→锁；SSE schema 在后端维护，浏览器尚无产品消费者，未新增共享包。参数与本地文件系统前提见 [Lifecycle](../engineering/lifecycle.md#generation-service-lifecycle)。
 
 ## Adding shared code
 

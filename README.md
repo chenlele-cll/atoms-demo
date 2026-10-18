@@ -4,7 +4,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 项目目标是让用户通过自然语言生成和修改网页应用，交互预览结果，并保存项目与代码版本。
 
-当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成已实现；公开生成接口、候选预览/采用和完整工作台尚未实现，Top 1 尚未完成。
+当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成已实现；公开生成事件流/查询/取消已实现；候选预览/采用和完整工作台尚未实现，Top 1 尚未完成。
 
 ## 环境
 
@@ -114,7 +114,7 @@ pnpm smoke:template
 
 新项目原子保存服务端可信模板 v0，消息为空、没有生成记录；模板冲突返回 409，客户端不能注入文件或所有者。匿名 cookie 为 HttpOnly、SameSite=Strict、Path=/api，有效期 30 天，复用不延长；HTTPS 配置启用 Secure。数据库只保存 token 摘要。清理 cookie 或到期后会失去旧项目入口，没有找回或认领接口；数据不会自动删除。有效会话访问他人的项目与不存在项目均为 404，无会话为 401。
 
-会话初始化默认每 IP 每分钟 30 次，创建项目 10 次；每会话最多 20 个项目。超限分别返回带 Retry-After 的 429 或项目配额 409；请求体最多 8 KiB。错误统一 `{error:{code,message},requestId}`，私有响应 no-store。当前只提供内部消息/run/候选存储操作，不提供公开写入、版本采用或分享接口；候选保存保持当前版本不变。契约与限制见 [Development](./docs/engineering/development.md#project-persistence)，真实验证见 [Verification](./docs/engineering/verification.md#project-persistence)。
+会话初始化默认每 IP 每分钟 30 次，创建项目 10 次；每会话最多 20 个项目。超限分别返回带 Retry-After 的 429 或项目配额 409；上述 POST 请求体最多 8 KiB。错误统一 `{error:{code,message},requestId}`，私有响应 no-store。消息/run/候选由生成内核写入，没有任意代码写入、版本采用或分享接口；候选保存保持当前版本不变。契约与限制见 [Development](./docs/engineering/development.md#project-persistence)，真实验证见 [Verification](./docs/engineering/verification.md#project-persistence)。
 
 ## 模型能力探针
 
@@ -133,7 +133,7 @@ pnpm model:probe:built --case all --report
 
 ## 有界候选生成
 
-GEN-004 提供内部 generateProject 内核，目前没有公开生成路由或生成 UI。它从已保存当前版本读取代码，通过 list_files/read_files/submit_files 修改有限业务文件，最多六次模型请求、共享默认 60 秒期限、零重试。受理记录与用户输入先保存，合法提交将完整候选、事实摘要和成功状态原子保存，当前版本保持不变。失败保留输入；同一 requestId 重放不再次调用模型。
+GEN-004 提供 generateProject 内核，GEN-005 将其接入下节公开接口；生成 UI 由 GEN-007 接入。内核从已保存当前版本读取代码，通过 list_files/read_files/submit_files 修改有限业务文件，最多六次模型请求、共享默认 60 秒期限、零重试。受理记录与用户输入先保存，合法提交将完整候选、事实摘要和成功状态原子保存，当前版本保持不变。失败保留输入；同一 requestId 重放不再次调用模型。
 
 ```sh
 pnpm generation:smoke --help
@@ -146,9 +146,29 @@ pnpm generation:smoke:built --live --case quote
 
 报告在忽略的 test-results/generation-smoke/<id>/report.json，同目录保留关闭后的隔离测试数据库用于本地核对，不能上传这些数据库。报告区分 live/fixture/not-run，含实际请求/已知用量、工具元数据、修改路径与候选重开比较，不含代码、提示词或凭据。保存成功仍为 previewStatus=unverified；本轮不证明报价交互、浏览器编译或线上部署。边界见 [Development](./docs/engineering/development.md#bounded-generation)，实测见 [GEN-004 记录](./openspec/changes/gen-004-bounded-agent-generation/tasks.md)。
 
+## 生成事件与控制 API
+
+先初始化会话并创建项目，在 POST 之前生成并保存 requestId（UUID）；取得项目当前 baseVersionId 后调用：
+
+| 请求 | 行为 |
+| --- | --- |
+| POST /api/projects/:projectId/generations | `{requestId,baseVersionId,prompt}`，Accept: text/event-stream；新任务 200 SSE，相同载荷重复请求为 202 running JSON / 200 terminal JSON |
+| GET /api/projects/:projectId/generations/by-request/:requestId | 200 JSON 状态，不调用模型；无执行者的 running 为 503 RUN_STATE_UNCONFIRMED |
+| POST /api/projects/:projectId/generations/by-request/:requestId/cancel | 严格 `{}`；活动任务 202、cancellationRequested=true，终态 200 保持原结果 |
+
+POST 沿用精确 Origin、JSON 与 cookie；生成体最大 32 KiB，prompt 修剪后 1–4000 字符且不超过 UTF-8 16 KiB。额外字段/非法路径 400、缺会话 401、来源 403、无归属 404、Accept 406、体积 413、类型 415。过期基线/载荷冲突 409，缺模型配置 503，均在受理及开流前返回安全 JSON。
+
+用 fetch 读取响应流，第一帧 accepted（seq=1），activity 是真实工具/请求元数据，terminal.state 是持久化状态。所有帧含递增 seq、项目/request/run/base ID；不发送代码、需求正文或思维链。成功仅代表候选已保存、previewStatus=unverified。terminal.state.status=unknown 表示落盘未确认；HTTP 200 或 EOF 都不能单独判断成功。心跳为注释，不计进度，不提供事件重放。
+
+断线后凭原 requestId 查询，不自动重新 POST；只关闭最初 SSE 才取消未完成运行，不能通过重复请求接管连接。显式取消先返回“已请求”，待查询确认 cancelled；成功先提交则保持 succeeded。关闭浏览器不保证后台续跑。当前每项目/会话/全局活动数为 1/1/2，生成 POST 每 IP 每分钟 6 次，查询与取消分别 120 次；每会话滚动 24 小时最多 20 次新受理（失败/取消也计数，匹配重放不重复扣日配额）。不排队；容量 429/503 带 Retry-After。多反代客户端可能共享 IP 配额，部署前核对实际环境。
+
+同一数据文件只运行一个后端服务；先取得文件所有权再恢复/监听。硬杀后可能需等待 30 秒 stale 窗口，禁止手工删未知锁；详见 [Lifecycle](./docs/engineering/lifecycle.md#generation-service-lifecycle)。流协议及资源上限见 [Development](./docs/engineering/development.md#generation-execution)。
+
 ## 验证
 
 项目专项需先构建，再运行 `pnpm smoke:projects`，覆盖真实浏览器的 dev/preview 代理、cookie 隔离、完整快照恢复和构建后端重启；测试中的消息、run 与候选明确为内部夹具，不消耗模型额度。
+
+生成流专项同样先 `pnpm build`，再运行 `pnpm smoke:generation-stream`；需要 Chrome 和空闲 3001/5173/4173。它以 fixture SDK 上游验证浏览器经 dev/preview 的首帧、终态、取消、断线查询及所属后端重启，报告在忽略的 `test-results/generation-stream/<id>/report.json`。跨字节 UTF-8 解码使用明确的注释夹具，实际业务帧仅为允许的元数据；不调用真实模型，不证明候选预览或最终服务器反代通过。详细前提与覆盖见 [Verification](./docs/engineering/verification.md#generation-stream)。
 
 既有工程与生命周期验收运行；模板专项另按上节执行：
 

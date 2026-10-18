@@ -188,6 +188,27 @@ smoke 已含 build，项目恢复及端口用例串行运行。GEN-004 不改变
 
 本次真实 quote 已保存候选并确认旧当前版本不变，仍为 unverified；未执行候选编译、报价交互、第二需求或线上部署，不把工具参数合法或 SQLite 保存当作完整 Top 1。实际命令、退出结果、模型请求和证据见 [GEN-004 tasks](../../openspec/changes/gen-004-bounded-agent-generation/tasks.md)。
 
+## Generation stream
+
+GEN-005 在默认 pnpm check 中使用真实临时 SQLite、随机端口 Fastify、SDK HTTP 上游和进程测试，source=fixture，不读取 backend/.env 或访问外部模型。覆盖三个接口的严格输入/归属/Origin/Accept、重放冲突、独立 IP 限流、1/1/2 准入及日配额重开；accepted 在 gate 未释放时已经可读，单调关联活动和一次 terminal 依据实际存储。
+
+取消/原连接 fetch abort/原始 socket 销毁会中止上游；关闭重复连接不接管原任务；提交后丢末帧仍可查询成功。终态写入失败为 unknown，无执行者 running 返回安全 503。传输测试覆盖 8 KiB 帧、总量、队列、可缩小等待阈值、真实慢读网络、独立连接正常工作与定时器清理。GEN-004 原测试继续检查事务内提交竞争和旧 CLI。
+
+子进程使用构建应用与测试专用 scripts/generation-stream-server.mjs，只注入本地模型传输和假配置，没有生产假模型开关。验证同库不同端口竞争、realpath 别名、独立数据库、恢复失败释放、实际 SIGTERM 与活动 SSE、实际 SIGKILL 后等待库的 30 秒 stale、所有权丢失及存储关闭异常。重启保留消息、当前版本和既有候选，不自动重发请求；晚到的非协作输出不能访问关闭的存储。
+
+```sh
+pnpm install --frozen-lockfile
+pnpm check
+pnpm test:manager
+pnpm smoke
+pnpm smoke:generation-stream
+pnpm smoke:projects
+```
+
+串行执行；smoke 已含 build，两个专项消费该产物。浏览器专项需要现有 playwright-core、本机 Chrome、npx 和空闲 3001/5173/4173；从现有首页用相对 /api，dev 和 preview 各验证 gate 前首帧、真实候选终态、取消、浏览器 abort 经代理传播、按 requestId 查询和所属后端重启，核对 currentVersionId/digest 不变。捕获真实帧逐字节重解码，并以明确的 UTF-8 注释夹具覆盖中文/emoji 跨块；不向生产事件添加虚假活动。只清理所属进程/数据；异常与 SIGINT/SIGTERM 同样执行有界清理，外部端口占用者保持运行。
+
+报告在忽略的 test-results/generation-stream/<id>/report.json，只记录 fixture 场景、计数和状态，不保存 cookie、正文或数据库。测试启动器只供本地自动化，不列为生产命令。默认 check/CI 不消耗真实额度；本轮不把 fixture 传输通过当作真实模型、候选预览、完整 Top 1 或最终线上反代通过。实施结果见 [GEN-005 tasks](../../openspec/changes/gen-005-generation-stream-control/tasks.md)。
+
 ## Lifecycle scenarios
 
 `OPS-001` 的原生配置验收使用真实进程，检查双服务与单服务启动、HTTP readiness、健康响应及前端 API 代理、所属进程故障恢复、就绪持续失败、外部端口冲突和停止后的进程清理。核对状态时同时检查是否运行、就绪、退出码与重试次数，不把 `process list` 命令成功当作项目健康；注意 [原生状态及就绪限制](./lifecycle.md#behavior-and-limits)，退出码可能属于前一轮进程。原生记录见 [OPS-001](../../openspec/changes/ops-001-process-compose/tasks.md)。

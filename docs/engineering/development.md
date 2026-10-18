@@ -27,7 +27,7 @@
 
 ## Generation when implemented
 
-当前已有内部有界生成内核与独立验收入口，公开生成/事件接口尚待 GEN-005。`client.run` 建立操作截止时间，内部 `session.step` 每次只执行一个模型步骤；工具分派和下一步必须留在同一作用域内，并在分派前检查取消。GEN-002 探针仍独立于项目；实际生成契约见下节。所有生成继续遵守以下边界：
+当前已有有界生成内核、独立验收入口及 GEN-005 公开生成/事件接口。`client.run` 建立操作截止时间，内部 `session.step` 每次只执行一个模型步骤；工具分派和下一步必须留在同一作用域内，并在分派前检查取消。GEN-002 探针仍独立于项目；实际生成契约见下节。所有生成继续遵守以下边界：
 
 - 对文件路径、依赖范围、输出体积、步骤数和总时长设置限制；模型结果通过 schema 校验后仍需验证实际编译与交互。
 - 生成代码在隔离的预览或执行环境中运行，不能在宿主后端进程中执行，也不能获得后端凭据。
@@ -37,7 +37,7 @@
 
 ## Bounded generation
 
-GEN-004 的 backend/src/generation/contracts.ts 是内部请求、结果和工具的 Zod 来源。generateProject 只接受会话/项目/基线/请求 UUID 与修剪后的需求（1–4000 字符、UTF-8 最多 16 KiB），不接收代码、模型配置或工具列表。先检查持久会话到期及项目归属，再查询相同 requestId；仅新请求检查当前基线、支持布局和模型配置。匹配重放返回原 run/候选，不能再次调用或追加输入；需求或基线不同为 REQUEST_CONFLICT，失败重试需要新 requestId。项目级并发准入与公开取消由 GEN-005 接入。
+GEN-004 的 backend/src/generation/contracts.ts 是内部请求、结果和工具的 Zod 来源。generateProject 只接受会话/项目/基线/请求 UUID 与修剪后的需求（1–4000 字符、UTF-8 最多 16 KiB），不接收代码、模型配置或工具列表。先检查持久会话到期及项目归属，再查询相同 requestId；仅新请求检查当前基线、支持布局和模型配置。匹配重放返回原 run/候选，不能再次调用或追加输入；需求或基线不同为 REQUEST_CONFLICT，失败重试需要新 requestId。项目级并发准入与公开取消由下节 GEN-005 管理器负责。
 
 上下文只含固定规则、当前快照身份/依赖元数据、同项目最近完整历史及当前需求一次。历史选最近 10 条，按从近到远保留总正文不超过 16 KiB 的整条消息，再恢复序号顺序，记录省略数；代码通过工具按需读取，不从 catalog 替换项目数据。每步将工具 schema 与完整消息序列 UTF-8 JSON 计量，累计最多 256 KiB，超限失败而不截断文件。
 
@@ -47,7 +47,21 @@ company-landing 策略只允许已有 App.tsx 与 components/data/lib/generated 
 
 整个操作共享 MODEL_TIMEOUT_MS（默认 60000ms）和外部 AbortSignal，最多 6 次实际模型请求，每次沿用输出预算且 maxRetries=0。请求、工具、验证和事务前均检查；成功事务退出前再次检查，取消/超时使写入整体回滚。模型与网络等待不在数据库事务内，外部连接可写。受理原子保存 running/user；完成原子保存候选、事实摘要及 succeeded，保持 currentVersionId 不变；摘要只声明“候选已保存，预览未验证”。运行中基线改变拒绝保存。受理后失败保留输入，取消写 cancelled，超时写 failed/GENERATION_TIMEOUT；终态也写不入时返回 STORAGE_UNAVAILABLE、terminalStatePersisted=false，不冒充已持久化终止。成功已提交后到达的取消不改写结果。
 
-活动只包含 runId、单调序号、时间、步骤、批准工具名、字节/路径、安全分类和保存标识。完成活动在相应动作后发出，saved 在事务提交后；观察者异常只计入 observerErrors，不影响事实结果。请求次数来自实际传输，用量按已观测单次值累计，任一步未知则合计 null；保留分项，重放未知指标全为 null。原始供应商异常、提示词、代码、工具正文与思维链均不进入结果或日志。进程硬杀可能留下 running，启动恢复由 GEN-005 负责，不自动重试模型。
+活动只包含 runId、单调序号、时间、步骤、批准工具名、字节/路径、安全分类和保存标识。完成活动在相应动作后发出，saved 在事务提交后；观察者异常只计入 observerErrors，不影响事实结果。请求次数来自实际传输，用量按已观测单次值累计，任一步未知则合计 null；保留分项，重放未知指标全为 null。原始供应商异常、提示词、代码、工具正文与思维链均不进入结果或日志。进程硬杀可能留下 running，启动恢复按 Lifecycle 的独占所有权规则执行，不自动重试模型。
+
+## Generation execution
+
+公开生成体/路径/状态/事件以 backend/src/contracts/generations.ts 的 Zod schema 为权威，生成体 pick GEN-004 输入规则。状态与每帧只含关联 ID、起止时间、持久状态、安全错误、取消请求标记、候选 ID、实际 changedFiles 和 unverified；usage=null，不推测历史计数。不返回需求/对话/代码/工具正文。输入 strict，状态显式构造并校验；Fastify stream 是预序列化对象，因此 SSE 在编码前独立运行时校验，不依赖 JSON serializer。
+
+prepareGeneration 负责归属、重放、基线/布局/配置预检；acceptPreparedGeneration 在短事务内保存 running/user，generateProject 可执行已受理运行，原 CLI 仍组合相同步骤。GenerationManager 是每个应用的具体活动 Map，持有唯一 Controller、最初连接、执行 Promise、最终化和写入许可。同步准入/受理之间没有 await；失败不占槽，重复在容量/日配额前返回原状态。一次性最终化后释放槽位；取消收尾仍占用。无执行者的 running 返回 503 RUN_STATE_UNCONFIRMED 并阻止该项目新生成；存储不可用不能由内存状态冒充成功。
+
+默认项目/会话/全局活动上限 1/1/2，分别返回 409 PROJECT_BUSY / 429 SESSION_BUSY / 503 GENERATION_CAPACITY，不排队；后两者 Retry-After=5。生成 POST 每 IP 6 次/分钟，状态和取消各 120 次；trustProxy 关闭，不信任任意转发头。日配额在受理事务内按项目所有者与 runs.startedAt 查询滚动 24 小时最多 20 个新受理，失败/取消计数、重放不重复计数；429 GENERATION_QUOTA 的 Retry-After 按最早记录离开窗口计算。索引通过 schema v2 迁移添加，重开不重置配额。
+
+新 POST 为 200 SSE；匹配重复为 202 running / 200 terminal JSON。开流前均为安全 JSON，开流后不再混入 JSON 错误。第一业务帧 accepted、seq=1，随后 activity 映射实际请求、工具、校验与提交后 saved；忽略内核 ended 回调，由管理器核对存储后只发送一个 terminal。每帧关联项目/request/run/base，序号严格递增；terminal.state.status=unknown、terminalStatePersisted=false 表示终态未确认，不声明成功候选。EOF/200 不代表完成。无 id/retry/事件日志，断线后仅按 requestId 查询。
+
+流采用 Node Readable、固定 16 KiB highWaterMark；单帧 8 KiB、业务总量 128 帧/256 KiB、显式队列 32 帧/64 KiB。push 返回 false 时暂停泵送，心跳不继续堆积；背压或终态发送最多等 5 秒，溢出/写失败显式 abort 并销毁流。编码使用 UTF-8 JSON 单行 data，响应 no-store,no-transform、X-Accel-Buffering=no，无 Content-Length；心跳每 10 秒为注释，不占序号或进度。清除队列、等待/心跳定时器和响应监听，内存上界同时计入独立的 Readable 缓冲。
+
+只绑定原 ServerResponse 的提前 close/error；POST 请求体正常读完不能视为断线。用户取消为 USER_CANCELLED，连接断开为 CLIENT_DISCONNECTED，关闭为 SERVER_SHUTDOWN，慢消费/写失败为 SLOW_CONSUMER / STREAM_WRITE_FAILED。未完成运行通过同一信号中止上游并写 cancelled；取消接口先回 202 cancellationRequested=true，终态已提交则回 200 原状态。成功事务内再次检查取消和写入许可，提交后的事实不被取消/断流覆盖。关闭/所有权丢失撤销写入许可，迟到回调不能访问已关闭存储。应用持有存储与锁的清理职责，具体顺序见 [Lifecycle](./lifecycle.md#generation-service-lifecycle)。
 
 ## Persistence when implemented
 

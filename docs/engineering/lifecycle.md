@@ -18,13 +18,25 @@
 
 后端读取自身目录下的 `.env`，进程已有变量优先，配置经过解析后监听。前端开发及 preview 的代理目标来自其配置；生产反向代理由部署环境提供。
 
-GEN-003 正式后端先验证 DATABASE_PATH / APP_ORIGINS，加载相对 server 模块的 template-assets，再打开 SQLite 并迁移，最后监听。数据库默认相对 backend cwd 为 ../data/atoms.sqlite，不在 dist 中；启用外键、WAL、5000ms busy_timeout，迁移事务取得写锁后重读 user_version。高于支持版本、迁移/文件/资产/监听失败均安全报错且释放连接，不删库或切换内存；正常 SIGINT/SIGTERM 关闭 Fastify 与所属连接并保留数据。
+GEN-003 正式后端先验证 DATABASE_PATH / APP_ORIGINS，加载相对 server 模块的 template-assets，取得同库单服务所有权后打开 SQLite、迁移并恢复遗留运行，最后监听。数据库默认相对 backend cwd 为 ../data/atoms.sqlite，不在 dist 中；启用外键、WAL、5000ms busy_timeout，迁移事务取得写锁后重读 user_version。高于支持版本、迁移/文件/资产/监听失败均安全报错且释放连接，不删库或切换内存；正常 SIGINT/SIGTERM 关闭 Fastify 与所属连接并保留数据。
 
-buildApp 无参数仍不打开磁盘数据库；项目测试显式传入 store/catalog，应用 onClose 负责关闭。后端 dev/typecheck/test 准备 src/template-assets，build 同时准备自身 dist 资源；运行 start 需要完整 backend/dist、平台依赖及可写持久目录。项目读写不调用模型。
+buildApp 无参数仍不打开磁盘数据库；项目测试显式传入 store/catalog，应用 preClose 终止所属生成，onClose 负责按 store→所有权顺序释放。后端 dev/typecheck/test 准备 src/template-assets，build 同时准备自身 dist 资源；运行 start 需要完整 backend/dist、平台依赖及可写持久目录。项目读写不调用模型。
 
 模型探针通过 workspace 使用 backend 工作目录及同样的原生环境加载规则，帮助不读取 `.env`。模型配置仅在显式探针或未来生成请求边界解析，manager、健康检查、默认自动化入口不触发模型。一次样例的全部请求共用截止时间；SIGINT/SIGTERM 中止底层请求、停止后续样例、输出脱敏最终报告并退出 130/143。构建入口为 `backend/dist/model/probe.js`；配置、请求上限与报告含义见 [README](../../README.md#模型能力探针) 和 [Model access](./verification.md#model-access)。
 
 当前已有 manager 的七个开发命令、infra 空配置入口和 Process Compose 配置。本地编排不接管生产服务器。
+
+## Generation service lifecycle
+
+后端生产入口使用 proper-lockfile@4.1.2 的本地文件所有权。验证路径、建立父目录，仅用 wx 创建不存在的数据库文件，不截断已有文件；realpath 统一符号链接后取得 `<canonical-database>.generation.lock`。参数固定 stale=30000ms、update=5000ms、retries=0，取得所有权后才打开/迁移/恢复数据库并监听。相同数据库的第二服务即使端口不同也失败；不同数据库独立。仅使用本次返回的 release，不强删未知锁。
+
+SIGKILL 后锁可能在最后一次更新时间起 30 秒内仍有效；立即重启可能安全失败，等待 stale 窗口后重试即可，不手工删锁。Process Compose 的后端失败重启 backoff 为 32 秒以跨过此窗口，前端仍为 2 秒；硬杀后的恢复验收允许 50 秒，手动起停可用 --timeout 60。该约束面向同机本地文件系统及遵守同一协议的单服务，不协调网络盘、多副本或外部数据库写入程序。onCompromised 立即停止准入、撤销当前执行写入许可并触发有界关闭，日志只记录安全分类。
+
+独占成功后，恢复事务将所有遗留 running 条件更新为 interrupted / PROCESS_RESTARTED，结束时间不早于开始；不重发模型、追加消息、修改快照/已完成候选或 currentVersionId。恢复写入失败不监听，并关闭连接/释放本次锁。修正问题后重新启动，原记录仍保留。
+
+Fastify preClose 先拒绝新生成并对所有活动 Controller 发 SERVER_SHUTDOWN，总收尾预算 5 秒，SQLite 等锁使用预算内的短等待。正常中止可确认 cancelled；超期撤销写入许可、销毁所属流，仅在剩余预算允许时条件收口 interrupted，否则保留未知待下次恢复。每个执行 Promise 都有拒绝处理，迟到输出不能写库、追加步骤或覆盖终态。onClose 统一先关闭 store，再在 finally 释放所有权；启动/监听失败及信号路径复用幂等清理，不依赖插件注册顺序。
+
+运行只归最初 POST 的 SSE 连接所有；后端观察到提前关闭才取消，浏览器离开不保证后台继续。断线/末帧丢失后按请求前保存的 requestId 查询；成功已提交则继续返回 succeeded，EOF 本身不能代表成功。现有 Vite dev/preview 需通过实际浏览器回归验证断线传播；最终服务器反代的缓冲、断线与超时留到 GEN-009 验证。
 
 ## Manager commands
 
@@ -156,7 +168,7 @@ mkdir -p .runtime/process-compose
 - 配置调用原有独立命令，前后端没有 `depends_on`。前端 readiness 检查页面本身，后端离线时仍可就绪；全项目检查需同时确认两个服务的 `Running`、`Ready` 和实际 API 代理响应。`project is-ready` 的单次检查在未就绪时返回非零；本步不使用可能持续等待的 `--wait`。
 - 托管 profile 固定后端 `HOST=127.0.0.1`、`PORT=3001`，前端代理为 `http://127.0.0.1:3001`，前端自身监听 5173。应用继续加载各自 `.env`，但这三个托管值优先；原生入口用 `--disable-dotenv`，进程也配置 `is_dotenv_disabled`，不把根 `.env` 注入两个应用。不新增环境变量或改写现有环境文件；自定义地址仍使用独立启动方式。
 - [端口预检](../../scripts/check-dev-port.cjs) 只检查本服务的固定端口，遇到占用返回失败；不按端口杀进程。检查和实际监听之间仍有竞争窗口，HTTP 探针也不验证响应正文或进程身份，不能据此承诺并发启动安全。
-- 使用官方 HTTP readiness：初始延迟 1 秒、间隔 2 秒、单次超时 1 秒、连续失败阈值 5。失败退出退避 2 秒，最多自动重试 2 次。实测持续失败的探针触发了两次重试，但最后一轮仍可能保持 `Running / Not Ready`，不能承诺原生配置会自动终止所有未就绪进程；原生操作需检查并显式停止，manager 已增加整体就绪截止时间及失败回滚。
+- 使用官方 HTTP readiness：初始延迟 1 秒、间隔 2 秒、单次超时 1 秒、连续失败阈值 5。失败退出退避后端 32 秒、前端 2 秒，最多自动重试 2 次。实测持续失败的探针触发了两次重试，但最后一轮仍可能保持 `Running / Not Ready`，不能承诺原生配置会自动终止所有未就绪进程；原生操作需检查并显式停止，manager 已增加整体就绪截止时间及失败回滚。
 - 本次实测工具在重试耗尽时可能给出 `status: Completed`、`exit_code: 1`、`is_running: false`，探针还可能保留 `is_ready: Ready`；故障恢复后的 `Running / Ready` 也可能保留上一轮的 `exit_code: -1`。不能按单个标签或退出码判断健康：持续服务停止即不可用，运行中的服务结合当前探针、真实接口及进程归属判断，退出码用于解释已结束的进程。原生 `project is-ready` 只作辅助检查，manager 使用上述统一状态判断。
 - 停止使用 SIGTERM 发给所属进程组，最多等待 10 秒，再由原生工具强制终止。服务仍作为前台子进程运行，不配置 `is_daemon`，也不自行写 PID 文件。
 - 应用合并日志在 `.runtime/process-compose/processes.log`，每行刷新，配置 5 MB 轮转、两个备份和七天保留；supervisor 与 client 日志使用不同文件。运行文件、socket、下载及工具均被忽略。原生日志接口按服务过滤，继续遵守应用日志规范；本步未做日志容量压力测试。
