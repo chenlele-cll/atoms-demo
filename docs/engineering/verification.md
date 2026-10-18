@@ -43,7 +43,39 @@ pnpm verify
 
 Agent 路由、文档英文路径、技能来源与项目配置范围通过工件和文件检查核对；交互式 Playwright CLI 验收独立使用具名会话，并只关闭本次会话。这些检查不等于各宿主会自动选择同名技能；具体发现限制见 [Skills](./skills.md#browser-verification) 和 [OpenSpec](./openspec.md#skill-entry-points)。
 
-本次实际结果维护在 [VER-001 tasks](../../openspec/changes/ver-001-integrated-verification/tasks.md)，原始证据位于忽略的 `test-results/ver-001/`。目标平台、耗时、已执行项与未验证能力以该记录为准；生成、持久化、外部基础设施与最终服务器需在各自接入时另行验收。
+本次实际结果维护在 [VER-001 tasks](../../openspec/changes/ver-001-integrated-verification/tasks.md)，原始证据位于忽略的 `test-results/ver-001/`。目标平台、耗时、已执行项与未验证能力以该记录为准；CI 配置与远端执行边界见下节，生成、持久化、外部基础设施与最终服务器需在各自接入时另行验收。
+
+## GitHub Actions
+
+`CI-001` 提供 [ci.yml](../../.github/workflows/ci.yml)，复用现有命令。配置落盘与云端运行分别记录；本步没有提交或推送，不能据此声称 GitHub runner 已通过。
+
+| Job | 触发与 runner | 执行内容 |
+| --- | --- | --- |
+| `quality` / Quality (Ubuntu) | PR、main push、workflow_dispatch；ubuntu-24.04 | frozen install → check → test:infra → smoke（含 build）→ OpenSpec 严格校验 |
+| `lifecycle` / Full lifecycle (macOS) | 仅 workflow_dispatch 且 full_lifecycle=true；macos-15 arm64 | bootstrap → pnpm verify，包含固定 Process Compose 安装与完整故障回归 |
+
+每个 job 使用独立 runner，同一 job 的端口场景串行执行。默认日常检查不下载 Process Compose，完整回归按需开启；本地测试通过不能替代首次 Linux/macOS hosted runner 结果。GitHub 官方 [runner 列表](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) 列出上述标准 runner；[Ubuntu 24.04 镜像清单](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md) 包含 Chrome，日常 job 先检查其版本再运行 smoke。镜像内容仍会更新，实际失败应按对应 step 诊断。
+
+Node 读取 .nvmrc，pnpm 读取 package.json，依赖使用唯一 lockfile 执行 frozen install。只由 pnpm action 缓存 store，setup-node 自动缓存关闭；不缓存 node_modules、工具目录或运行状态。各 job 分别有 10/15 分钟超时；同事件、PR 或分支的新运行取消旧运行，手动验收与自动检查使用独立分组。
+
+工作流使用只读 contents 权限，checkout 不保留凭据，不使用 pull_request_target、应用 secrets 或部署权限。完成或失败时仅上传 smoke PNG 和可选的 manager 汇总 report.json，保留七天；没有文件时忽略上传，不上传 fixture、.env、认证状态或整个 .runtime。
+
+### Fixed action sources
+
+上游版本与输入已按下列固定提交核对，工作流内使用完整 SHA，并注释对应标签。升级时核对 action.yml、runner 要求和实际运行结果，不只修改标签文字。
+
+| 官方 Action | 标签与固定提交 |
+| --- | --- |
+| actions/checkout | [v7.0.1 · 3d3c42e5aac5ba805825da76410c181273ba90b1](https://github.com/actions/checkout/tree/3d3c42e5aac5ba805825da76410c181273ba90b1) |
+| actions/setup-node | [v7.1.0 · 949feb2413d6458794dcd2491c4babbbce0c15c1](https://github.com/actions/setup-node/tree/949feb2413d6458794dcd2491c4babbbce0c15c1) |
+| pnpm/action-setup | [v6.1.0 · ea17c68df8912ef543352723c149a84f56e3d413](https://github.com/pnpm/action-setup/tree/ea17c68df8912ef543352723c149a84f56e3d413) |
+| actions/upload-artifact | [v7.0.2 · cf430e030ddbb5b0abf93d22962f4752f3646cd9](https://github.com/actions/upload-artifact/tree/cf430e030ddbb5b0abf93d22962f4752f3646cd9) |
+
+### First hosted run
+
+配置发布后，检查 Actions 的 CI 工作流与 Quality (Ubuntu) 结果。需要完整验收时，在 Run workflow 中开启 full_lifecycle；[手动触发入口](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch) 需先让工作流存在于默认分支。分支保护与必需检查不由该 YAML 自动配置，取得实际成功的检查名称后再按明确任务接入。
+
+本步本地使用固定 [actionlint 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12) 校验工作流 YAML 和表达式，并核对固定上游输入；不向项目新增 linter 依赖。日常 job 的对应命令在本机执行，完整生命周期源码未变时复用 VER-001 实测与哈希。实际结果见 [CI-001 tasks](../../openspec/changes/ci-001-github-actions/tasks.md)，本地证据位于忽略的 test-results/ci-001/。
 
 ## Existing coverage
 

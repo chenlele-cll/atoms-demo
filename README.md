@@ -99,6 +99,8 @@ pnpm test:infra
 
 各命令的实际内容、浏览器前提、已有覆盖和按变更选择检查的要求，统一见 [验证规范](./docs/engineering/verification.md)。检查通过只证明对应范围，不代表尚未实现的产品能力已完成。
 
+[GitHub Actions 配置](./.github/workflows/ci.yml) 已提供：PR、main 推送和手动触发运行 Ubuntu 工程检查、infra 测试、构建/浏览器 smoke 与 OpenSpec 校验；手动可开启 macOS 完整生命周期验收。配置需发布到 GitHub 后才能取得远端运行结果，触发方式、固定来源和覆盖边界见 [CI 说明](./docs/engineering/verification.md#github-actions)。
+
 交互式浏览器检查使用仓库官方 Playwright Skill 和 `pnpm playwright`，无需全局安装。固定版本、具名会话及截图路径见 [浏览器验收入口](./docs/engineering/skills.md#browser-verification)。
 
 单独执行：
@@ -197,6 +199,7 @@ DESIGN.md              平台设计入口，链接到详细设计 skill 与现�
 .agents/skills/        固定上游 Git、Playwright 技能与官方生成的 OpenSpec 技能
 .playwright/           浏览器 CLI 的项目配置
 .config/openspec/      项目范围的官方 OpenSpec CLI 设置
+.github/workflows/ci.yml         日常质量检查与手动完整生命周期验收
 openspec/              项目上下文与变更工件
 README.md              本文件
 package.json           workspace 根：命令、工具链版本、共享开发依赖

@@ -30,6 +30,7 @@ Use [README.md](README.md) for project scope, current setup, and production star
 | Skills installation or update | [Skill sources and usage](docs/engineering/skills.md) |
 | Branch, commit, push, merge, or PR | [Git workflow](docs/engineering/git-workflow.md) and the skill routing below |
 | Selecting checks or preparing handoff | [Verification](docs/engineering/verification.md) |
+| GitHub Actions workflows or CI failures | [CI scope and sources](docs/engineering/verification.md#github-actions), then the affected check and workflow |
 
 Implementation rules live in [Development conventions](docs/engineering/development.md). UI rules are reached through [DESIGN.md](DESIGN.md) and the existing design skill; update the owning contract when rules change rather than copying them into this map.
 
