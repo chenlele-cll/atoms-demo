@@ -1,6 +1,6 @@
 # 技术栈调研与初始化建议
 
-状态：已有健康检查和固定模板隔离预览；模型接入、项目生成与数据库仍待验收。
+状态：前端 React + Vite、后端 Fastify + Node.js + TypeScript 分别启动，已有健康检查、固定模板隔离预览和后端模型能力探针。模型真实能力尚待 API 验收，项目生成与数据库尚未实现。用户已有服务器，要求保持简单、只引入必要技术。本文记录本项目的技术决策与适用边界。
 
 ## 1. 选型目标
 
@@ -17,7 +17,7 @@
 | 后端（已确认） | Fastify + Node.js + TypeScript | 独立 HTTP 服务，提供请求生命周期、schema 校验、错误处理与接口测试基础，负责模型调用、生成事件流和数据库读写 |
 | UI | CSS Modules + 少量全局 CSS | 使用 Vite 内置支持，先不安装样式框架、组件库或图标库 |
 | AI 接入 | Vercel AI SDK + Zod | 统一模型调用、流式结果、工具调用与结构化文件输出 |
-| 模型 | 实现生成时配置一个实际可用的供应商与模型 | 具体选择取决于现有凭据、可达性和结构化输出／工具支持，不凭框架兼容声明代替实测 |
+| 模型 | OpenAI Responses API；显式 MODEL_ID，模板建议 gpt-6.1-sol | GEN-002 使用独立探针实测账户权限和三项能力；失败不自动换模型，不凭 SDK 兼容声明代替实测 |
 | 应用预览 | Sandpack React | 浏览器内运行受约束的 React 项目，默认使用外部 bundler；不是完整远程 Linux 环境 |
 | 持久化 | SQLite + better-sqlite3 | 直接使用参数化 SQL；单机 Demo 无需数据库服务或 ORM，使用简短的 SQL 迁移维护表结构 |
 | 部署 | 已有服务器，前端静态文件与后端服务分别运行 | 静态文件由现有 Web 服务器提供，`/api` 转发到独立 Node 后端；复用已有进程管理和反向代理设施 |
@@ -26,6 +26,10 @@
 | 行为验证 | Node 内置测试器 + Fastify injection；浏览器实测 | 当前接口与配置无需额外测试框架；前端复杂逻辑出现时按需添加 Vitest，需要持续浏览器回归时再加入 Playwright 工程配置 |
 
 AI SDK 用于减少流式协议、工具调用和结构化输出的手写工作，不要求部署到 Vercel，也不要求使用其模型网关。只接一个实际可用的供应商，不预先编写多模型适配层。
+
+GEN-002 在 backend 精确固定 `ai@7.0.143`、`@ai-sdk/openai@4.0.96` 和 `zod@4.6.7`，兼容 Node 22；前端不引入模型依赖。显式使用 `provider.responses()`、`generateText`、`Output.object`、Zod schema 和单步工具调用。客户端控制零自动重试、每次输出预算、完整样例截止时间和取消；工具分派前检查完整调用批次，再显式提交工具结果，避免 SDK 自动多步扩大请求次数。
+
+实现依据为 [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)、[Function Calling](https://developers.openai.com/api/docs/guides/function-calling?api-mode=responses) 和 [AI SDK generateText](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text)，实际兼容性由固定包源码与本地 HTTP 协议测试确认。Responses 设置 `store: false`；账户 API 凭据、额度及模型访问仍需真实探针。ChatGPT Pro 不作为这些前提的证明，不读取订阅登录缓存。
 
 Sandpack 用于避免自行实现 React 编译与预览环境。它是当前基于 React 生成目标的推荐；如果最终只生成 HTML/CSS/JS，可以使用隔离 iframe，并移除这项依赖。
 
@@ -120,7 +124,7 @@ FastAPI 的 Pydantic 校验、OpenAPI 文档与 Python 工具生态具有实际�
 - 初始化使用本机已有的 Node.js `22.22.2` LTS 与 pnpm `12.11.2`，在 `.nvmrc` 和 package.json 中固定工具链。
 - 已安装 React `19.3.1`、Vite `8.3.4`、Fastify `5.12.7`。TypeScript 使用与当前 typescript-eslint peer 范围兼容的 `5.9.3`；依赖由根目录 lockfile 锁定。
 - 已建立开发入口、生产构建、严格类型检查、ESLint 和后端接口／配置测试。实际命令与配置以 README 和 package.json 为准。
-- 固定模板 Sandpack 基线已有本地测试；模型、SQLite 持久化、生成候选预览和实际服务器仍需各自验收，不能将工程检查描述为这些能力已完成。
+- 模型客户端和固定模板 Sandpack 基线已有本地测试；真实模型能力、SQLite 持久化、生成候选预览和实际服务器仍需各自验收，不能将工程检查描述为这些能力已完成。
 
 ## 8. 初始化前的实际前提
 

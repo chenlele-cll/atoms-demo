@@ -22,7 +22,9 @@
     "smoke": "pnpm build && node scripts/smoke.cjs",
     "prepare:template": "node scripts/prepare-company-template.mjs",
     "test:template": "node --test scripts/prepare-company-template.test.mjs",
-    "smoke:template": "node scripts/template-smoke.cjs && node --test scripts/template-smoke-control.test.mjs"
+    "smoke:template": "node scripts/template-smoke.cjs && node --test scripts/template-smoke-control.test.mjs",
+    "model:probe": "pnpm --filter @atoms/backend model:probe",
+    "model:probe:built": "pnpm --filter @atoms/backend model:probe:built"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

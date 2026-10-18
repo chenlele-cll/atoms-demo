@@ -21,7 +21,7 @@
 - 每个应用在自己的 package.json 中声明实际使用的依赖；根目录声明公共开发工具，不能依靠另一应用的依赖偶然可见。
 - `backend/src/app.ts` 构建应用并注册路由，不监听端口；`server.ts` 负责环境加载、监听和进程生命周期。
 - 路由负责 HTTP 边界。生成和存储职责随首次实现形成实际模块，不持续堆入路由，也不预建空的 service、repository 或通用依赖注入层。
-- backend/src/model 维护单供应商客户端、延迟配置、能力样例、runner 和安全错误，AI SDK/OpenAI/Zod 仅在 backend 声明。探针文件和工具不依赖模板或项目模块，不新增浏览器可用的计费接口；真实调用与替身测试分别记录。
+- backend/src/model 维护单供应商客户端、延迟配置、独立探针和安全错误，AI SDK/OpenAI/Zod 仅在 backend 声明。探针文件和工具不依赖模板或项目模块，不新增浏览器可用的计费接口；真实调用与替身测试分别记录。
 
 ## Workspace and toolchain
 

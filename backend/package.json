@@ -8,7 +8,9 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "model:probe": "tsx src/model/probe.ts",
+    "model:probe:built": "node dist/model/probe.js"
   },
   "dependencies": {
     "fastify": "5.12.7",

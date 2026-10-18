@@ -4,7 +4,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 项目目标是让用户通过自然语言生成和修改网页应用，交互预览结果，并保存项目与代码版本。
 
-当前已有健康接口、前端连通检查和企业官网模板的隔离基线预览。尚未实现真实项目生成、数据库持久化、生成候选采用和完整工作台，Top 1 尚未完成。
+当前已有健康接口、前端连通检查、企业官网模板的隔离基线预览，以及后端模型客户端与独立能力探针。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。尚未实现真实项目生成、数据库持久化、生成候选采用和完整工作台，Top 1 尚未完成。
 
 ## 环境
 
@@ -87,11 +87,30 @@ pnpm smoke:template
 | --- | --- | --- | --- |
 | `backend/.env` | `HOST` | `127.0.0.1` | 后端监听地址 |
 | `backend/.env` | `PORT` | `3001` | 后端端口，范围 1–65535 |
+| `backend/.env` | `OPENAI_API_KEY` | 无；仅模型调用时必填 | 独立 OpenAI Platform 项目的服务端凭据 |
+| `backend/.env` | `MODEL_ID` | 无；模板建议 `gpt-6.1-sol` | 显式指定模型；无权限时失败，不自动切换 |
+| `backend/.env` | `MODEL_TIMEOUT_MS` | `60000` | 每项完整能力样例的时限，整数 1000–120000ms |
+| `backend/.env` | `MODEL_MAX_OUTPUT_TOKENS` | `4096` | 每次请求的输出上限，整数 256–8192 |
 | `frontend/.env` | `API_PROXY_TARGET` | `http://127.0.0.1:3001` | 仅供 Vite 开发／预览代理使用 |
 
 通过 pnpm 启动后端时，其工作目录为 `backend/`；原生 Node 环境加载器读取其中的 `.env`，进程已有变量优先。修改配置后重启对应进程。
 
-前端不配置任何秘密。`API_PROXY_TARGET` 不会自动配置服务器上的生产反向代理。
+模型配置延迟到显式调用边界校验；后端启动、健康检查和模板预览不需要密钥。前端不配置任何秘密。`API_PROXY_TARGET` 不会自动配置服务器上的生产反向代理。
+
+## 模型能力探针
+
+先在本地 `backend/.env` 配置独立 API 凭据与模型，勿在聊天或仓库发送秘密。ChatGPT Pro 与 OpenAI Platform 的 API 凭据、额度和模型权限分开；本项目不读取 ChatGPT/Codex 登录缓存。推荐模型是否可用以账户实际调用为准。
+
+```sh
+pnpm model:probe --help
+pnpm model:probe --case text
+pnpm build
+pnpm model:probe:built --case all --report
+```
+
+无参数或 `--help` 仅显示帮助，不读取环境文件、不发请求。只有显式 `--case text|files|tools|all` 才调用；文本/文件各最多 1 次、工具最多 2 次、all 最多 4 次，没有自动重试。使用 Responses API 并设置 `store: false`；每项样例共用一个截止时间，Ctrl+C / SIGTERM 中止活动请求并分别退出 130/143。认证、权限、额度、服务、网络、超时或取消会停止剩余样例。
+
+文件样例只检查 `/App.tsx` 的结构、非空内容及 16 KiB 字节上限，不写入、不执行、不证明编译通过；工具只读取公开内存数据，最终回答须确认本次实际工具结果。默认输出脱敏 JSON，可选报告保存到忽略的 `test-results/model-probe/<runId>.json`。`source` 区分 live/fixture/not-run，用量缺失为 null；缺配置、任一必需项失败或未执行均非零退出。默认 check/smoke/verify、健康检查及 CI 均不调用真实模型。覆盖和验收边界见 [Model access](./docs/engineering/verification.md#model-access)。
 
 ## 验证
 

@@ -13,9 +13,12 @@
 | 原生开发编排 | 根 [process-compose.yaml](../../process-compose.yaml) 管理前后端，操作见下节；工具版本由 [.process-compose-version](../../.process-compose-version) 固定 |
 | 生产后端 | 构建后运行 `pnpm --filter @atoms/backend start` |
 | 本地检查前端产物 | `pnpm --filter @atoms/frontend preview`；这是本地验收入口 |
+| 独立模型能力探针 | `pnpm model:probe` / `pnpm model:probe:built`，默认仅帮助；只有显式 --case 才调用，不监听端口 |
 | 当前基础设施 | `infra start/stop/status` 明确报告未配置；没有独立数据库、容器或队列服务，现有连通页面无需模型凭据 |
 
 后端读取自身目录下的 `.env`，进程已有变量优先，配置经过解析后监听。前端开发及 preview 的代理目标来自其配置；生产反向代理由部署环境提供。
+
+模型探针通过 workspace 使用 backend 工作目录及同样的原生环境加载规则，帮助不读取 `.env`。模型配置仅在显式探针或未来生成请求边界解析，manager、健康检查、默认自动化入口不触发模型。一次样例的全部请求共用截止时间；SIGINT/SIGTERM 中止底层请求、停止后续样例、输出脱敏最终报告并退出 130/143。构建入口为 `backend/dist/model/probe.js`；配置、请求上限与报告含义见 [README](../../README.md#模型能力探针) 和 [Model access](./verification.md#model-access)。
 
 当前已有 manager 的七个开发命令、infra 空配置入口和 Process Compose 配置。本地编排不接管生产服务器。
 

@@ -79,7 +79,7 @@ Node 读取 .nvmrc，pnpm 读取 package.json，依赖使用唯一 lockfile 执�
 
 ## Existing coverage
 
-`pnpm check` 依次运行 ESLint、前后端类型检查和后端测试。当前 [app.test.ts](../../backend/test/app.test.ts) 与 [config.test.ts](../../backend/test/config.test.ts) 共六个测试，覆盖健康接口、API 404、配置默认值、配置覆盖、非法端口和空监听地址。
+`pnpm check` 依次运行 ESLint、前后端类型检查和后端测试。既有 [app.test.ts](../../backend/test/app.test.ts) 与 [config.test.ts](../../backend/test/config.test.ts) 覆盖健康接口、API 404、监听配置；GEN-002 增加模型配置、协议、生命周期及 CLI 测试，见下节。
 
 `pnpm build` 分别构建前后端；后端构建配置排除测试文件。
 
@@ -119,6 +119,23 @@ pnpm smoke:template
 产物在忽略的 `test-results/template-baseline/<runId>/`，包含本次 digest、用例结果、清理状态、截图及私有诊断；交互复核使用独立 `gen-001` Playwright 会话，截图在 output/playwright/。外部 SDK 的非关键统计请求失败不代表模板交互通过或失败，真实编译和控件断言仍分别检查。
 
 当前 `pnpm verify` 和既有 CI 保留原工程/生命周期/连通覆盖，不自动执行新增模板专项；完整模板验收需显式运行上述命令，后续 GEN-008 再整合。manager 的隔离副本补充模板源/准备脚本并排除旧生成资产，以验证独立 dev 命令不依赖原工作目录缓存。实际结果和未验证范围见 [GEN-001 任务记录](../../openspec/changes/gen-001-company-template-baseline/tasks.md)，模板通过不能替代模型、持久化、完整 Top 1 或公网部署验收。
+
+## Model access
+
+GEN-002 的 [模型模块](../../backend/src/model/client.ts) 只由显式调用使用，后端启动/健康接口不初始化它。运行 `pnpm check` 会执行 backend/test 中的配置、协议和 CLI 自动化，无需 API 凭据；不读取开发者真实 `.env`。HTTP fixture 使用假密钥与本地随机端口，通过真实 SDK 发起 Responses 请求；传输注入仅为模块测试参数，没有生产假模型环境开关、任意上游地址选项或公共模型接口。
+
+覆盖范围：
+
+- 配置缺失、空值、非法模型标识、时限和输出预算；既有健康接口保持可用。
+- 固定官方端点（不受 OPENAI_BASE_URL 影响）、禁止重定向重放、`/v1/responses`、显式模型、`store: false`、输出预算、JSON schema 与工具结果回传，all 最多四次实际请求；schema 不合法、路径/数量/UTF-8 体积、拒绝、截断和缺失最终文本均失败。
+- 唯一内存工具的一次分派与随机 nonce 确认；缺少/未知/重复调用、非法参数、未确认或额外调用均失败，不自动修复。
+- 401、403/404、429、上游故障、网络故障的安全分类和零重试；错误体/响应头包含哨兵秘密时，报告与捕获日志不回显。
+- 真实 HTTP 延迟连接的超时/取消与底层连接结束，两次工具请求共用时限，晚到响应不继续步骤；操作结束移除监听器并关闭调用作用域，不能再次请求。输出格式失败可继续其他独立能力，账户/网络/时限故障停止后续样例。
+- 子进程使用隔离工作目录及测试环境，不继承开发者凭据；帮助不读环境、不请求网络；源码与临时编译产物可运行；缺配置非零、报告脱敏/保存、SIGINT/SIGTERM 输出取消结果并在有限时间退出。临时编译产物放在 backend/node_modules 下以使用真实运行依赖，结束后删除。
+
+真实验收单独执行：配置 backend/.env 的 API 项目凭据和显式模型，完成构建后运行 `pnpm model:probe:built --case all --report`。该命令最多四次计费请求，缺配置零次；只在三项必需能力都 passed 时退出零。报告 source=live 仅证明实际发起请求，是否通过仍看各项状态；前置失败为 not-run，模块传输替身为 fixture。用量缺失为 null，不估算账单。报告只包含标识、状态、时间、请求次数、用量和安全摘要，保存在忽略的 test-results/model-probe/。
+
+本地替身通过不能替代 OpenAI 账户和模型权限实测。默认 check/smoke/verify、CI、manager 均不执行上述真实探针；现有 smoke 继续验证既有前后端连通，模板专项见上节。实际命令结果、未完成真实验收及供 GEN-004 复用的边界见 [GEN-002 tasks](../../openspec/changes/gen-002-model-access-validation/tasks.md)。这些能力不构成项目生成、持久化、预览编译或完整 Top 1 已完成。
 
 ## Lifecycle scenarios
 
