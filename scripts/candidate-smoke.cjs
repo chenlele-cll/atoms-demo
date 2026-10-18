@@ -15,6 +15,7 @@ const { createRequire } = require('node:module');
 const { chromium } = require('playwright-core');
 
 const root = path.resolve(__dirname, '..');
+if (!require('./verification/standalone-lock.cjs').canStartStandalone(root)) process.exit(2);
 const runId = randomUUID();
 const output = path.join(root, 'test-results/candidate-review', runId);
 const runtime = path.join(output, 'runtime');

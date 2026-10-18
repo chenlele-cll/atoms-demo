@@ -65,3 +65,23 @@
 - 追加无模型中断专项：使用实际发布包/匹配报告，在白名单且无模型凭据的预检子进程上验证 SIGINT=130、SIGTERM=143、cancelled/SIGNAL、not-run 来源和正常清理；网络守卫未观察到请求。17 项控制在空闲的独立快照上全部通过，根工作区默认 16 项通过/专项 1 skipped。首次误在已持有原仓库验收锁时运行专项产生失败，记录保留；专项已显式要求锁空闲，未将该失败作为通过证据。
 - 当前跟踪 6/10 完成；3.2、4.1、5.1、6.1 仍未勾选：缺少双用例真实候选、业务/采用/重开/窄屏和最终视觉通过证据。演示指引已补充实际失败范围，core-paths 的 Top 1 未标记最终完成。部署通过消除了原端口阻塞，当前实际未通过原因是首例真实生成超时。
 - 安全交接位于 `test-results/gen-010/accepted/deployment/`、`live/` 和 `live-pre-generation-failure/`，实际模型调用 4 次，第二例未运行。原始 DB、源码、provider IDs、会话相关信息与截图均留在独立快照的 private/shared，导出仅安全字段。无提交/推送、公网/TLS、远端发布或 hosted CI 操作。
+
+## Unlimited duration implementation — 2026-10-18
+
+- 按用户本轮明确要求取消默认生成累计截止：MODEL_TIMEOUT_MS 默认/本地均为 0；生成服务与模型客户端在 0 时既不建立 deadline，也不创建超时定时器。显式正值保留可选有限期限（1000–2147483647ms），原 120 秒人为上限取消。输出仍 4096、六步骤与零自动重试不变。
+- 前端移除默认 150 秒累计连接期限；live 移除 10 分钟全局硬截止，0 时 Playwright 等待生成终态为无累计期限。心跳/首部/空闲故障检测、有限查询/编译、用户取消、断线和服务关闭仍保持原有语义。同步修订 GEN-002/004/007 的相关既有规则与 README/Development/Lifecycle/Verification，没有改写旧失败结果。
+- 当前工作区 `pnpm check` 通过：416 项（415 passed / 1 opt-in skipped），lint/两应用类型检查均通过；前后端 `pnpm build` 通过。额外新增的墙钟专项在完整 check 后独立执行并通过，补充后端 typecheck/ESLint 通过，不声称 417 项已重新完整执行。
+- 聚焦回归 34 项后端、6 项流解析通过；受控单调时钟跨 540 秒的真实 SDK/HTTP 三步生成成功，0 下实际取消连接；前端受控计时器连续心跳跨 200 秒后仍接收成功终态，显式有限期限的原有回滚/迟到保护保留。
+- 真实墙钟专项 `ATOMS_LONG_GENERATION_TEST=1 pnpm --filter @atoms/backend exec tsx --test test/generation-unlimited-network.test.ts` 通过，用例耗时 61759.8175ms。随机 loopback 端口上的实际 Fastify/SSE/AI SDK/SQLite，模拟上游首响应实际等待 61.5 秒，至少五次真实心跳后保存候选，current 仍为原模板；source=fixture、供应商请求 0，不能作为真实模型或报价业务通过。
+- 冻结 Top 1 基线的新完整 product run=`gen010-unlimited-final` 通过，耗时 202055ms、cleanup=passed；check 296 项（294 passed / 2 opt-in skipped），Playwright smoke 3＋workspace 26 共 29 项。此前 `gen010-unlimited-product` 工程/构建均过，但浏览器前端口检查被外部监听阻塞，失败保留，未跳过必需项。
+- 新发布包 releaseId=`af263b1a-d849-4039-b552-1c7a9cf25459`，releaseDigest=`4a0886d691ec94c602433804f795ff99f54d135dab81eb8384a099df6d4af1e5`，构建 21558ms、cleanup=passed；已复制到原工作区 .runtime/releases 并重新验证一致。原 60 秒包与既有失败证据保留，不能用旧通过报告为新包背书。
+- 新包部署 run=`7a56e952-3585-416e-a0dc-8343c1a40381` 前 11 项通过，在 SIGKILL/stale 恢复窗口另一回归重新监听 3001，PORT_OWNER_CHANGED 失败；耗时 78993ms、cleanup=passed、SDK fixture 请求 10、供应商请求 0。其后部署监督器等待端口稳定 300 秒仍被其他独立 workspace/history 测试连续占用，PORTS_STILL_BUSY，未启动另一个部署实例。
+- 用户已确认暂停其他整体验收及排队专项，但实际又观察到独立 history 测试进程持续启动。遵守此前不停止对方进程的边界，已单独请求 SIGTERM 测试/队列的授权；尚未得到该项授权，未向对方发信号。当前共享端口阻塞与产品任务总超时不是同一问题。
+- 当前跟踪 8/13 完成，7.1/7.2 已实现并验证；7.3 与原 3.2/4.1/5.1/6.1 保持未完成。本轮取消时限修复已完成本地工程、物理 61.8 秒慢响应和 Playwright 产品验证；新包完整部署及新一轮真实模型验证仍待稳定端口。修复后新增真实供应商请求为 0，不将旧 4 次请求记为本轮新验证。
+- 已保存交接 `test-results/gen-010/accepted/unlimited/product/`、release-build.json、deployment-attempts/ 与 status.json.durationFix；旧接受/失败记录均保留。没有提交、推送或远端发布；Top 1 最终通过状态不更新。
+
+### Port coordination follow-up
+
+- 用户随后明确授权以 SIGTERM 停止该回归及其验收队列。原先列出的 PID 已自行退出；重新核对同一 opencode 验收队列、当前 runner 的 PID/父关系/启动时间和完整命令后，向仍匹配的 92066、92079 发送 SIGTERM，让测试自身清理；没有向 opencode、其他交互进程或真实服务发信号。
+- 为阻止队列再次立即启动，补齐根工作区 candidate/workspace/history/revision 四个独立浏览器入口对既有 verify 锁的检查；锁存在时 2/VERIFY_BUSY 退出，尚未创建服务或浏览器。不修改这些 suite 的业务断言；集成浏览器仍在原有独立 source 副本执行。24 项 verification 控制通过，四个实际入口确认在持锁时零启动拒绝，相关 ESLint 通过。此根入口协调修订未修改冻结包产品字节或本轮 live 业务 oracle。
+- 固定端口已释放，继续补跑同一 af263b1a 发布包的完整部署验收，工程和产品通过结果复用，不发起额外模型探针。

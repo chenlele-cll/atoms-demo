@@ -200,8 +200,12 @@ export async function mainPath({page, context, report, provider, phase, count, r
           assert.equal((await api(page, 'GET', `/api/projects/${projectId}/versions?limit=50`)).body.items.length, 3);
         });
         await phase('refresh-owned-restart', true, async () => {
-          await page.reload(); await waitCompiled(page); assert.deepEqual((await detail()).currentVersion, versions[0]);
-          await restart(); await page.reload(); await waitCompiled(page); assert.deepEqual((await detail()).currentVersion, versions[0]);
+          await page.reload(); await button(page, '当前版本').click(); await button(page, '预览').click(); await waitCompiled(page);
+          assert.equal(await page.locator('[data-viewed-version]').getAttribute('data-viewed-version'), versions[0].id);
+          assert.deepEqual((await detail()).currentVersion, versions[0]);
+          await restart(); await page.reload(); await button(page, '当前版本').click(); await button(page, '预览').click(); await waitCompiled(page);
+          assert.equal(await page.locator('[data-viewed-version]').getAttribute('data-viewed-version'), versions[0].id);
+          assert.deepEqual((await detail()).currentVersion, versions[0]);
           await business(page, 'v1'); await unchanged();
         });
       }

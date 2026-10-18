@@ -8,6 +8,7 @@ const {setTimeout: delay} = require('node:timers/promises');
 const {runtime} = require('./release/runtime.cjs');
 const {closeBrowser, signalOwned} = require('./verification/processes.cjs');
 const root = path.resolve(__dirname, '..');
+if (!require('./verification/standalone-lock.cjs').canStartStandalone(root)) process.exit(2);
 const HASH = /^[a-f0-9]{64}$/;
 const UUID = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
 const REQUIRED = ['v1-generation', 'v1-business-adoption', 'v2-generation', 'v2-business-adoption', 'history-pagination-preview-cancel', 'explicit-restore', 'refresh-owned-restart', 'v3-generation', 'v3-business-adoption', 'v2-preserved-preview'];

@@ -194,3 +194,12 @@ test('masked derivatives are created by the capture helper, raw sentinel screens
   const result=await runNode(code,{env:{...cleanEnvironment(),ATOMS_VERIFY_CONTEXT:contextFile}});assert.equal(result.status,'passed');const report=JSON.parse(await readFile(context.report));assert.equal(report.screenshots.length,1);assert.ok(!JSON.stringify(report).includes('PRIVATE_CAPTURE_SENTINEL'));
   const bytes=evidence.screenshotForExport(f.folder,report.screenshots[0]);assert.ok(!bytes.includes(Buffer.from('PRIVATE_CAPTURE_SENTINEL')));
 });
+
+
+test('standalone browser entry cannot start services while its workspace verification lock is held', async t => {
+ const f=await fixture(t);await mkdir(path.join(f.folder,'.runtime/verify.lock'),{recursive:true});const marker=path.join(f.folder,'started');
+ const code=`const{canStartStandalone}=require(${JSON.stringify(path.join(root,'scripts/verification/standalone-lock.cjs'))});if(!canStartStandalone(${JSON.stringify(f.folder)}))process.exit(2);require('node:fs').writeFileSync(${JSON.stringify(marker)},'started');`;
+ await assert.rejects(exec(process.execPath,['-e',code],{cwd:f.folder,env:cleanEnvironment(),timeout:5000}),error=>error.code===2&&error.stderr.includes('VERIFY_BUSY'));
+ await assert.rejects(access(marker),{code:'ENOENT'});await rm(path.join(f.folder,'.runtime/verify.lock'),{recursive:true});
+ await exec(process.execPath,['-e',code],{cwd:f.folder,env:cleanEnvironment(),timeout:5000});assert.equal(await readFile(marker,'utf8'),'started');
+});

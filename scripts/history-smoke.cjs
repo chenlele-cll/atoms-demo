@@ -13,6 +13,7 @@ const { ownChild, signalOwned, groupAlive, closeBrowser } = require('./verificat
 const { api, waitCompiled, assertQuote } = require('./verification/workspace-path.cjs');
 
 const root = path.resolve(__dirname, '..');
+if (!require('./verification/standalone-lock.cjs').canStartStandalone(root)) process.exit(2);
 const runId = randomUUID();
 const output = path.join(root, 'test-results/history-workspace', runId);
 const runtime = path.join(output, 'runtime');

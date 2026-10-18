@@ -393,3 +393,7 @@ ATOMS_LONG_GENERATION_TEST=1 pnpm --filter @atoms/backend exec tsx --test test/g
 ```
 
 该用例使用随机 loopback 端口、实际 Fastify/SSE/AI SDK/SQLite 和明确的本地模拟上游，首个上游响应实际延迟 61.5 秒。要求受理先返回、至少五次心跳、三步骤生成 succeeded、候选保存且当前仍为原模板；没有供应商调用或真实密钥。本次实际用例耗时 61759.8175ms，通过。测试本身的 80/90 秒看门狗只用于发现挂起，并不配置产品任务期限。
+
+### Standalone browser verification lock
+
+candidate/workspace/history/revision 四个独立浏览器入口现在先检查当前工作副本的 `.runtime/verify.lock`：已有验收持锁时以 2/VERIFY_BUSY 退出，不启动服务、浏览器或测试数据准备。集成验收在自身独立 source 副本运行浏览器专项，沿用既有目录/锁边界。不要绕过锁并行启动固定端口专项；等待原验收收尾后再单独运行。standalone-lock.cjs 的控制测试覆盖持锁零启动及释放后可启动，四个真实入口在本轮已持锁状态下均确认返回 VERIFY_BUSY；24 项 verification 控制测试通过。
