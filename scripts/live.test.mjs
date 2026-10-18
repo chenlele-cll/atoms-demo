@@ -39,20 +39,22 @@ test('owned live preflight records SIGINT/TERM cancellation and cleanup without 
  skip:!process.env.ATOMS_LIVE_CONTROL_RELEASE||!process.env.ATOMS_LIVE_CONTROL_DEPLOYMENT_REPORT,
  timeout:30000,
 },async()=>{
- const{readdir,access}=await import('node:fs/promises');const{setTimeout:delay}=await import('node:timers/promises');
+ const{readdir,access,cp}=await import('node:fs/promises');const{setTimeout:delay}=await import('node:timers/promises');
  const release=process.env.ATOMS_LIVE_CONTROL_RELEASE,report=process.env.ATOMS_LIVE_CONTROL_DEPLOYMENT_REPORT;
- assert.ok(path.isAbsolute(release)&&path.isAbsolute(report));await assert.rejects(access(path.join(root,'.runtime/verify.lock')),{code:'ENOENT'},'Signal controls require an idle verification lock');const output=path.join(root,'test-results/live-generation');
+ assert.ok(path.isAbsolute(release)&&path.isAbsolute(report));
  for(const[signal,expected]of[['SIGINT',130],['SIGTERM',143]]){
   const temporary=await mkdtemp(path.join(os.tmpdir(),'atoms live signal '));let child;let finished;let signalled=false;
   try{
+   const harness=path.join(temporary,'harness');await mkdir(harness);await cp(path.join(root,'scripts'),path.join(harness,'scripts'),{recursive:true});
+   await symlink(path.join(root,'node_modules'),path.join(harness,'node_modules'),'dir');
+   const output=path.join(harness,'test-results/live-generation');
    const guard=path.join(temporary,'guard.mjs');const marker=path.join(temporary,'unexpected-network');
    await writeFile(guard,`import{writeFileSync}from'node:fs';globalThis.fetch=async()=>{writeFileSync(${JSON.stringify(marker)},'network');throw Error('CONTROL_NETWORK_FORBIDDEN');};`);
-   const before=new Set(await readdir(output).catch(()=>[]));
-   child=spawn(process.execPath,['--import',guard,path.join(root,'scripts/live-smoke.cjs'),'--live','--release',release,'--deployment-report',report],{cwd:temporary,env:cleanEnvironment(),stdio:'ignore'});
+   child=spawn(process.execPath,['--import',guard,path.join(harness,'scripts/live-smoke.cjs'),'--live','--release',release,'--deployment-report',report],{cwd:temporary,env:cleanEnvironment(),stdio:'ignore'});
    finished=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',(code,signal)=>resolve({code,signal}));});
    let created;const deadline=Date.now()+10000;
    while(Date.now()<deadline&&child.exitCode===null){
-    const names=(await readdir(output)).filter(name=>!before.has(name));assert.ok(names.length<=1);
+    const names=await readdir(output).catch(()=>[]);assert.ok(names.length<=1);
     if(names.length===1){created=names[0];try{await access(path.join(output,created,'private/report.json'));signalled=child.kill(signal);break;}catch{/* Wait for the initial atomic report. */}}
     await delay(5);
    }
@@ -63,6 +65,5 @@ test('owned live preflight records SIGINT/TERM cancellation and cleanup without 
   }finally{if(child&&child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await finished?.catch(()=>{});await rm(temporary,{recursive:true,force:true});}
  }
 });
-
 
 test('live generation waits without an implicit 20-second or ten-minute deadline when model timeout is disabled',()=>{assert.equal(live.generationWaitTimeout({timeoutMs:0}),0);assert.equal(live.generationWaitTimeout({timeoutMs:60000}),80000);assert.equal(live.generationWaitTimeout({timeoutMs:2147483647}),2147483647);});
