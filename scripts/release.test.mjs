@@ -86,8 +86,19 @@ for(const native of [true,false])test(`actual isolated release pipeline ${native
   await file(folder,'package.json',JSON.stringify({name:'release-control-fixture',private:true,packageManager:'pnpm@12.11.2',scripts:{build:'node -e "process.exit(7)"'}}));
   await file(folder,'pnpm-workspace.yaml','packages:\n  - backend\nengineStrict: true\n');
   await file(folder,'backend/package.json',JSON.stringify({name:'@atoms/backend',private:true,type:'module',dependencies:native?{'better-sqlite3':'13.0.3'}:{}}));
+  // Keep the pinned toolchain and package resolutions without resolving a new offline project.
+  const lock=await readFile(path.join(root,'pnpm-lock.yaml'),'utf8');
+  const importers=`\nimporters:\n\n  .: {}\n\n  backend:${native?"\n    dependencies:\n      better-sqlite3:\n        specifier: 13.0.3\n        version: 13.0.3":" {}"}\n`;
+  const boundary=lock.indexOf('\n---\n');assert.ok(boundary>=0);
+  const applicationLock=lock.slice(boundary);const packagesAt=applicationLock.indexOf('\npackages:\n'),snapshotsAt=applicationLock.indexOf('\nsnapshots:\n');
+  assert.ok(packagesAt>=0&&snapshotsAt>packagesAt);
+  const select=section=>section.split(/(?=^  \S)/m).filter(block=>/^  (?:better-sqlite3@13\.0\.3|node-addon-api@[^:]+):/m.test(block)).join('');
+  const packages=native?select(applicationLock.slice(packagesAt+'\npackages:\n'.length,snapshotsAt)):'';
+  const snapshots=native?select(applicationLock.slice(snapshotsAt+'\nsnapshots:\n'.length)):'';
+  const application=applicationLock.slice(0,packagesAt).replace(/\nimporters:\n[\s\S]*$/,importers)+
+    (native?`\npackages:\n\n${packages}\nsnapshots:\n\n${snapshots}`:'\npackages: {}\n\nsnapshots: {}\n');
+  await file(folder,'pnpm-lock.yaml',lock.slice(0,boundary)+application);
   await exec('git',['init','-q'],{cwd:folder});
-  await exec('pnpm',['install','--lockfile-only','--offline'],{cwd:folder,env:cleanEnvironment(),timeout:30_000});
   assert.equal(await buildRelease(folder,true),native?1:2);
   const{readdir}=await import('node:fs/promises');const ids=await readdir(path.join(folder,'.runtime/release-build'));assert.equal(ids.length,1);
   const report=JSON.parse(await readFile(path.join(folder,'.runtime/release-build',ids[0],'report.json'),'utf8'));
