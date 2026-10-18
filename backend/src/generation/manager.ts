@@ -154,4 +154,8 @@ export class GenerationManager {
     this.streams.clear();
   }
   get activeCount() { return this.active.size; }
+  projectActivity(projectId: string): 'busy' | 'unconfirmed' | null {
+    if ([...this.active.values()].some(item => item.accepted.request.projectId === projectId)) return 'busy';
+    return this.store.hasRunning(projectId) ? 'unconfirmed' : null;
+  }
 }

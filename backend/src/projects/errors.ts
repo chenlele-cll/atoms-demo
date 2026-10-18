@@ -5,6 +5,8 @@ const definitions = {
   CONFLICT: [409, 'Record conflicts with existing state.'], RATE_LIMITED: [429, 'Too many requests.'],
   REQUEST_CONFLICT: [409, 'Request identifier was already used for different input.'],
   BASE_VERSION_CHANGED: [409, 'Project base version has changed.'],
+  CURRENT_VERSION_CONFLICT: [409, 'Current version changed. Reload the project state.'],
+  CANDIDATE_NOT_ADOPTABLE: [409, 'Version is not a successful candidate for this base.'],
   ACCEPT_REQUIRED: [406, 'Accept text/event-stream is required.'],
   PROJECT_BUSY: [409, 'Project already has an active generation.'],
   SESSION_BUSY: [429, 'Session already has an active generation.'],

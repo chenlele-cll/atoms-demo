@@ -10,6 +10,7 @@ import type { ProjectStore } from '../storage/store.js';
 import type { TemplateCatalog } from '../templates/catalog.js';
 import type { GenerationOptions, GenerationManager } from '../generation/manager.js';
 import { generationRoutes } from './generations.js';
+import { versionRoutes } from './versions.js';
 
 export type ProjectServices = {
   store: ProjectStore;
@@ -59,6 +60,7 @@ export async function projectRoutes(app: FastifyInstance, services: ProjectServi
     return session.id;
   };
   generationRoutes(app, services.manager, owner);
+  versionRoutes(app, store, services.manager, owner, services.now);
 
   app.post('/session', {
     bodyLimit: 8192,
