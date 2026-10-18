@@ -60,3 +60,9 @@ manager 隔离副本复制 packages/contracts 源、build.mjs 和准备脚本，
 现有工具执行严格类型检查、ESLint 和行为测试。[CI 配置](../engineering/verification.md#github-actions) 已接入既有检查，远端执行结果以实际 Actions 记录为准。跨应用源码导入和模块依赖方向目前仍需审查，本文件不代表这些约束已经自动执行。新增自动约束时应同时更新配置和验证记录。
 
 GEN-007 的前端固定依赖 eventsource-parser 4.1.2，负责有界 POST 响应的 SSE 分帧；本地控制器继续负责 HTTP、UTF-8、总字节/帧数、关联/顺序、超时和终态，不手写第二个 SSE 解析器。它是浏览器运行依赖，不加入后端或共享契约包。
+
+## Production release boundary
+
+`pnpm release:build` 以固定 pnpm 默认 deploy 生成独立生产依赖图，不启用 injected workspace/legacy，也不手工解析依赖。backend 与 @atoms/contracts 的 files 均为 dist；后端 dist 包含中立模板 bundle、格式模块/声明及模板 LICENSE 内容。前端 dist 复制为 frontend/，只有独立本地 Nginx 模板进入 deploy/；Ansible inventory、私有配置、构建源、测试 SDK 启动器、DB 与开发工具不发布。第三方包自己的 src/map 属正常依赖内容，不能按全局 src 黑名单删除。
+
+release.json 对普通文件内容/模式、目录模式和内部相对链接目标建立清单，记录 UUID、源/lock/build 身份、精确 Node/pnpm、平台/架构/ABI 与模板身份，拒绝外链、缺资产和篡改。运行不依赖原工作区或 pnpm store 的链接；发布依赖原生绑定必须在同平台搬迁后实际加载和 SQLite 读写。目标平台不同应在目标平台重新 frozen install/build/deploy；本机成功只对应实际记录的平台，Linux/公网结果须单独验收。操作与停机切换见 [Local release lifecycle](../engineering/lifecycle.md#local-release-lifecycle)。

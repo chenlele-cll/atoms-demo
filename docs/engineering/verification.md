@@ -312,3 +312,17 @@ dev/preview 分别覆盖示例不提交、创建去重/丢响应/离页晚到、
 脚本运行成功不等于产品所有能力完成。交接时区分已实现、已验证、未验证和不可用部分，明确缺少凭据、工具或目标环境造成的限制。
 
 本地日志、截图和临时报告保存在忽略目录，不进入提交；源码与需要分发的技能资源按各自职责入库。CI、线上部署及自动技能触发只有实际执行并取得结果后才能报告通过。
+
+## Local deployment acceptance
+
+GEN-009 本次最终验收按用户明确授权使用独立快照，仅不含并行 REV 任务尚未配套实现的 `backend/test/version-restoration.test.ts` 和 `backend/test/version-restoration-network.test.ts`；其余当前应用与 GEN-009 实现保留。快照内公共 check/product/release/deployment 入口不修改，原工作区文件和默认检查规则保留。建立快照时原工作区受这两份未完成测试阻塞，本次结果只对应记录的冻结授权基线；后续完整工作区须待 REV 配套实现后正常执行 check。
+
+GEN-009 的独立入口为 `pnpm test:release`、`pnpm release:build [--json]`、`NGINX_BIN=/absolute/nginx pnpm smoke:deployment --release /absolute/package`。release 控制测试随 check 执行，不要求 Nginx；额外真实故障控制入口为 `ATOMS_DEPLOYMENT_TEST_RELEASE=/absolute/package NGINX_BIN=/absolute/nginx pnpm test:deployment-control`，验证缺 Nginx、外部端口、并发锁、实际 SIGINT/SIGTERM 及损坏包拒绝，结果为 control-test，需独占 3001/8080；真实部署验收要求 Nginx/Chrome、3001/8080 空闲、同平台发布包和 Sandpack 网络，不接入默认 verify 或 CI。按 README 顺序先 frozen install/check/verify:product，再 build release、独立消费产物。
+
+release 控制用例覆盖固定 CLI、已有输出保护、输入排除/越界 symlink/变更、完整清单/模式/缺资产/ABI/篡改、Nginx 路径注入、报告身份与脱敏、互斥/外部端口及所属进程超时/取消；控制 fixture 标为 control-test，不作为真实应用证据。实际发布运行是 offline frozen install → 原生 SQLite → 一次 build → 固定 pnpm deploy --prod --frozen-lockfile → 产物外移加载契约/SQLite → 输入复核/删除源副本/原子发布，构建日志位于 .runtime/release-build/<releaseId>/。
+
+部署报告关联 releaseId/releaseDigest/sourceDigest/buildDigest、Nginx 版本/配置摘要、精确 origin 和每个阶段来源。阶段 A 使用未修改 server.js，无模型配置，验收模板实际编译、项目创建与深链接、Origin/归属/模型未受理、相同 cookie 停启重开；阶段 B 私有启动器注入真实 SDK 的本地 HTTP fixture，复用工作台可见表单/报价/采用断言，真实工具编排/候选入库与 Sandpack 交互，经 Nginx 实测 gate 前 accepted、至少一次真实 10s 心跳、完成/取消/断流、SIGTERM 与 SIGKILL stale 后 interrupted/无重发；阶段 C 回到生产入口读取采用结果，演练冷备份 quick_check、隔离恢复、坏配置/只读目录/高 schema/同库第二实例失败及原数据重开。
+
+所有服务由本次 runner 管理，未创建 Vite/tsx；只有 frontend 静态根可以公开，JS/CSS MIME 与缓存、缺资源/API/私有文件、后端离线均有实际断言。产物搬迁前后重新比较清单；原包保持只读。总预算 10 分钟，正常就绪 30s、真实预览最多 70s、清理最多 10s，硬杀单独等待 32s stale。缺前提、断言、取消或清理失败均非零；不能通过跳过必需场景报告成功。
+
+`test-results/deployment/<runId>/{releases,shared,private,export}` 保留本次证据，分享只取 export 的白名单 JSON/Markdown 摘要；不导出截图、源码/需求/对话、cookie/DB、原日志/配置或密钥。live 模型、公网 HTTPS、hosted CI 永远单独标 not-run。本次平台/耗时/实际命令与 GEN-010 交接身份在 [GEN-009 tasks](../../openspec/changes/gen-009-local-release-validation/tasks.md)，本地成功不代表服务器发布或跨版本数据库迁移通过。

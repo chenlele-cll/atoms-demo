@@ -268,9 +268,26 @@ pnpm --filter @atoms/backend start
 
 部署框架已定义预检、发布暂存、配置暂存、激活、健康、失败恢复和收尾，包含配置暂存保护与幂等决策。生产模板采用已有 Nginx + systemd，支持 IP HTTPS、API 流转发和外置 SQLite/配置。依赖未接入时 `apply` 列出缺项后返回非零，尚无真实上传、切换、服务操作或部署通过记录；后续补齐接点，DEP-004 再做目标验收。
 
-releaseId 创建、复用、配置更新与回滚规则统一维护在 [发布版本标识](./docs/engineering/lifecycle.md#deployment-release-identity)。发布包不可变，重复部署不得隐式重建；发布构建继续由 GEN-009 实现。
+releaseId 创建、复用、配置更新与回滚规则统一维护在 [发布版本标识](./docs/engineering/lifecycle.md#deployment-release-identity)。发布包不可变，重复部署不得隐式重建；本机发布构建由下述 GEN-009 入口提供；远端上传/激活接点仍需 DEP 工作完成。
 
 本地检查生产前端产物可运行 `pnpm --filter @atoms/frontend preview`，访问 <http://127.0.0.1:4173>；该命令同样代理 `/api`，仅用于本地验收，不替代生产静态服务器。
+
+## 本机生产包与 Nginx 验收
+
+先选择 .nvmrc 的 Node、固定 pnpm，安装系统 Chrome，并准备可执行 Nginx（入口不会自动安装）。可按 [Nginx 官方源码安装说明](https://nginx.org/en/docs/configure.html) 安装在项目忽略目录，再将 NGINX_BIN 指向其绝对路径；也可使用 PATH 中已有 Nginx。依赖需有当前平台的本地 pnpm 缓存，Sandpack 真实编译仍需网络。
+
+```sh
+pnpm install --frozen-lockfile
+pnpm check
+pnpm verify:product
+pnpm release:build --json
+# 从上一条 JSON 的 directory 复制完整绝对路径
+NGINX_BIN=/absolute/path/to/nginx pnpm smoke:deployment --release /absolute/path/to/release
+```
+
+release:build 无参数会构建，--help 仅说明；缺离线缓存/原生前提/toolchain 会明确失败，源码改变则报 STALE_INPUT。成功产物位于 .runtime/releases/<releaseId>，只支持构建时 OS/架构/精确 Node 与 ABI；不要将本机依赖包搬到不同系统。smoke:deployment 不重建或安装、不读真实 .env、不修改原包，要求 3001/8080 空闲，使用 http://127.0.0.1:8080 与外置持久库。生产入口阶段和本地 SDK fixture 阶段分别记录，真实模型、公网 HTTPS、远端部署与 hosted CI 不由本地结果代替。
+
+报告在 test-results/deployment/<runId>/export/；private/shared 含日志、DB 与测试配置，仅留本地。完整路径、Nginx SSE/同源规则、共享代理 IP 限流、停机备份/失败切回见 [Lifecycle](./docs/engineering/lifecycle.md#local-release-lifecycle)，覆盖与实际证据见 [Verification](./docs/engineering/verification.md#local-deployment-acceptance)。
 
 ## 目录
 

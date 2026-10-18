@@ -35,7 +35,9 @@
     "test:verification": "node --test scripts/verify.test.mjs",
     "verify:product": "node scripts/verify.mjs --profile product",
     "release:build": "node scripts/release.mjs",
-    "test:release": "node --test scripts/release.test.mjs"
+    "test:release": "node --test scripts/release.test.mjs",
+    "smoke:deployment": "node scripts/deployment-smoke.cjs",
+    "test:deployment-control": "node --test scripts/deployment-control.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

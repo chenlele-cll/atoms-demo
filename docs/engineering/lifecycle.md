@@ -235,7 +235,7 @@ SQLite 接入后是应用使用的文件数据库，不需要额外数据库守�
 
 ## Deployment release identity
 
-本节维护自动部署必须遵守的版本标识与幂等规则。DEP-002/003 已提供本地工具、只读检查、离线 plan、Ansible 阶段、配置暂存及幂等决策，入口与待接入边界见 [Deployment](./deployment.md)；真实 apply 与发布构建仍待接入。[GEN-009 设计](../../openspec/changes/gen-009-local-release-validation/design.md) 已规划以 UUID 作为 releaseId，并在 release.json 记录输入、平台和文件清单；此处补充其创建、复用与激活规则。
+本节维护自动部署必须遵守的版本标识与幂等规则。DEP-002/003 已提供本地工具、只读检查、离线 plan、Ansible 阶段、配置暂存及幂等决策，入口与待接入边界见 [Deployment](./deployment.md)；真实 apply 仍待接入，本地发布构建见下节 Local release lifecycle。[GEN-009 设计](../../openspec/changes/gen-009-local-release-validation/design.md) 已落实以 UUID 作为 releaseId，并在 release.json 记录输入、平台和文件清单；此处补充其创建、复用与激活规则。
 
 ### Identity and ownership
 
@@ -262,3 +262,17 @@ SQLite 接入后是应用使用的文件数据库，不需要额外数据库守�
 ## Verification and updates
 
 起停与故障场景以 [Verification](./verification.md#lifecycle-scenarios) 为准。每次能力落地后，更新本文件的可用状态、README 和必要的环境模板，避免计划命令继续被当作已实现命令。
+
+## Local release lifecycle
+
+GEN-009 提供 `pnpm release:build [--json]` 和 `pnpm smoke:deployment --release /absolute/path`。它们复用验证互斥锁与进程身份辅助，但不加入默认 product/full/CI，不调用 manager，也不改系统 Nginx 或远端服务。固定端口为后端 3001、Nginx 8080；未知占用直接失败。验收只停止自己创建且 PID/启动时间/命令仍匹配的进程，Nginx 以前台 master 和独立 prefix 启动，不调用系统级 `nginx -s stop`。
+
+构建在 `.runtime/release-build/<UUID>/source` 离线 frozen install、原生读写、一次完整 build、默认 pnpm deploy --prod --frozen-lockfile。自有 backend/contracts 仅发布 package.json、dist 及生产依赖，前端只含 dist 字节。源身份含当前未提交输入及唯一 deploy/nginx.conf.template，不含 README/CI/文档/真实环境/数据；结束前复核源，成功删除本次源副本再原子发布 `.runtime/releases/<UUID>`，已有目录不覆盖。release.json 是完整性清单而非签名；包依赖构建时的 OS/架构/Node 版本和 ABI，不能把 Darwin 包上传 Linux。
+
+验收在 `test-results/deployment/<runId>/` 新建私有布局：`releases/relocated release/<releaseId>` 为搬迁后的只读包，`shared/data/atoms.sqlite` 为绝对持久路径，`shared/backup` 为停服冷备份，`shared/restored` 为隔离恢复演练，`private` 为日志/本地 SDK 启动器/Nginx prefix，分享只取 `export`。原包不修改、不安装/构建，搬迁临时副本移除后实际导入契约并打开 SQLite；进程 cwd 为搬迁包 backend，绝对 Node 执行 dist/server.js，环境白名单剔除开发者凭据、代理和 NODE_OPTIONS。正式配置由外部监督器传入，禁止把 .env、cookie、DB 或测试启动器打包。
+
+本机 HTTP origin 精确为 `http://127.0.0.1:8080`，不能混用 localhost。APP_ORIGINS 与浏览器 origin 保持一致；公开服务使用精确 HTTPS 域名/IP 与已验证证书。Nginx 保留原 Host 端口、Origin、Cookie、URI 与查询，关闭 SSE 缓冲/缓存/重试/错误回退，read timeout 150s 是相邻读取期限；后端仍有总期限和 10s 心跳。trustProxy 仍关闭，后端按代理地址限流，公开单机 Demo 的客户端共享代理 IP 配额。此本地 HTTP 验收不证明 TLS、Secure Cookie、公网或多层代理通过。
+
+真实切换采用停机操作：先验收目标平台新包 → 所属监督器停止旧后端并确认退出 → 冷备份 DB 及仍存在的 WAL/SHM → 使用包内 SQLite 对备份只读 quick_check → 设置 backend cwd、外置 DATABASE_PATH/APP_ORIGINS 和 frontend 静态根 → 对所属配置执行 nginx -t → 启动单个后端并检查健康/同源/项目重开 → reload 所属 Nginx。不要复制运行中的单个 sqlite 文件，不删除 generation.lock；硬杀后按 30s stale 等待，验收保留 32s 窗口。
+
+失败切回先停止本次新进程，再启用保留的兼容旧包和原数据，重新验收。若新 schema 已不兼容旧程序，禁止自动降级、恢复旧备份覆盖当前数据或将 DB 路径换成空库；保留现场并单独评审。首次 GEN-009 使用同一发布包和错误配置演练失败后重启，只证明数据保留与操作流程，不代表跨版本迁移/数据库回滚已验证。
