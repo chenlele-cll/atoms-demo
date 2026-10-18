@@ -28,6 +28,7 @@ try {
   else {
     store = openStore(ownership.filename); store.recoverRunning();
     app = buildApp({ logger: false }, { store, catalog, origins: ['http://127.0.0.1:5173', 'http://127.0.0.1:4173'], secureCookies: false,
+      limits: { sessionPerMinute: 1000, projectsPerMinute: 1000, projectsPerSession: 100 },
       ownershipSignal: lost.signal, releaseOwnership: ownership.release,
       generation: { env: { OPENAI_API_KEY: 'sk-explicit-stream-fixture', MODEL_ID: 'gpt-6.1-sol', MODEL_TIMEOUT_MS: '120000' },
         limits: { postPerMinute: 1000, queryPerMinute: 1000, cancelPerMinute: 1000 },

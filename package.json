@@ -14,7 +14,7 @@
     "build": "pnpm -r build",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm test:contracts && pnpm --filter @atoms/backend test",
+    "test": "pnpm test:contracts && pnpm --filter @atoms/backend test && pnpm --filter @atoms/frontend test",
     "test:contracts": "node --test scripts/prepare-contracts.test.mjs",
     "test:manager": "node --test scripts/manager.test.mjs",
     "test:infra": "node --test scripts/infra.test.mjs",
@@ -29,7 +29,8 @@
     "generation:smoke": "pnpm --filter @atoms/backend generation:smoke",
     "generation:smoke:built": "pnpm --filter @atoms/backend generation:smoke:built",
     "smoke:projects": "node scripts/project-smoke.cjs && node --test scripts/project-smoke-control.test.mjs",
-    "smoke:generation-stream": "node scripts/generation-stream-smoke.cjs"
+    "smoke:generation-stream": "node scripts/generation-stream-smoke.cjs",
+    "smoke:candidate": "node scripts/candidate-smoke.cjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -4,7 +4,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 项目目标是让用户通过自然语言生成和修改网页应用，交互预览结果，并保存项目与代码版本。
 
-当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成已实现；公开生成事件流/查询/取消已实现；候选预览/采用和完整工作台尚未实现，Top 1 尚未完成。
+当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成、公开生成事件流/查询/取消和候选预览/采用已实现；首页保留连接检查，完整工作台尚未实现，Top 1 尚未完成。
 
 ## 环境
 
@@ -114,7 +114,26 @@ pnpm smoke:template
 
 新项目原子保存服务端可信模板 v0，消息为空、没有生成记录；模板冲突返回 409，客户端不能注入文件或所有者。匿名 cookie 为 HttpOnly、SameSite=Strict、Path=/api，有效期 30 天，复用不延长；HTTPS 配置启用 Secure。数据库只保存 token 摘要。清理 cookie 或到期后会失去旧项目入口，没有找回或认领接口；数据不会自动删除。有效会话访问他人的项目与不存在项目均为 404，无会话为 401。
 
-会话初始化默认每 IP 每分钟 30 次，创建项目 10 次；每会话最多 20 个项目。超限分别返回带 Retry-After 的 429 或项目配额 409；上述 POST 请求体最多 8 KiB。错误统一 `{error:{code,message},requestId}`，私有响应 no-store。消息/run/候选由生成内核写入，没有任意代码写入、版本采用或分享接口；候选保存保持当前版本不变。契约与限制见 [Development](./docs/engineering/development.md#project-persistence)，真实验证见 [Verification](./docs/engineering/verification.md#project-persistence)。
+会话初始化默认每 IP 每分钟 30 次，创建项目 10 次；每会话最多 20 个项目。超限分别返回带 Retry-After 的 429 或项目配额 409；上述 POST 请求体最多 8 KiB。错误统一 `{error:{code,message},requestId}`，私有响应 no-store。消息/run/候选由生成内核写入，没有任意代码写入或分享接口；版本读取/采用见下节，候选保存保持当前版本不变。契约与限制见 [Development](./docs/engineering/development.md#project-persistence)，真实验证见 [Verification](./docs/engineering/verification.md#project-persistence)。
+
+## 候选预览与采用
+
+使用原会话直接打开 `/projects/:projectId/candidates/:versionId`，读取已存版本并在跨源 Sandpack iframe 中预览。页面展示当前/候选、模板来源、实际修改文件和编译状态；支持查看当前版本、重试和明确“使用这个版本”。没有会话或归属时显示真实错误，不初始化或认领项目。
+
+| 接口 | 行为 |
+| --- | --- |
+| GET /api/projects/:projectId/versions/:versionId | 完整不可变 version、successfulRun 或 null、changedFiles、currentVersionId、adoptionAvailability；有归属、no-store、每 IP 每分钟 60 次 |
+| POST /api/projects/:projectId/versions/:versionId/adopt | 严格 `{expectedCurrentVersionId}`，上限 1 KiB；返回 `{projectId,currentVersionId,updatedAt,alreadyCurrent}`；每 IP 每分钟 10 次 |
+
+采用须关联本项目成功生成运行，parent 与 expected 相同，当前仍为 expected，且没有活动或未确认生成。过期为 409 CURRENT_VERSION_CONFLICT；不是合法候选为 409 CANDIDATE_NOT_ADOPTABLE；活动为 409 PROJECT_BUSY，孤立 running 为 503 RUN_STATE_UNCONFIRMED。同一合法目标已是当前时返回 alreadyCurrent=true，不重复写入；不提供历史恢复。采用只切换当前引用，不修改快照或调用模型。
+
+按钮仅在本轮候选真实编译完成、无已知错误且服务端条件可用时启用。编译反馈是本地观察，不是可信编译证明或业务验收；后端不接受 verified 标记。网络断开/响应不合法时显示待确认并查询当前项目，查询失败可再次查询；仍是原版本不能证明原请求不会提交，可由所有者明确重试同一载荷。出现其他当前版本时保留冲突，不自动更换 expected 或回写旧版本。
+
+外部 Sandpack/bundler 会接收用于预览的代码，依赖联网与依赖包下载。iframe 不接收平台会话、对话或后端配置；sandbox 仅允许 scripts/same-origin，allow 为空且 no-referrer。切换/重试重置预览内临时输入；刷新及后端重启重新读取持久选择并重新编译，浏览器运行错误不会静默回退已采用版本。
+
+前后端通过 `packages/contracts` 共用项目/版本/快照/run/采用/安全错误契约；会话、消息、分页与 SSE 契约仍在后端。独立 dev/build/typecheck/test 自动准备其 ESM/声明，根 check 也先准备；契约源改变后重新准备或重启应用，不承诺跨包热更新。生产后端部署须含中立包的 package.json、dist 和运行依赖，见 [Monorepo](./docs/architecture/monorepo.md#shared-contract-build)。
+
+先 `pnpm build`，再 `pnpm smoke:candidate`；需要 Chrome、空闲 3001/5173/4173 以及外部 Sandpack 网络。报告位于忽略的 `test-results/candidate-review/<id>/report.json`，以明确 fixture 候选验证真实编译、报价控件、隔离、错误、采用竞争和重启，不消耗真实模型额度。覆盖与限制见 [Verification](./docs/engineering/verification.md#candidate-review)，历史混合工作区证据与隔离验证记录见 [GEN-006 tasks](./openspec/changes/gen-006-candidate-preview-adoption/tasks.md#isolated-review-evidence)。
 
 ## 模型能力探针
 
@@ -207,7 +226,7 @@ pnpm --filter @atoms/backend build
 
 ## 服务器运行
 
-后端 dev/typecheck/test 在执行前准备 src/template-assets，build 先准备 src，再编译并准备 dist/template-assets；三个目标从同一中立模板源产生一致内容，前后端构建各写自己的目标。后端部署包含整个 backend/dist 及在目标平台安装的运行依赖，不需要 frontend 源码或 public 目录。better-sqlite3 13.0.3 自带 N-API 原生预构建文件；安装后仍需验证实际打开/读写，不跨系统复制 node_modules。
+两应用独立 dev/build/typecheck/test 先准备共享契约。后端 dev/typecheck/test 在执行前准备 src/template-assets，build 先准备 src，再编译并准备 dist/template-assets；三个目标从同一中立模板源产生一致内容，前后端构建各写自己的目标。后端部署包含整个 backend/dist、@atoms/contracts 的 package.json/dist 及在目标平台安装的各自运行依赖，不需要 frontend 源码或 public 目录。better-sqlite3 13.0.3 自带 N-API 原生预构建文件；安装后仍需验证实际打开/读写，不跨系统复制 node_modules。
 
 后端监听前加载自身模板目录并迁移真实 SQLite 文件；初始化、缺资产、不支持 schema 或监听失败均非零退出。正常停止保留数据库，启动不清库、不回退到内存，不自动降级高版本数据。数据库应放在 dist 之外的持久目录。
 
@@ -242,6 +261,8 @@ frontend/              React + Vite 前端应用
     styles.css         全局基础样式
     templates/         公开模板资源加载与解析
     template-baseline/ 企业官网模板基线页及隔离预览
+    preview/           共用快照 iframe 与每次尝试的状态机
+    candidate-review/  候选读取、编译状态与明确采用
   vite.config.ts       开发与预览代理
 backend/               Fastify 后端应用
   AGENTS.md            后端任务路由与局部边界
@@ -251,10 +272,12 @@ backend/               Fastify 后端应用
     config.ts          服务配置解析
     routes/health.ts   健康接口
     routes/projects.ts 匿名会话、目录和项目 API
+    routes/versions.ts 有归属的版本读取与条件采用
     contracts/         Zod 输入/输出与快照契约
     storage/           SQLite 迁移、事务和内部写入
     templates/         后端可信模板目录
   test/                接口与配置行为测试
+packages/contracts/    项目/版本/快照/run/采用/错误的共用 schema 与摘要校验
 docs/
   README.md            文档索引与目录约定
   architecture/

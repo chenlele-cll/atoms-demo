@@ -75,15 +75,27 @@ prepareGeneration 负责归属、重放、基线/布局/配置预检；acceptPre
 
 ## Project persistence
 
-backend/src/contracts/projects.ts 是项目/session/模板/快照/分页/安全错误的 Zod 契约来源，类型由 schema 推导。项目路由局部设置 Fastify validatorCompiler / serializerCompiler；请求 strict 拒绝额外字段，输出经显式 DTO 和 schema 投影，不返回 ownerSessionId、token 摘要、SQL 行或原始异常。健康契约保持独立。GEN-007 接入浏览器时再提取公开契约到中立模块，禁止复制规则或导入后端实现。
+@atoms/contracts 是前后端共用项目/版本/快照/run/采用/安全错误的 Zod 契约来源，类型由 schema 推导；backend/src/contracts/projects.ts 重导出公开契约，保留会话、目录、消息、分页与可信模板 ID 等后端限制，SSE 仍由后端维护。项目路由局部设置 Fastify validatorCompiler / serializerCompiler；请求 strict 拒绝额外字段，输出经显式 DTO 和 schema 投影，不返回 ownerSessionId、token 摘要、SQL 行或原始异常。健康契约保持独立。GEN-006 的实际浏览器消费者已提取所需公开契约，禁止复制规则或导入后端实现。
 
 中立 templates/bundle.mjs 的纯文件规则随准备复制到后端部署资产；Zod 快照校验调用相同规则并重算 SHA-256，限制规范化虚拟路径、入口/样式/许可/运行配置、精确依赖版本、64 文件和总 UTF-8 2 MiB。新建项目核对当前可信目录；历史快照按自身身份验证，读取不依赖当前模板。保存候选须匹配基础版本的来源、入口和依赖，不改变 currentVersionId；结构合法不证明编译通过。
 
-storage/store.ts 管理 sessions、projects、versions、messages、generation_runs 五张表；外键和组合引用限制关联在同一项目，快照更新由数据库触发器拒绝。创建项目、带消息创建/结束 run、保存候选均在短事务内全成或全退；配额在创建事务内部检查。追加消息分配递增序号，重复项目内 requestId 拒绝。只有内部编排调用这些写入方法；本次没有公开消息/快照/采用接口。run 的 succeeded 仅代表候选落盘，不代表预览验收。
+storage/store.ts 管理 sessions、projects、versions、messages、generation_runs 五张表；外键和组合引用限制关联在同一项目，快照更新由数据库触发器拒绝。创建项目、带消息创建/结束 run、保存候选均在短事务内全成或全退；配额在创建事务内部检查。追加消息分配递增序号，重复项目内 requestId 拒绝。只有内部编排调用这些写入方法；没有任意消息/文件写入接口，版本读取与条件采用见下节。run 的 succeeded 仅代表候选落盘，不代表预览验收。
 
 持久会话使用随机 32 字节 token，数据库只存 SHA-256 摘要和 30 天到期时间。每个私有请求检查有效会话和 owner 条件；失效后初始化新会话不能认领旧项目。POST 只接受精确配置的 Origin 和 JSON；默认 trustProxy 关闭，不以伪造转发头绕过限流。请求体 8 KiB、项目 20 个/会话、消息 16 KiB、列表 50 条为初始边界，限流与配额可由显式构造参数在测试中缩小。
 
 项目错误只使用固定 code/message/requestId：输入 400、会话 401、来源 403、资源 404、模板/配额 409、超大体 413、类型 415、频率 429（Retry-After）、存储不可用 503、损坏记录 500。底层 SQL、绑定值、绝对路径、cookie、提示词和代码不进入错误或日志；结构化 `{err}` 只记录安全分类。默认请求日志仅保留方法，响应日志仅状态，避免 URL 查询中夹带敏感内容；私有响应 no-store。
+
+## Candidate review
+
+公开版本与采用以 @atoms/contracts 为唯一 schema。快照结构复用同源纯文件规则，UTF-8 总正文最多 2 MiB/64 文件，规范 JSON 的 SHA-256 在两个运行时同步验证；历史读取不从当前模板补文件。版本 GET 先检查会话/归属/项目关联，返回不可变版本、成功运行或 null、实际相对父版本修改路径及当时采用可用性。两份快照路径并集最多 128 条，不能以单快照的 64 文件限制截断修改列表。源码仅在归属成功的读取响应中返回，不进入错误或普通日志。
+
+采用 POST 严格只接受 expectedCurrentVersionId，1 KiB；成功候选必须为本项目 generated 版本并关联 succeeded.resultVersionId，parent 必须等于 expected。短事务再次检查会话到期、归属、完整候选和引用；目标已当前则幂等且不修改更新时间，否则比较当前 expected，检查 GEN-005 活动 Map 和数据库 running，再以 owner/current 条件 CAS 更新一行。无 await 或模型调用；失败回滚，不更改快照/运行/消息，不实现历史恢复。GET 每 IP 60/min、POST 10/min，Origin/JSON/no-store 沿用项目边界。冲突与拒绝的状态码见 [README API](../../README.md#候选预览与采用)。
+
+前端 api/versions.ts 使用相对 /api、same-origin、10 秒请求与读取期限，unknown 进入共用 schema，并核对响应与请求的项目/版本关联。完整响应上限 16 MiB，容纳快照 JSON 转义；错误体 64 KiB、展示消息最多 500 字符，均为纯文本。UTF-8/JSON/schema/摘要、HTTP、网络、取消、超时和超限分别处理；不读取 cookie 值，不将原始网络异常展示或上传。
+
+SnapshotPreview 供模板与候选页复用，仅接收已校验的快照和项目/版本/摘要/attempt 键，使用固定外部 bundler 与快照依赖，不补默认示例。useSandpackClient 作用域内的实际 done 且 compilatonError=false 才成为 compiled；load/connected 不成功。状态机拒绝旧键事件，编译/运行错误及 60 秒超时锁定该轮，文档重载使旧成功无效；主动重试才新实例。已 compiled 后 runtimeError 禁用采用。卸载清除 timer/监听，晚到的异步 client 被销毁；每次切换最多一个 iframe。
+
+iframe 固定跨源、sandbox="allow-scripts allow-same-origin"、空 allow、no-referrer；不传平台凭据/对话，不由 postMessage 触发采用。编译结果不是服务端信任根，采用接口不接收 verified/compiled 字段。页面把 loadingSnapshot/loadError/compiling/compiled/compileError/runtimeError/timeout 与 idle/submitting/confirmed/conflict/unknown/error 分开。用户点击且收到有效确认才声明采用；丢响应后查询当前事实，旧版本仍当前保持 unknown，其他选择为 conflict，不自动改 expected 重发。刷新与采用共用同步互斥保护，刷新期间禁用首次采用及手动重试，避免迟到的旧读取覆盖确认结果。手动同载荷重试依赖服务端幂等和 CAS；运行错误不回写旧版本。
 
 ## UI and handoff
 

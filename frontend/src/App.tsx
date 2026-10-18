@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { checkBackend } from './api/health';
 import styles from './App.module.css';
 import { TemplateBaseline } from './template-baseline/TemplateBaseline';
 
+const CandidateReview = lazy(() => import('./candidate-review/CandidateReview').then(module => ({ default: module.CandidateReview })));
+
 export function App() {
+  const candidate = /^\/projects\/([^/]+)\/candidates\/([^/]+)$/.exec(window.location.pathname);
+  if (candidate?.[1] && candidate[2]) return (
+    <Suspense fallback={<main><p role="status">正在加载页面…</p></main>}>
+      <CandidateReview projectId={candidate[1]} versionId={candidate[2]} />
+    </Suspense>
+  );
   return window.location.pathname === '/templates/company-landing' ? <TemplateBaseline /> : <ConnectionCheck />;
 }
 
