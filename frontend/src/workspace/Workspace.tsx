@@ -3,6 +3,8 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import type { WorkspaceController, WorkspaceState } from './controller';
 import { internalClick } from './routing';
 import styles from './Workspace.module.css';
+import { HistoryPane } from './HistoryPane';
+import { operationBlocks } from './history-state';
 const VersionPane = lazy(() => import('./VersionPane').then(module => ({ default: module.VersionPane })));
 
 export function ProductLink({ href, navigate, children, className }: { href: string; navigate: (path: string) => void; children: ReactNode; className?: string | undefined }) {
@@ -76,7 +78,7 @@ function Conversation({ state, app }: { state: WorkspaceState; app: WorkspaceCon
   const task = state.task; const runId = task?.state?.runId ?? task?.events[0]?.runId;
   const busy = task && !['terminal','unknown'].includes(task.phase);
   const wrongBase = state.selected?.id !== state.project?.project.currentVersionId;
-  const locked = busy || task?.phase === 'unknown' || wrongBase;
+  const locked = busy || task?.phase === 'unknown' || wrongBase || operationBlocks(state.operation) || Boolean(state.operation.refreshError);
   const submit = () => { if (!composing.current && !locked) void app.start(); };
   return <section className={styles.conversation} aria-label="对话">
     <div className={styles.messages} ref={container} onScroll={event => { const element = event.currentTarget; stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 64; app.reading.set(projectId, element.scrollTop); }}>
@@ -94,14 +96,15 @@ function Conversation({ state, app }: { state: WorkspaceState; app: WorkspaceCon
         <div className={styles.switch}>
           {busy && <button type="button" onClick={() => void app.cancel()} disabled={task.phase === 'cancelling'}>{task.phase === 'cancelling' ? '正在取消…' : '取消生成'}</button>}
           {task.phase !== 'terminal' && <button type="button" onClick={() => void app.query()}>查询结果</button>}
-          {task.phase === 'unknown' && task.local && <button type="button" onClick={() => void app.start(task.payload.prompt, undefined, true)}>重试原请求</button>}
+          {task.phase === 'unknown' && task.local && <button type="button" disabled={operationBlocks(state.operation)} onClick={() => void app.start(task.payload.prompt, undefined, true)}>重试原请求</button>}
           {task.phase === 'terminal' && task.state?.status !== 'succeeded' && <button type="button" onClick={() => { app.setDraft(task.payload.prompt); }}>使用上次需求</button>}
         </div>
       </section>}
     </div>
     <form className={styles.prompt} onSubmit={event => { event.preventDefault(); submit(); }}>
       <p className={styles.note} data-input-base={state.project?.project.currentVersionId}>生成基线：当前 v{state.project?.currentVersion.sequence}</p>
-      {wrongBase && <p className={styles.warning}>正在查看未采用候选。请先采用，或切换“当前版本”再提交。</p>}
+      {wrongBase && <p className={styles.warning}>正在查看其他版本。请先采用或恢复，或切换“当前版本”再提交。</p>}
+      {(operationBlocks(state.operation) || state.operation.refreshError) && <p className={styles.warning}>版本操作尚未结束或当前事实待核对，请先查询版本状态。</p>}
       <label htmlFor={`project-prompt-${activation}`}>描述下一步需求</label>
       <textarea id={`project-prompt-${activation}`} rows={4} maxLength={4000} value={state.draft} disabled={Boolean(busy)} onChange={event => app.setDraft(event.target.value)}
         onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
@@ -113,18 +116,19 @@ function Conversation({ state, app }: { state: WorkspaceState; app: WorkspaceCon
 export function ProjectWorkspace({ state, app }: { state: WorkspaceState; app: WorkspaceController }) {
   const resultPane = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { if (resultPane.current) resultPane.current.scrollTop = 0; }, [state.view]);
-  if (!state.project || !state.review) return <main className={styles.projectLoading}><h1>项目工作台</h1><p role={state.error ? 'alert' : 'status'}>{state.error || '正在读取项目、最新对话与已保存版本…'}</p>
+  if (!state.project) return <main className={styles.projectLoading}><h1>项目工作台</h1><p role={state.error ? 'alert' : 'status'}>{state.error || '正在读取项目、最新对话与已保存版本…'}</p>
+    {state.operation.status === 'confirmed' && <p role="status">{state.operation.message}</p>}
     <button type="button" onClick={() => app.activate(state.route, true)}>重新读取项目</button></main>;
   return <main className={styles.workspace}>
-    <header className={styles.projectHeader}><div><h1>{state.project.project.title}</h1><p>当前已保存 v{state.project.currentVersion.sequence} · {state.project.project.templateId}</p></div>
-      <div className={styles.viewTabs} aria-label="工作台视图">{(['chat','preview','code'] as const).map(view => <button type="button" key={view} aria-pressed={state.view === view} onClick={() => app.setView(view)}>{view === 'chat' ? '聊天' : view === 'preview' ? '预览' : '代码'}</button>)}</div>
+    <header className={styles.projectHeader}><div><h1 id="workspace-project-heading" tabIndex={-1}>{state.project.project.title}</h1><p>当前已保存 v{state.project.currentVersion.sequence} · {state.project.project.templateId}</p></div>
+      <div className={styles.viewTabs} aria-label="工作台视图">{(['chat','history','preview','code'] as const).map(view => <button type="button" key={view} aria-pressed={state.view === view} onClick={() => app.setView(view)}>{view === 'chat' ? '聊天' : view === 'history' ? '历史' : view === 'preview' ? '预览' : '代码'}</button>)}</div>
     </header>
     {state.error && <p role="alert" className={styles.error}>{state.error}</p>}
     {state.storageWarning && <p role="status" className={styles.warning}>{state.storageWarning}</p>}
     <div className={styles.workspacePanes} data-mobile-view={state.view}>
-      <div className={styles.chatPane}><Conversation state={state} app={app} /></div>
-      <div className={styles.resultPane} ref={resultPane}><Suspense fallback={<p role="status">正在加载预览与源码视图…</p>}><VersionPane key={`${state.project.project.id}/${state.review.version.id}`} project={state.project} review={state.review} mode={state.view}
-        onProject={project => app.facts(project, state.activation, state.review?.version.id)} onSelection={version => app.select(version, state.activation, state.review?.version.id)} onUnauthorized={() => app.expireSession()} /></Suspense></div>
+      <div className={styles.chatPane}><div hidden={state.view === 'history'} className={styles.paneContent}><Conversation state={state} app={app} /></div>
+        <div hidden={state.view !== 'history'} className={styles.paneContent}><HistoryPane state={state} app={app} /></div></div>
+      <div className={styles.resultPane} ref={resultPane}><Suspense fallback={<p role="status">正在加载预览与源码视图…</p>}><VersionPane key={state.activation} state={state} app={app} /></Suspense></div>
     </div>
   </main>;
 }
