@@ -32,8 +32,8 @@ export async function runGenerationSmoke(selected: SmokeCase, options: {
   let store: ProjectStore | undefined;
   try {
     const config = readModelConfig(options.env);
-    report.model = config.modelId; report.baseURL = 'https://api.openai.com/v1';
-    report.provider = 'openai';
+    report.model = config.modelId; report.baseURL = config.baseURL;
+    report.provider = config.baseURL === 'https://api.openai.com/v1' ? 'openai' : 'openai-compatible';
     const catalog = await loadCatalog();
     const template = catalog.list().items[0];
     if (!template) throw new GenerationError('UNSUPPORTED_TEMPLATE');

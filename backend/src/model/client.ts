@@ -71,7 +71,7 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
       };
       const provider = createOpenAI({
         apiKey: config.apiKey,
-        baseURL: 'https://api.openai.com/v1',
+        baseURL: config.baseURL,
         fetch: async (url, init) => {
           check();
           if (metrics.requestCount >= maxRequests) throw new ModelError('invalid_output');

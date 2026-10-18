@@ -6,6 +6,8 @@
 
 用户已有 ChatGPT Pro，尚未确认独立 API 凭据或模型权限，并请求给出推荐。本提案建议首个组合为 OpenAI Responses API 与 `gpt-6.1-sol`。该建议不表示账户权限、网络、费用或实际调用已经验证；这些由实施时的真实探针确认。
 
+实施追加决定：用户随后提供 ai.elegantyc.com 的 API 凭据及目录 URL，并明确要求在项目配置与测试。后端仍使用同一 OpenAI provider / Responses 协议，增加显式 OPENAI_BASE_URL 允许名单；默认官方 URL，另允许此次指定的 HTTPS /v1 URL。实际报告区分 openai 与 openai-compatible，并记录 baseURL。无自动切换、无任意浏览器上游地址、无第二套认证。
+
 `GEN-002` 无须等待 `GEN-001` 完成：能力探针使用独立、公开的小型输入，不读取模板、项目或私有材料。后续 `GEN-004` 复用模型客户端，但项目工具和生成流程另行实现。
 
 ## Goals / Non-Goals
@@ -40,6 +42,7 @@ ChatGPT 登录可提供 Codex 的订阅访问，API 密钥访问则由 Platform 
 | --- | --- |
 | `OPENAI_API_KEY` | 必填非空，只在模型调用边界读取，错误不回显值 |
 | `MODEL_ID` | 必填非空标识，环境模板建议 `gpt-6.1-sol`，不能以聊天订阅名称替代 |
+| `OPENAI_BASE_URL` | 默认 https://api.openai.com/v1；仅另允许用户指定的 https://ai.elegantyc.com/v1；禁止其他地址、凭据、查询、片段及重定向 |
 | `MODEL_TIMEOUT_MS` | 默认 60000，接受 1000–120000 的整数，覆盖一次完整能力样例及其工具往返 |
 | `MODEL_MAX_OUTPUT_TOKENS` | 默认 4096，接受 256–8192 的整数，传递至每次模型请求 |
 
@@ -74,6 +77,8 @@ CLI 沿用后端原生 `.env` 加载与进程环境优先规则，工作目录�
 无参数或 `--help` 只显示使用说明，不发请求；真实验证显式使用 `--case text|files|tools|all`。默认检查、健康检查、manager 和本地总验收不自动调用真实探针。CLI 不监听 HTTP 端口。
 
 报告包含本地运行标识、结果来源、实际请求次数、供应商、配置模型标识、时间、各项 `passed/failed/not-run`、耗时、安全错误分类和已观测的用量。实际发出供应商请求时来源为 `live`，前置检查失败且未调用时为 `not-run`，受控测试为 `fixture`。供应商未返回用量时记为 `null`；不计算未经核对的费用或将用量当成账单。默认输出脱敏 JSON，可选 `--report` 保存到忽略的 `test-results/model-probe/`。
+
+供应商字段由已校验的地址确定：官方为 openai，用户指定兼容服务为 openai-compatible；无合法配置时 provider/baseURL 为 null。读取指定 /models 目录只作一次接入前核对，不加入默认测试或后台轮询，也不自动改选模型。兼容服务的模型、用量和能力结果只代表该服务本次实际返回，不推断官方账号权限。
 
 配置错误时明确报告尚未发起调用；缺少凭据不是通过。命令成功仅用于全部请求的能力通过，其他结果返回非零，取消遵循终端中断语义。接收 SIGINT/SIGTERM 时先中止活动请求再完成有限清理，不再启动下一项样例。
 

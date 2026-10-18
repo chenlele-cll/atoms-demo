@@ -137,7 +137,7 @@ GEN-002 的 [模型模块](../../backend/src/model/client.ts) 只由显式调用
 覆盖范围：
 
 - 配置缺失、空值、非法模型标识、时限和输出预算；既有健康接口保持可用。
-- 固定官方端点（不受 OPENAI_BASE_URL 影响）、禁止重定向重放、`/v1/responses`、显式模型、`store: false`、输出预算、JSON schema 与工具结果回传，all 最多四次实际请求；schema 不合法、路径/数量/UTF-8 体积、拒绝、截断和缺失最终文本均失败。
+- 默认官方端点、显式批准兼容端点与其他地址拒绝（不受 SDK 隐式覆盖影响）、禁止重定向重放、`/v1/responses`、显式模型、`store: false`、输出预算、JSON schema 与工具结果回传，all 最多四次实际请求；schema 不合法、路径/数量/UTF-8 体积、拒绝、截断和缺失最终文本均失败。
 - 唯一内存工具的一次分派与随机 nonce 确认；缺少/未知/重复调用、非法参数、未确认或额外调用均失败，不自动修复。
 - 401、403/404、429、上游故障、网络故障的安全分类和零重试；错误体/响应头包含哨兵秘密时，报告与捕获日志不回显。
 - 真实 HTTP 延迟连接的超时/取消与底层连接结束，两次工具请求共用时限，晚到响应不继续步骤；操作结束移除监听器并关闭调用作用域，不能再次请求。输出格式失败可继续其他独立能力，账户/网络/时限故障停止后续样例。
@@ -145,7 +145,7 @@ GEN-002 的 [模型模块](../../backend/src/model/client.ts) 只由显式调用
 
 真实验收单独执行：配置 backend/.env 的 API 项目凭据和显式模型，完成构建后运行 `pnpm model:probe:built --case all --report`。该命令最多四次计费请求，缺配置零次；只在三项必需能力都 passed 时退出零。报告 source=live 仅证明实际发起请求，是否通过仍看各项状态；前置失败为 not-run，模块传输替身为 fixture。用量缺失为 null，不估算账单。报告只包含标识、状态、时间、请求次数、用量和安全摘要，保存在忽略的 test-results/model-probe/。
 
-本地替身通过不能替代 OpenAI 账户和模型权限实测。默认 check/smoke/verify、CI、manager 均不执行上述真实探针；现有 smoke 继续验证既有前后端连通，模板专项见上节。实际命令结果、未完成真实验收及供 GEN-004 复用的边界见 [GEN-002 tasks](../../openspec/changes/gen-002-model-access-validation/tasks.md)。这些能力不构成项目生成、持久化、预览编译或完整 Top 1 已完成。
+本地替身通过不能替代服务和模型权限实测。用户指定兼容服务已完成一次真实 all 验证，报告区分 provider/baseURL，不推断官方 Platform 权限。默认 check/smoke/verify、CI、manager 均不执行上述真实探针；现有 smoke 继续验证既有前后端连通，模板专项见上节。实际服务、能力和供 GEN-004 复用的边界见 [GEN-002 tasks](../../openspec/changes/gen-002-model-access-validation/tasks.md)。探针通过不构成项目生成、预览编译或完整 Top 1 已完成。
 
 ## Project persistence
 
@@ -234,7 +234,7 @@ pnpm generation:smoke:built --help
 
 smoke 已含 build，项目恢复及端口用例串行运行。GEN-004 不改变应用启动/安装、模板准备或预览 UI；这些源码未变时复用 GEN-003 的 frozen/manager/模板专项证据，不为了新增内部方法重复全量生命周期验证。新增生成路径不接入默认 smoke/verify/CI 的真实调用。
 
-真实验收只显式运行一次构建后的 `pnpm --filter @atoms/backend generation:smoke:built --live --case quote`。当前冻结版本使用固定官方端点；下述历史兼容服务验收还依赖独立待提交的 GEN-002 端点配置改动。运行器使用后端模型配置、一个公开固定需求和全新隔离项目，最多六次请求，报告实际服务、请求/用量、读取/提交活动、完整候选保存及数据库重开；不自动执行 filter、修复或重新计费。报告与关闭的本地测试数据库在忽略的 test-results/generation-smoke/<id>/，数据库不上传。预检失败为 not-run，本地注入为 fixture，有供应商请求才为 live；用量缺失与重放未知为 null。
+真实验收只显式运行一次构建后的 `pnpm --filter @atoms/backend generation:smoke:built --live --case quote`。它使用已确认的后端服务配置、一个公开固定需求和全新隔离项目，最多六次请求，报告实际服务、请求/用量、读取/提交活动、完整候选保存及数据库重开；不自动执行 filter、修复或重新计费。报告与关闭的本地测试数据库在忽略的 test-results/generation-smoke/<id>/，数据库不上传。预检失败为 not-run，本地注入为 fixture，有供应商请求才为 live；用量缺失与重放未知为 null。
 
 本次真实 quote 已保存候选并确认旧当前版本不变，仍为 unverified；未执行候选编译、报价交互、第二需求或线上部署，不把工具参数合法或 SQLite 保存当作完整 Top 1。实际命令、退出结果、模型请求和证据见 [GEN-004 tasks](../../openspec/changes/gen-004-bounded-agent-generation/tasks.md)。
 

@@ -19,7 +19,8 @@ export type ProbeCaseResult = {
 export type ProbeReport = {
   runId: string;
   source: 'live' | 'fixture' | 'not-run';
-  provider: 'openai';
+  provider: 'openai' | 'openai-compatible' | null;
+  baseURL: string | null;
   model: string | null;
   startedAt: string;
   finishedAt: string;
@@ -38,7 +39,7 @@ export async function runProbe(selected: CaseName | 'all', options: {
 }): Promise<ProbeReport> {
   const start = performance.now();
   const report: ProbeReport = {
-    runId: randomUUID(), source: 'not-run', provider: 'openai', model: null,
+    runId: randomUUID(), source: 'not-run', provider: null, baseURL: null, model: null,
     startedAt: new Date().toISOString(), finishedAt: '', durationMs: 0,
     status: 'failed', requestCount: 0, error: null,
     cases: caseNames.map(name => ({ name, status: 'not-run', durationMs: null,
@@ -47,6 +48,8 @@ export async function runProbe(selected: CaseName | 'all', options: {
   try {
     const config = readModelConfig(options.env);
     report.model = config.modelId;
+    report.baseURL = config.baseURL;
+    report.provider = config.baseURL === 'https://api.openai.com/v1' ? 'openai' : 'openai-compatible';
     const client = createModelClient(config, options.transport);
     for (const item of report.cases) {
       if (selected !== 'all' && item.name !== selected) continue;

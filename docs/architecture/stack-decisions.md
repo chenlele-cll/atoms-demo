@@ -1,6 +1,6 @@
 # 技术栈调研与初始化建议
 
-状态：前端 React + Vite、后端 Fastify + Node.js + TypeScript 分别启动，已有健康检查、固定模板预览、模型能力探针和 SQLite 匿名项目 API。官方模型真实能力尚待 API 验收；内部有界候选生成已实现，公开生成和候选预览/采用尚未实现。用户已有服务器，要求保持简单、只引入必要技术。本文记录本项目的技术决策与适用边界。
+状态：前后端独立启动，已有固定模板预览、模型探针、SQLite 匿名项目 API 和内部有界候选生成。指定兼容服务的 gpt-6.1-sol 三项探针及一个报价候选的真实生成/保存/重开已通过；公开生成控制、候选预览/采用与完整工作台仍待实现。用户已有服务器，要求保持简单、只引入必要技术。本文记录技术决策与适用边界。
 
 ## 1. 选型目标
 
@@ -31,7 +31,7 @@ GEN-004 的生成内核采用显式的最多六次单步工具请求，权限、
 
 GEN-002 在 backend 精确固定 `ai@7.0.143`、`@ai-sdk/openai@4.0.96` 和 `zod@4.6.7`，兼容 Node 22；前端不引入模型依赖。显式使用 `provider.responses()`、`generateText`、`Output.object`、Zod schema 和单步工具调用。客户端控制零自动重试、每次输出预算、完整样例截止时间和取消；工具分派前检查完整调用批次，再显式提交工具结果，避免 SDK 自动多步扩大请求次数。
 
-实现依据为 [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)、[Function Calling](https://developers.openai.com/api/docs/guides/function-calling?api-mode=responses) 和 [AI SDK generateText](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text)，实际兼容性由固定包源码与本地 HTTP 协议测试确认。Responses 设置 `store: false`；账户 API 凭据、额度及模型访问仍需真实探针。ChatGPT Pro 不作为这些前提的证明，不读取订阅登录缓存。
+实现依据为 [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)、[Function Calling](https://developers.openai.com/api/docs/guides/function-calling?api-mode=responses) 和 [AI SDK generateText](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text)。Responses 设置 `store: false`。用户随后指定 ai.elegantyc.com/v1，已通过后端 OPENAI_BASE_URL 允许名单配置并完成 gpt-6.1-sol 实测，报告标明 openai-compatible 与实际端点；默认仍为官方 URL，无自动换供应商或模型。兼容服务通过不能证明官方 Platform 权限；ChatGPT Pro 不作为 API 凭据或额度证明，不读取订阅登录缓存。
 
 Sandpack 用于避免自行实现 React 编译与预览环境。它是当前基于 React 生成目标的推荐；如果最终只生成 HTML/CSS/JS，可以使用隔离 iframe，并移除这项依赖。
 
@@ -126,7 +126,7 @@ FastAPI 的 Pydantic 校验、OpenAPI 文档与 Python 工具生态具有实际�
 - 初始化使用本机已有的 Node.js `22.22.2` LTS 与 pnpm `12.11.2`，在 `.nvmrc` 和 package.json 中固定工具链。
 - 已安装 React `19.3.1`、Vite `8.3.4`、Fastify `5.12.7`。TypeScript 使用与当前 typescript-eslint peer 范围兼容的 `5.9.3`；依赖由根目录 lockfile 锁定。
 - 已建立开发入口、生产构建、严格类型检查、ESLint 和后端接口／配置测试。实际命令与配置以 README 和 package.json 为准。
-- 模型客户端、模板基线与 SQLite 项目 API 有各自本地测试；真实模型能力、生成候选预览/采用、实际服务器和完整产品生成仍需独立验收。
+- 模型客户端、模板基线与 SQLite 项目 API 有各自本地测试；指定兼容服务的真实探针已通过，生成候选预览/采用、实际服务器和完整产品生成仍需独立验收。
 
 ## 8. 初始化前的实际前提
 

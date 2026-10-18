@@ -23,7 +23,7 @@
 - 修改实际命令或配置时，同步更新 README 与相关 `.env.example`；模板只放必要名称、说明和安全示例值。
 - 环境文件、持久数据和本地工具产物遵循 `.gitignore`；原始题目材料保持本地参考用途。
 
-模型客户端固定官方 `https://api.openai.com/v1`，不读取 SDK 的 OPENAI_BASE_URL 覆盖，不跟随重定向。先将供应商异常转为 `ModelError` 的允许字段（code、HTTP status 或 null、retryable），再交给日志或报告；不记录 SDK 异常 cause、原始 body、headers、提示词或文件正文。`retryable` 仅为提示，不触发重试。分类为 configuration、authentication、model_access、quota_rate_limit、upstream、network、refusal、invalid_output、truncated、timeout、cancelled；报告缺失用量使用 null。SDK 的原始 warning 文本也不进入日志。
+模型客户端只读取已校验的 OPENAI_BASE_URL：默认官方 `https://api.openai.com/v1`，另允许用户明确指定的 `https://ai.elegantyc.com/v1`，没有任意地址或 SDK 隐式覆盖，不跟随重定向。报告标明实际 provider/baseURL，兼容服务结果不代表官方权限。先将供应商异常转为 `ModelError` 的允许字段（code、HTTP status 或 null、retryable），再交给日志或报告；不记录 SDK 异常 cause、原始 body、headers、提示词或文件正文。`retryable` 仅为提示，不触发重试。分类为 configuration、authentication、model_access、quota_rate_limit、upstream、network、refusal、invalid_output、truncated、timeout、cancelled；报告缺失用量使用 null。SDK 的原始 warning 文本也不进入日志。
 
 ## Generation when implemented
 

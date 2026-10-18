@@ -1,6 +1,6 @@
 # Tasks
 
-范围与边界见 [proposal.md](./proposal.md)，实现方案见 [design.md](./design.md)，验收行为见 [project-persistence](./specs/project-persistence/spec.md)。已按用户“实施 GEN-003”完成代码与实际验证，检查结果见文末；规划校验不作为运行证据。实施复用 GEN-001 的真实模板基线，不依赖模型密钥。
+范围与边界见 [proposal.md](./proposal.md)，实现方案见 [design.md](./design.md)，验收行为见 [project-persistence](./specs/project-persistence/spec.md)。已按用户“实施 GEN-003”完成代码与实际验证，检查结果见文末；规划校验不作为运行证据。实施复用 GEN-001 的真实模板基线，不依赖模型密钥。用户追加指定兼容服务配置与实测的结果单独记录于 GEN-002。
 
 ## 1. 运行时契约与文件数据库
 

@@ -265,3 +265,19 @@ test('bounded client closes its scope, enforces request budget and removes exter
     assert.equal(fixture.requests.length, 2);
   } finally { await fixture.close(); }
 });
+
+test('explicit approved compatible endpoint uses Responses and is identified in the report', async () => {
+  const fixture = await startFixture((_, res) => res.end(JSON.stringify(response())));
+  let target = '';
+  const transport: typeof fetch = (url, init) => {
+    target = String(url);
+    return fetch(`${fixture.origin}/v1/responses`, init);
+  };
+  try {
+    const report = await runProbe('text', { env: { ...fixtureEnv, OPENAI_BASE_URL: 'https://ai.elegantyc.com/v1' }, transport });
+    assert.equal(report.status, 'passed'); assert.equal(report.source, 'fixture');
+    assert.equal(report.provider, 'openai-compatible'); assert.equal(report.baseURL, 'https://ai.elegantyc.com/v1');
+    assert.equal(target, 'https://ai.elegantyc.com/v1/responses');
+    assert.equal(fixture.requests[0]?.store, false); assert.equal(report.requestCount, 1);
+  } finally { await fixture.close(); }
+});

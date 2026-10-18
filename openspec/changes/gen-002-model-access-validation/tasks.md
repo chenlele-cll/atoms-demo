@@ -1,6 +1,6 @@
 # Tasks
 
-任务：`GEN-002`。范围为单供应商模型接入、能力探针和对应自动化测试，不包含真实项目生成。收到实施请求后已实现代码与本地验证；用户明确 API 前提尚未准备，4.2 保留未完成。需求见 [model-access](./specs/model-access/spec.md)，边界、参数与测试矩阵见 [design.md](./design.md)。
+任务：`GEN-002`。范围为模型接入、能力探针和对应自动化测试，不包含真实项目生成。首轮已完成代码与替身验证；用户后续提供指定兼容服务并要求配置与实测，现已通过 gpt-6.1-sol 三项真实探针，见文末追加证据。需求见 [model-access](./specs/model-access/spec.md)，边界、参数与测试矩阵见 [design.md](./design.md)。
 
 ## 1. Configuration and dependencies
 
@@ -21,18 +21,18 @@
 ## 4. Integration verification and handoff
 
 - [x] 4.1 GEN-002 运行 frozen install、`pnpm check`、`pnpm build` 和构建产物的无网络入口检查；确认默认测试、健康检查及现有本地总验收不会调用真实模型，不访问开发者秘密文件，记录退出结果并清理测试 HTTP 服务及子进程。
-- [ ] 4.2 GEN-002 在 API 凭据、额度和模型权限确实准备好后，显式运行构建产物的 `--case all`，记录指定模型的文本、文件与工具实际结果、耗时及可用用量；如前提未满足或任何能力失败，保留该项未完成并报告具体边界，不能以替身测试通过代替。
+- [x] 4.2 GEN-002 在 API 凭据、额度和模型权限确实准备好后，显式运行构建产物的 `--case all`，记录指定模型的文本、文件与工具实际结果、耗时及可用用量；如前提未满足或任何能力失败，保留该项未完成并报告具体边界，不能以替身测试通过代替。
 - [x] 4.3 GEN-002 核对配置、模型推荐、命令与实际实现一致，执行本 change 严格校验、链接和差异检查；在本清单记录实际能力与未验证范围供 GEN-004 使用，确认 GEN-001、manager、其他 change 和用户既有改动未被覆盖，不提交或推送。
 
 ## Workflow follow-up
 
-- 已按用户实施请求使用仓库 `openspec-apply-change` 工作流；真实 API 验收待凭据、额度与模型权限准备后继续，不读取开发者登录缓存或秘密文件。
+- 已按用户实施请求使用仓库 `openspec-apply-change` 工作流；后续按用户追加授权完成指定兼容服务的真实验收，凭据只从其后端本地配置读取，不访问 ChatGPT/Codex 登录缓存。
 - 如选择改用 ChatGPT 套餐授权、Codex SDK 或其他供应商，先修订本提案中的认证、调用限制及验收，不静默更换路线。
 - 验证、规格同步和归档按后续请求分别执行；模型能力探针通过不能作为真实模板修改、持久化、预览或完整 Top 1 已通过的证据。
 
 ## Implementation evidence
 
-2026-10-18 按用户“实施 GEN-002”执行。用户随后明确“尚未准备，先完成代码和本地测试”，因此不运行真实 API 验收、不勾选 4.2。
+首轮：2026-10-18 按用户“实施 GEN-002”执行。当时用户明确“尚未准备，先完成代码和本地测试”，因此该轮未运行真实 API 验收。后续新的配置与实测授权见下方追加记录。
 
 - 后端精确依赖：ai 7.0.143、@ai-sdk/openai 4.0.96、zod 4.6.7；使用项目 Node 22.22.2 / pnpm 12.11.2。安装时核对官方 Responses、Structured Outputs、Function Calling、AI SDK generateText 及固定包的实际实现，更新唯一 lockfile，前端未引入模型依赖。
 - [配置](../../../backend/src/model/config.ts) 仅在调用边界解析；安全模板增加四个模型变量，既有 HOST/PORT 和健康行为不受缺少模型配置影响。不读取 ChatGPT/Codex 缓存，不接受任意上游地址；固定官方 API baseURL，阻止 SDK 环境覆盖及重定向重放。
@@ -59,4 +59,22 @@
 
 GEN-001 模板内容标识仍为 `44e5ae3cc6ad1faf92e9000108279abe533b903dc7ea9b04124466690c2133e6`；未修改其源码/任务、manager 实现、其他 GEN change 或用户 .config/opencode 改动。README、两级指南、配置/选型/生命周期/验证文档只补充实际模型边界。现有默认 check/verify/CI 的命令链未加入真实探针；本轮未重复运行未受影响的完整 manager、浏览器和模板专项，沿用 GEN-001 对应记录。未提交、推送、归档、部署到服务器。
 
-供 GEN-004：可复用 readModelConfig 与 createModelClient().run 中的有限 session.step；项目工具、权限、生成步骤和文件采用另行实现。真实 OpenAI 的三项能力、模型权限、额度、网络和用量均未验证；文件样例合法不证明代码能编译，模板预览也不构成真实项目生成或完整 Top 1 已完成。
+供 GEN-004：可复用 readModelConfig 与 createModelClient().run 中的有限 session.step；项目工具、权限、生成步骤和文件采用另行实现。首轮未验证真实服务，后续指定兼容服务的结果如下；文件样例合法不证明代码能编译，模板预览也不构成真实项目生成或完整 Top 1 已完成。
+
+## Explicit compatible-service acceptance
+
+2026-10-18 用户后续明确提供兼容服务地址/目录及 API 凭据，要求配置到项目并执行相关测试；该新请求覆盖此前“尚未准备”的状态。保留原 Responses 协议与 gpt-6.1-sol，没有更换模型或自动回退。
+
+- 凭据只保存于忽略的 backend/.env，权限 0600；报告检查不含密钥。环境模板只记录名称及安全端点示例，没有真实凭据。
+- 后端 OPENAI_BASE_URL 默认官方 URL，只另允许用户指定的 https://ai.elegantyc.com/v1；不允许其他地址、认证 URL、查询、明文 HTTP 或重定向。继续使用固定 AI SDK/OpenAI provider，无多供应商/认证抽象。
+- 对指定 /models 的一次授权读取返回 HTTP 200、12 个模型，包含 gpt-6.1-sol。此为服务目录观察，不据此声明官方账号权限。
+- 更新后的 pnpm check 退出 0，共 85 项后端测试；新增兼容端点的实际 SDK/本地 HTTP 协议测试和非法端点配置测试，默认测试仍不读取真实凭据或调用真实服务。后端构建退出 0。
+- 显式执行 `pnpm model:probe:built --case all --report`，退出 0，source=live、provider=openai-compatible、baseURL=https://ai.elegantyc.com/v1、model=gpt-6.1-sol。
+
+| 能力 | 实际结果 | 模型请求 | 耗时 | 供应商返回 input/output/total tokens |
+| --- | --- | --- | --- | --- |
+| text | passed，38 个字符的非空最终文本 | 1 | 2714ms | 4234 / 12 / 4246 |
+| files | passed，1 个固定路径文件、70 UTF-8 字节 | 1 | 2357ms | 4310 / 45 / 4355 |
+| tools | passed，1 次 inspect_fixture 分派、最终确认真实随机 nonce | 2 | 4412ms | 8820 / 64 / 8884 |
+
+总计四次请求、9484ms、零自动重试。脱敏报告为 `test-results/model-probe/238cfa8f-692b-43ec-869d-a89c6fdc9ca1.json`。用量为该兼容服务返回值，不推算账单，不代表官方 OpenAI Platform 权限或费用；本次仍未进行真实项目生成、代码编译或候选采用。GEN-003 的数据测试与此真实探针分别记录。

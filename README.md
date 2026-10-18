@@ -4,7 +4,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 项目目标是让用户通过自然语言生成和修改网页应用，交互预览结果，并保存项目与代码版本。
 
-当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成、公开生成事件流/查询/取消、候选预览/采用及创建/对话/预览/只读源码工作台已实现；本地工作台使用受控 SDK 上游验证，真实模型最终业务与部署验收仍需独立完成。
+当前已有健康检查、企业官网模板预览、SQLite 匿名项目 API、模型能力探针、有界候选生成、公开事件流/查询/取消，以及创建、对话、候选预览、只读源码和明确采用的工作台。用户指定兼容服务的三项探针已通过；工作台专项使用受控上游验证完整本地路径，真实模型最终业务验收与最终部署仍由后续 GEN 任务完成。
 
 ## 环境
 
@@ -102,7 +102,8 @@ pnpm smoke:template
 | `backend/.env` | `PORT` | `3001` | 后端端口，范围 1–65535 |
 | `backend/.env` | `DATABASE_PATH` | `../data/atoms.sqlite` | 相对 backend 工作目录解析的持久数据文件；禁止内存/空路径及 backend/dist 内路径 |
 | `backend/.env` | `APP_ORIGINS` | `http://127.0.0.1:5173,http://127.0.0.1:4173` | 逗号分隔的精确来源；公网必须 HTTPS，不与开发 HTTP 混用 |
-| `backend/.env` | `OPENAI_API_KEY` | 无；仅模型调用时必填 | 独立 OpenAI Platform 项目的服务端凭据 |
+| `backend/.env` | `OPENAI_API_KEY` | 无；仅模型调用时必填 | 所配置 API 服务的后端凭据 |
+| `backend/.env` | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | 仅允许官方或用户指定的 `https://ai.elegantyc.com/v1` |
 | `backend/.env` | `MODEL_ID` | 无；模板建议 `gpt-6.1-sol` | 显式指定模型；无权限时失败，不自动切换 |
 | `backend/.env` | `MODEL_TIMEOUT_MS` | `60000` | 每项完整能力样例的时限，整数 1000–120000ms |
 | `backend/.env` | `MODEL_MAX_OUTPUT_TOKENS` | `4096` | 每次请求的输出上限，整数 256–8192 |
@@ -170,7 +171,7 @@ The workspace consumes the restore API. REV-004 requires a successful current-ve
 
 ## 模型能力探针
 
-先在本地 `backend/.env` 配置独立 API 凭据与模型，勿在聊天或仓库发送秘密。ChatGPT Pro 与 OpenAI Platform 的 API 凭据、额度和模型权限分开；本项目不读取 ChatGPT/Codex 登录缓存。推荐模型是否可用以账户实际调用为准。
+在本地 `backend/.env` 配置 API 凭据、允许的端点与模型；该文件被 Git 忽略，不向前端或报告返回凭据。ChatGPT Pro 与 API 服务凭据及额度分开，本项目不读取 ChatGPT/Codex 登录缓存。用户指定兼容服务的目录包含 gpt-6.1-sol，本次真实三项探针结果见 GEN-002 任务记录；兼容服务通过不代表官方 Platform 权限。
 
 ```sh
 pnpm model:probe --help
@@ -181,7 +182,7 @@ pnpm model:probe:built --case all --report
 
 无参数或 `--help` 仅显示帮助，不读取环境文件、不发请求。只有显式 `--case text|files|tools|all` 才调用；文本/文件各最多 1 次、工具最多 2 次、all 最多 4 次，没有自动重试。使用 Responses API 并设置 `store: false`；每项样例共用一个截止时间，Ctrl+C / SIGTERM 中止活动请求并分别退出 130/143。认证、权限、额度、服务、网络、超时或取消会停止剩余样例。
 
-文件样例只检查 `/App.tsx` 的结构、非空内容及 16 KiB 字节上限，不写入、不执行、不证明编译通过；工具只读取公开内存数据，最终回答须确认本次实际工具结果。默认输出脱敏 JSON，可选报告保存到忽略的 `test-results/model-probe/<runId>.json`。`source` 区分 live/fixture/not-run，用量缺失为 null；缺配置、任一必需项失败或未执行均非零退出。默认 check/smoke/verify、健康检查及 CI 均不调用真实模型。覆盖和验收边界见 [Model access](./docs/engineering/verification.md#model-access)。
+文件样例只检查 `/App.tsx` 的结构、非空内容及 16 KiB 字节上限，不写入、不执行、不证明编译通过；工具只读取公开内存数据，最终回答须确认本次实际工具结果。默认输出脱敏 JSON，可选报告保存到忽略的 `test-results/model-probe/<runId>.json`。`source` 区分 live/fixture/not-run，provider/baseURL 标明官方或兼容服务，用量缺失为 null；缺配置、任一必需项失败或未执行均非零退出。默认 check/smoke/verify、健康检查及 CI 均不调用真实模型。覆盖和验收边界见 [Model access](./docs/engineering/verification.md#model-access)。
 
 ## 有界候选生成
 
@@ -194,7 +195,7 @@ pnpm generation:smoke:built --help
 pnpm generation:smoke:built --live --case quote
 ```
 
-另有公开 filter 样例；每次只执行所选一项，不自动追加第二项或修复。源码命令会先准备后端模板资产；帮助不读取后端环境或请求模型。只有 --live 和指定 --case 同时存在才调用，使用 backend/.env 的模型配置及固定官方端点；兼容端点支持仍在独立待提交的 GEN-002 改动中。运行器创建自己的随机匿名会话、项目和 SQLite 文件，忽略生产 DATABASE_PATH，不接收现有项目 ID。
+另有公开 filter 样例；每次只执行所选一项，不自动追加第二项或修复。源码命令会先准备后端模板资产；帮助不读取后端环境或请求模型。只有 --live 和指定 --case 同时存在才调用，使用 backend/.env 的允许端点与模型配置。运行器创建自己的随机匿名会话、项目和 SQLite 文件，忽略生产 DATABASE_PATH，不接收现有项目 ID。
 
 报告在忽略的 test-results/generation-smoke/<id>/report.json，同目录保留关闭后的隔离测试数据库用于本地核对，不能上传这些数据库。报告区分 live/fixture/not-run，含实际请求/已知用量、工具元数据、修改路径与候选重开比较，不含代码、提示词或凭据。保存成功仍为 previewStatus=unverified；本轮不证明报价交互、浏览器编译或线上部署。边界见 [Development](./docs/engineering/development.md#bounded-generation)，实测见 [GEN-004 记录](./openspec/changes/gen-004-bounded-agent-generation/tasks.md)。
 
@@ -335,6 +336,7 @@ backend/               Fastify 后端应用
     contracts/         Zod 输入/输出与快照契约
     storage/           SQLite 迁移、事务和内部写入
     templates/         后端可信模板目录
+    model/             有界 Responses 客户端与独立探针
   test/                接口与配置行为测试
 packages/contracts/    会话/目录/项目/消息/版本/快照/run/SSE/采用/错误共用契约与摘要校验
 docs/
