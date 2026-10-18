@@ -1,0 +1,14 @@
+packages:
+  - frontend
+  - backend
+
+engineStrict: true
+saveExact: true
+
+allowBuilds:
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - react-dom@19.3.1
+  - react@19.3.1
+  - playwright-core@1.64.1

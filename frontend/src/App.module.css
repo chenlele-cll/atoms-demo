@@ -1,0 +1,32 @@
+.page {
+  max-width: 880px;
+  padding: var(--space-6);
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.identity { font-family: ui-monospace, monospace; font-size: 12px; }
+.page h1 { font-size: clamp(2rem, 6vw, 3.5rem); line-height: 1.25; margin-block: var(--space-6) var(--space-3); }
+.intro { color: var(--muted); margin-bottom: var(--space-4); }
+.panel { padding: var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.panel h2 { margin: 0; font-size: 1.25rem; }
+.panel button { min-height: 44px; padding: var(--space-1) var(--space-2); border: 0; border-radius: 6px; background: var(--accent); color: var(--surface); cursor: pointer; }
+.panel button:disabled { cursor: wait; opacity: 0.65; }
+.panel button:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.status { color: var(--muted); }
+.error { color: var(--error); }
+
+@media (max-width: 600px) {
+  .page { padding: var(--space-3); }
+  .panel { padding: var(--space-3); }
+}

@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+.DS_Store
+.omo/
+.playwright-mcp/
+playwright-report/
+test-results/
+
+# Local-only assignment source material; do not publish.
+/docs/笔试背景与要求.md
