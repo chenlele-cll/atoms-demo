@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/F1bonacc1/process-compose/v1.122.0/schemas/process-compose-schema.json
+# Tool version: .process-compose-version. Run from the repository root; see docs/engineering/lifecycle.md.
+version: "0.5"
+is_strict: true
+shell:
+  shell_command: /bin/bash
+  shell_argument: -c
+log_location: .runtime/process-compose/processes.log
+log_configuration:
+  flush_each_line: true
+  rotation:
+    max_size_mb: 5
+    max_backups: 2
+    max_age_days: 7
+    compress: true
+
+processes:
+  backend:
+    command: node scripts/check-dev-port.cjs 3001 && exec pnpm dev:backend
+    is_dotenv_disabled: true
+    environment:
+      - HOST=127.0.0.1
+      - PORT=3001
+    availability:
+      restart: on_failure
+      backoff_seconds: 2
+      max_restarts: 2
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 3001
+        path: /api/health
+      initial_delay_seconds: 1
+      period_seconds: 2
+      timeout_seconds: 1
+      failure_threshold: 5
+    shutdown:
+      signal: 15
+      timeout_seconds: 10
+      parent_only: false
+
+  frontend:
+    command: node scripts/check-dev-port.cjs 5173 && exec pnpm dev:frontend
+    is_dotenv_disabled: true
+    environment:
+      - API_PROXY_TARGET=http://127.0.0.1:3001
+    availability:
+      restart: on_failure
+      backoff_seconds: 2
+      max_restarts: 2
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 5173
+        path: /
+      initial_delay_seconds: 1
+      period_seconds: 2
+      timeout_seconds: 1
+      failure_threshold: 5
+    shutdown:
+      signal: 15
+      timeout_seconds: 10
+      parent_only: false

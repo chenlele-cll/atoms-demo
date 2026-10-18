@@ -6,7 +6,10 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  globalIgnores(['**/dist/**', '**/node_modules/**', '.omo/**', '.playwright-mcp/**', 'test-results/**', 'output/playwright/**']),
+  globalIgnores([
+    '**/dist/**', '**/node_modules/**', '.omo/**', '.playwright-mcp/**',
+    'test-results/**', 'output/playwright/**', '.runtime/**', '.tools/**',
+  ]),
   js.configs.recommended,
   {
     files: ['**/*.{mjs,cjs}'],

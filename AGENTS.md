@@ -4,7 +4,7 @@ This file applies to the whole repository. Before editing an application, also r
 
 ## Project
 
-Atoms Demo has an independently runnable React + Vite frontend and Fastify + Node.js backend. Both use TypeScript; the frontend uses CSS Modules. The current application is a connection-check skeleton; generation, persistence, and generated-app preview are not implemented yet. OpenSpec is available; lifecycle tooling will be added with its implementation tasks.
+Atoms Demo has an independently runnable React + Vite frontend and Fastify + Node.js backend. Both use TypeScript; the frontend uses CSS Modules. The current application is a connection-check skeleton; generation, persistence, and generated-app preview are not implemented yet. Native Process Compose development configuration and OpenSpec are available; manager commands are planned.
 
 Use [README.md](README.md) for project scope, current setup, and production startup. Use [docs/README.md](docs/README.md) to find documentation by responsibility.
 

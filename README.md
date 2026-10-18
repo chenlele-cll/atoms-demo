@@ -144,7 +144,10 @@ docs/
   product/
     assignment.md     原始题目整理稿，仅本地保留
 scripts/
+  check-dev-port.cjs   托管服务启动前检查固定端口，不终止占用者
   smoke.cjs            浏览器端到端冒烟脚本（pnpm smoke）
+process-compose.yaml  原生本地开发进程与就绪、退出、日志配置
+.process-compose-version        固定 Process Compose 工具版本
 AGENTS.md              开发与交付约定
 DESIGN.md              平台设计入口，链接到详细设计 skill 与现有启动页约定
 .opencode/skills/atoms-frontend-design/   已确认的 Lovable 风格及工作台设计规范

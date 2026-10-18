@@ -18,6 +18,8 @@ playwright-report/
 test-results/
 .playwright-cli/
 /output/playwright/
+/.tools/
+/.runtime/
 
 # Local-only assignment source material; do not publish.
 /docs/product/assignment.md

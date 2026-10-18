@@ -37,6 +37,8 @@
 
 ## Lifecycle scenarios
 
+`OPS-001` 的原生配置验收使用真实进程，检查双服务与单服务启动、HTTP readiness、健康响应及前端 API 代理、所属进程故障恢复、就绪持续失败、外部端口冲突和停止后的进程清理。核对状态时同时检查是否运行、就绪、退出码与重试次数，不把 `process list` 命令成功当作项目健康；注意 [原生状态及就绪限制](./lifecycle.md#behavior-and-limits)，退出码可能属于前一轮进程。原生记录见 [OPS-001](../../openspec/changes/ops-001-process-compose/tasks.md)。
+
 以下是实现对应能力时的验收要求，不能作为 manager 或基础设施已经完成的证据：
 
 - 重复启动不会增加实例，停止后可以再次停止，重启后恢复到一组健康实例。
