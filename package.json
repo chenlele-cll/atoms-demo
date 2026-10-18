@@ -32,6 +32,7 @@
     "smoke:generation-stream": "node scripts/generation-stream-smoke.cjs",
     "smoke:candidate": "node scripts/candidate-smoke.cjs",
     "smoke:workspace": "node scripts/workspace-smoke.cjs",
+    "smoke:history": "node scripts/history-smoke.cjs",
     "test:verification": "node --test scripts/verify.test.mjs",
     "verify:product": "node scripts/verify.mjs --profile product",
     "release:build": "node scripts/release.mjs",

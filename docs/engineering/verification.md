@@ -193,6 +193,26 @@ REV-002 的 `backend/test/version-restoration.test.ts` 与 `version-restoration-
 
 本变更整体检查按 `pnpm check` → `pnpm build` → `pnpm smoke:projects` → `pnpm smoke:generation-stream` 串行执行，后两项消费该构建。实际命令/退出结果、源码身份和剩余边界见 [REV-002 tasks](../../openspec/changes/rev-002-version-restoration/tasks.md)。本任务不验证恢复 UI、恢复后模型上下文、真实模型业务质量或线上部署，也不修改其他 REV 的完成状态。
 
+## History workspace
+
+REV-003 supplies frontend/test/history-api.test.ts and history-state.test.ts for shared-schema parsing, bounded pagination, safe errors/abort, epoch isolation, selection, preview identity, restore confirmation, CAS/unknown reconciliation, permissions and operation locks. The dependent frontend/test/restored-continuation.test.ts covers the confirmed-GET gate, stale/failed queries, preserved drafts and original-request continuation. These test sources are included, not executed in this preparation.
+
+After a matching `pnpm build`, run `pnpm smoke:history` explicitly. It uses existing playwright-core, system Chrome, isolated built backend/frontend copies and temporary real SQLite; ports 3001/5173/4173 must be free and Sandpack/dependency downloads require network. It exercises dev/preview history pages, exact source, actual quote preview, explicit branch/template restore, CAS, orphan running, storage rollback, lost responses, manual queries, restart, 1280/320/375px and keyboard dialog behavior. PROJECT_BUSY is an injected HTTP transport response, not an active generation test. No model generation is started.
+
+Future runner output belongs in ignored test-results/history-workspace/<runId>/; no output or acceptance report is created by snapshot preparation. The runner cleans only its owned services/browser/runtime and leaves occupied ports alone. scripts/workspace-smoke.cjs adds restored A -> current GET -> explicit SDK continuation -> preview/adoption -> restart fixtures, depending on REV-004 already in HEAD. Run port suites sequentially; historical results stay in REV-004 artifacts. Real-model quality, REV-005 and deployment acceptance remain separate and unverified here.
+
+## Restored version continuation
+
+Frozen selection scope: the coverage and command results below describe the historical mixed-workspace REV-004 record. No tests, build, install, lint, typecheck, smoke, OpenSpec validation or other verification commands were run during this preparation. They are not acceptance results for these frozen snapshots.
+
+REV-004 的 `backend/test/restored-version-continuation.test.ts` 使用实际 SDK、loopback 上游和真实临时 SQLite；31 项覆盖血缘先筛选后 LIMIT、模板空历史、未采用成功基线、跨项目与非成功消息排除、最近 10 条/UTF-8 16 KiB/无第 11 条补位/256 KiB 累计预算、2000 节点长链与损坏安全失败。损坏在受理前返回 DATA_CORRUPT，零 SDK 请求且无部分写入。list/read/submit 核对冻结 A 正文、parent=A、全项目 max+1、unverified/current 不变、旧版本/run/消息及重开不变；同时验证第二连接可写、原 B 请求重放、冲突、明确新 ID，以及拒绝/截断/校验/取消/超时/基线变化/各存储阶段失败回滚和终态未确认。
+
+`frontend/test/restored-continuation.test.ts` 覆盖恢复写入与随后 GET 的门槛、失败/过期查询、原请求恢复、另一标签改变 current 时保留草稿及原选择。网络准入复用 `version-restoration-network.test.ts` 的真实 gate/SDK/SQLite：生成先受理则恢复 busy，恢复先完成则旧 base 拒绝，孤立 running 返回 unconfirmed。该测试随完整后端检查再次执行。
+
+`pnpm smoke:workspace` 在既有 dev/preview 工作台中新增恢复 A、GET 确认、明确续写、实际 SDK 文件读取、真实 Sandpack 报价、明确采用和所属后端重启。记录首个 SDK 输入与工具正文的摘要/字节和计数、parent/max+1、旧数据不变、恢复与刷新零自动生成；恢复响应丢失且首次 GET 失败后，手动查询只读确认。第二标签提交旧 B 需求明确拒绝且保留草稿、零新增 SDK 请求。断流只查询原 ID、未知采用及重开继续由原工作台/候选专项覆盖。
+
+使用 Node 22.22.2，整体检查为 `pnpm check`、`pnpm build`、`pnpm smoke` 以及串行的 `pnpm smoke:workspace`、`pnpm smoke:generation-stream`、`pnpm smoke:candidate`；需要独占 3001/5173/4173、Chrome 及外部 Sandpack 网络，端口占用时保留占用者。实际结果与失败/取消尝试见 [REV-004 tasks](../../openspec/changes/rev-004-restored-version-continuation/tasks.md)。这些证据是 fixture，真实供应商模型、业务质量和部署验收不由本次结果替代。
+
 ## Bounded generation
 
 GEN-004 使用现有 Node 测试器覆盖实际 SDK 与真实临时 SQLite 链路。普通 check 使用显式 fixture 传输与假配置，不读取开发者 .env、调用外部模型或触碰生产 DATABASE_PATH。测试范围：

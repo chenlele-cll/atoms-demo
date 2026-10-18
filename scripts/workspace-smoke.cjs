@@ -116,6 +116,7 @@ async function setupProvider() {
       res.on('close', () => { if (!res.writableEnded) provider.aborts++; }); const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
       const body = JSON.parse(Buffer.concat(chunks).toString()); provider.requests++; report.fixtureModelRequests++;
+      if (provider.observed) provider.observed.push(body);
       const outputs = body.input.filter(item => item.type === 'function_call_output'); const step = outputs.length;
       res.setHeader('content-type', 'application/json');
       if (provider.mode === 'hold' || provider.firstHeld && step === 0) {
@@ -313,6 +314,97 @@ async function mode(name, port) {
       assert.equal(await page.getByRole('textbox',{name:'描述下一步需求',exact:true}).inputValue(),'未配置模型的原始需求');
       const detail=await api(page,'GET',`/api/projects/${id}`); assert.equal(detail.body.currentVersion.kind,'template'); assert.equal(detail.body.latestRun,null); assert.equal(provider.requests,models); assert.equal(posts.length,count+1);
       await stop(backend); await startBackend();
+    });
+    await scenario(`${name}: restored A → GET confirmation → explicit continuation → frozen SDK files → branch preview/adoption → restart`,async()=>{
+      await page.goto(`${origin}/projects/${projectId}`); await page.locator('[data-input-base]').waitFor();
+      const b=adopted; const a=(await api(page,'GET',`/api/projects/${projectId}/versions/${b.parentVersionId}`)).body;
+      assert.notEqual(a.version.snapshot.files[quotePath],b.snapshot.files[quotePath]);
+      const history=(await api(page,'GET',`/api/projects/${projectId}/versions?limit=50`)).body;
+      const oldVersions=await Promise.all(history.items.map(async item=>(await api(page,'GET',`/api/projects/${projectId}/versions/${item.id}`)).body.version));
+      const oldMessages=(await api(page,'GET',`/api/projects/${projectId}/messages?direction=backward&limit=50`)).body.items;
+      const count=posts.length; const models=provider.requests; let restorePosts=0; let blockedReads=0;
+      const stale=await context.newPage(); const stalePosts=[];
+      stale.on('request',request=>{if(request.method()==='POST'&&request.url().endsWith('/generations'))stalePosts.push(request.postDataJSON());});
+      const projectMatch=`**/api/projects/${projectId}`; const restoreMatch=`**/api/projects/${projectId}/versions/${a.version.id}/restore`;
+      try {
+        await stale.goto(`${origin}/projects/${projectId}`); await stale.locator(`[data-input-base="${b.id}"]`).waitFor();
+        await stale.getByRole('textbox',{name:'描述下一步需求',exact:true}).fill(`${name} stale B draft must survive`);
+        await page.getByRole('button',{name:'历史',exact:true}).click();
+        await page.locator(`[data-history-version="${a.version.id}"] > button`).click();
+        await page.getByRole('button',{name:'预览',exact:true}).click(); await waitCompiled(page);
+        await page.getByRole('button',{name:'恢复此版本',exact:true}).click();
+        await page.route(restoreMatch,async route=>{restorePosts++;assert.deepEqual(route.request().postDataJSON(),{expectedCurrentVersionId:b.id});const response=await route.fetch();assert.equal(response.status(),200);await route.abort('failed');});
+        await page.route(projectMatch,async route=>{if(route.request().method()==='GET'){blockedReads++;await route.abort('failed');}else await route.continue();});
+        await page.getByRole('button',{name:'确认恢复此版本',exact:true}).click();
+        await page.locator('[data-restore-state="unknown"]').waitFor();
+        await page.getByRole('button',{name:'查询恢复结果',exact:true}).waitFor({state:'visible'});
+        await page.getByRole('button',{name:'聊天',exact:true}).click();
+        await page.getByRole('textbox',{name:'描述下一步需求',exact:true}).fill(`${name} restored A continuation`);
+        assert.equal(await page.getByRole('button',{name:'生成候选',exact:true}).isDisabled(),true);
+        assert.equal(posts.length,count); assert.equal(provider.requests,models);
+        await page.getByRole('alert').filter({hasText:'项目查询失败'}).waitFor();
+        await page.unroute(projectMatch);
+        await page.bringToFront();
+        // Let the iframe compositor catch up with the host pane's scroll before clicking.
+        await page.getByRole('button',{name:'查询恢复结果',exact:true}).scrollIntoViewIfNeeded();
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        await scenario(`${name}: unknown restore manual GET confirms without another write or SDK call`,async()=>{
+          const [response]=await Promise.all([
+            page.waitForResponse(response=>response.url()===`${origin}/api/projects/${projectId}`&&response.request().method()==='GET'),
+            page.getByRole('button',{name:'查询恢复结果',exact:true}).click(),
+          ]);
+          assert.equal(response.status(),200);
+          await page.locator('[data-restore-state="confirmed"]').waitFor(); await page.locator(`[data-input-base="${a.version.id}"]`).waitFor();
+          assert.equal(restorePosts,1); assert.equal(posts.length,count); assert.equal(provider.requests,models);
+        });
+        assert.ok(blockedReads>0); assert.equal(restorePosts,1);
+        const restored=(await api(page,'GET',`/api/projects/${projectId}`)).body;
+        assert.equal(restored.project.currentVersionId,a.version.id); assert.deepEqual(restored.currentVersion,a.version);
+        await page.unroute(restoreMatch);
+        await stale.getByRole('button',{name:'生成候选',exact:true}).click(); await taskFinished(stale,/生成未受理/);
+        assert.equal(stalePosts.length,1); assert.equal(stalePosts[0].baseVersionId,b.id); assert.equal(provider.requests,models);
+        assert.equal(await stale.getByRole('textbox',{name:'描述下一步需求',exact:true}).inputValue(),`${name} stale B draft must survive`);
+        await stale.getByRole('button',{name:'刷新版本状态',exact:true}).scrollIntoViewIfNeeded();
+        await stale.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        await stale.getByRole('button',{name:'刷新版本状态',exact:true}).click(); await stale.locator(`[data-input-base="${a.version.id}"]`).waitFor();
+        assert.equal(stalePosts.length,1); assert.equal(provider.requests,models);
+        await page.reload(); await page.getByRole('button',{name:'当前版本',exact:true}).click(); await waitCompiled(page);
+        assert.equal(posts.length,count); assert.equal(provider.requests,models);
+        const prompt=`${name} restored A continuation`; provider.observed=[]; provider.revision++;
+        await page.getByRole('textbox',{name:'描述下一步需求',exact:true}).fill(prompt);
+        await page.getByRole('button',{name:'生成候选',exact:true}).click(); await taskFinished(page,/候选已保存/);
+        assert.equal(posts.length,count+1); assert.equal(posts.at(-1).body.baseVersionId,a.version.id);
+        assert.ok(posts.slice(0,-1).every(post=>post.body.requestId!==posts.at(-1).body.requestId));
+        assert.equal(provider.requests,models+3); assert.equal(provider.observed.length,3);
+        const initial=provider.observed[0].input; const text=item=>typeof item.content==='string'?item.content:(item.content??[]).map(part=>part.text??'').join('');
+        const contents=initial.map(text); const eligible=oldMessages.filter(message=>message.runId===a.successfulRun.id);
+        assert.equal(eligible.length,2); for(const message of eligible)assert.equal(contents.filter(content=>content===message.content).length,1);
+        for(const message of oldMessages.filter(message=>message.runId!==a.successfulRun.id&&message.role==='user'))assert.equal(contents.includes(message.content),false);
+        assert.equal(contents.filter(content=>content===prompt).length,1);
+        const tools=provider.observed[2].input.filter(item=>item.type==='function_call_output');
+        const read=JSON.parse(tools.at(-1).output); assert.equal(read.files.length,2);
+        for(const file of read.files)assert.equal(file.content,a.version.snapshot.files[file.path]);
+        const pending=(await api(page,'GET',`/api/projects/${projectId}`)).body;
+        const candidate=(await api(page,'GET',`/api/projects/${projectId}/versions/${pending.latestRun.resultVersionId}`)).body.version;
+        assert.equal(candidate.parentVersionId,a.version.id); assert.equal(candidate.sequence,Math.max(...oldVersions.map(version=>version.sequence))+1);
+        const status=(await api(page,'GET',`/api/projects/${projectId}/generations/by-request/${posts.at(-1).body.requestId}`)).body;
+        assert.equal(status.candidateVersionId,candidate.id); assert.equal(status.previewStatus,'unverified'); assert.equal(pending.project.currentVersionId,a.version.id);
+        await page.getByRole('button',{name:'预览',exact:true}).click(); await waitCompiled(page); await assertQuote(page,5000+provider.revision*100);
+        assert.equal((await api(page,'GET',`/api/projects/${projectId}`)).body.project.currentVersionId,a.version.id);
+        await page.getByRole('button',{name:'使用这个版本',exact:true}).click(); await page.locator('[data-adoption-state="confirmed"]').waitFor();
+        await stop(backend); await startBackend(); await page.reload(); await waitCompiled(page);
+        const reopened=(await api(page,'GET',`/api/projects/${projectId}`)).body;
+        assert.equal(reopened.project.currentVersionId,candidate.id); assert.deepEqual(reopened.currentVersion,candidate);
+        for(const version of oldVersions)assert.deepEqual((await api(page,'GET',`/api/projects/${projectId}/versions/${version.id}`)).body.version,version);
+        const messages=(await api(page,'GET',`/api/projects/${projectId}/messages?direction=backward&limit=50`)).body.items;
+        assert.deepEqual(messages.slice(0,oldMessages.length),oldMessages); assert.equal(messages.length,oldMessages.length+2);
+        assert.equal(posts.length,count+1); assert.equal(provider.requests,models+3);
+        report.restoredContinuation??=[]; report.restoredContinuation.push({mode:name,projectId,restoredVersionId:a.version.id,previousVersionId:b.id,candidateVersionId:candidate.id,
+          restorePosts,blockedConfirmationReads:blockedReads,staleGenerationPosts:stalePosts.length,staleSdkRequests:0,automaticGenerationPosts:0,continuationSdkRequests:provider.observed.length,
+          firstSdkInput:{items:initial.length,bodyBytes:Buffer.byteLength(JSON.stringify(initial)),digest:digest(initial),eligibleHistoryMessages:eligible.length,currentPromptOccurrences:contents.filter(content=>content===prompt).length},
+          toolOutputs:tools.length,readFiles:read.files.map(file=>({path:file.path,bodyBytes:Buffer.byteLength(file.content),digest:digest(file.content)})),parentVersionId:candidate.parentVersionId,sequence:candidate.sequence,previousMaxSequence:Math.max(...oldVersions.map(version=>version.sequence)),oldVersionsUnchanged:oldVersions.length,oldMessagesUnchanged:oldMessages.length});
+        adopted=candidate; await evidence.screenshot(page,{path:path.join(output,`${name}-restored-continuation.png`),animations:'disabled'});
+      } finally {provider.observed=undefined;await page.unroute(projectMatch);await page.unroute(restoreMatch);await stale.close();}
     });
     await scenario(`${name}: A/B ownership and expired session stop private display without silently creating a session`,async()=>{
       const stranger=await browser.newContext();const alien=await stranger.newPage();await alien.goto(`${origin}/projects/${projectId}`); await alien.getByRole('alert').filter({hasText:'会话'}).waitFor();

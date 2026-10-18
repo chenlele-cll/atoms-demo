@@ -142,3 +142,11 @@ REV-001 的公开历史契约在 `packages/contracts/src/index.ts`（`@atoms/con
 UI 规范由 [DESIGN.md](../../DESIGN.md) 导航到现有设计 skill；在该契约维护 token 与交互约定，不在本文复制。
 
 按 [Verification](./verification.md) 收集实际结果；版本控制操作遵循 [Git workflow](./git-workflow.md)。
+
+## History workspace
+
+REV-003 uses the existing workspace controller, version API client and SnapshotPreview. History loads 20 entries on demand and uses exclusive beforeSequence pages; failures retain the cursor and entries, refresh changes the list epoch, and project GET calibrates current badges. Current, inspected history and candidate identities remain separate. Complete validated snapshots supply both source and preview; immutable detail metadata never overrides newer project facts.
+
+Restore and adoption share the controller operation lock with generation. Restore confirmation freezes project/activation/target/expected/digest/attempt and requires this preview attempt to be compiled without a known error. Identity, current, task or preview changes invalidate confirmation. Only expectedCurrentVersionId is posted; restore eligibility is independent of adoption parent rules. An acknowledged POST survives a failed calibration GET; an uncertain POST performs one GET and then offers manual queries, with no automatic write replay. 401 clears private state, while 404 removes inaccessible content.
+
+The dependent REV-004 continuation guard waits for a successful current GET after acknowledged restoration. Unknown operations and failed fact reads prevent new generation; a different current preserves draft and inspected selection. Original unknown generation retries keep their request payload. No view, preview, restore or refresh starts generation automatically. This section describes selected implementation, not new validation evidence.

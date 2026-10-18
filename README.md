@@ -152,7 +152,7 @@ pnpm smoke:template
 
 先 `pnpm build`，再 `pnpm smoke:candidate`；需要 Chrome、空闲 3001/5173/4173 以及外部 Sandpack 网络。报告位于忽略的 `test-results/candidate-review/<id>/report.json`，以明确 fixture 候选验证真实编译、报价控件、隔离、错误、采用竞争和重启，不消耗真实模型额度。覆盖与限制见 [Verification](./docs/engineering/verification.md#candidate-review)，历史混合工作区证据与隔离验证记录见 [GEN-006 tasks](./openspec/changes/gen-006-candidate-preview-adoption/tasks.md#isolated-review-evidence)。
 
-历史查询由 REV-001 提供：beforeSequence 为排他非负安全整数，0 返回空页，末页 nextBeforeSequence=null；分页间新增版本需刷新首页可见。每项展示版本/父关联/时间、当前标记、对应运行与需求摘录、标明 stored/fallback 的简短摘要和实际修改路径，文本最多 240 个 Unicode 码点。每页当前标记反映该次读取，不代表版本曾被采用或已通过预览。每 IP 每分钟 60 次，响应最多 1 MiB，损坏/超限明确失败；查询不改数据、不调用模型。历史 UI、确认恢复与恢复后续改仍由后续 REV 任务对接；契约与验证分别见 [Version history](./docs/engineering/development.md#version-history) 和 [历史验证](./docs/engineering/verification.md#version-history)。
+历史查询由 REV-001 提供：beforeSequence 为排他非负安全整数，0 返回空页，末页 nextBeforeSequence=null；分页间新增版本需刷新首页可见。每项展示版本/父关联/时间、当前标记、对应运行与需求摘录、标明 stored/fallback 的简短摘要和实际修改路径，文本最多 240 个 Unicode 码点。每页当前标记反映该次读取，不代表版本曾被采用或已通过预览。每 IP 每分钟 60 次，响应最多 1 MiB，损坏/超限明确失败；查询不改数据、不调用模型。REV-003 adds the History view to `/projects/:projectId`: page through saved versions, inspect metadata and read-only source, and use the same isolated preview. Viewing never changes current. Restore requires this preview attempt to compile without a known error, followed by explicit confirmation; a lost response is reconciled by project GET without automatic write replay. Unsent drafts remain in memory. See [History workspace](./docs/engineering/development.md#history-workspace) and [History workspace coverage](./docs/engineering/verification.md#history-workspace).
 
 ## 历史版本恢复
 
@@ -166,7 +166,7 @@ REV-002 提供 `POST /api/projects/:projectId/versions/:versionId/restore`，使
 
 每 IP 每分钟 10 次，429 带 Retry-After，所有响应 no-store。冲突为 409 CURRENT_VERSION_CONFLICT，缺少成功结果关联为 409 VERSION_NOT_RESTORABLE，活动为 409 PROJECT_BUSY，孤立 running 为 503 RUN_STATE_UNCONFIRMED，停服/所有权失效拒绝实际切换；损坏目标为安全 500。响应丢失后用项目 GET 查询当前事实，不能直接当作回滚或自动换 expected 重试。
 
-本轮实现后端恢复接口；先预览再确认的历史 UI、恢复后上下文筛选与完整真实模型验收由 REV-003～005 接入。恢复代码和布局不代表恢复预览内业务临时输入。契约见 [Version restoration](./docs/engineering/development.md#version-restoration)，测试及实际结果见 [恢复验证](./docs/engineering/verification.md#version-restoration)。
+The workspace consumes the restore API. REV-004 requires a successful current-version GET after an acknowledged restore before an explicit new generation; unknown results and failed queries block new generation. A changed current preserves the draft and inspected target until explicit selection. Continuation uses the restored lineage, saves a new candidate without automatic adoption, and retains other history. Restoring code does not restore temporary preview business inputs. After a matching build, `pnpm smoke:history` exercises history/restore fixtures and `pnpm smoke:workspace` exercises SDK continuation fixtures. Neither was run for this frozen selection; historical REV-004 results remain historical, and REV-005 live acceptance remains separate.
 
 ## 模型能力探针
 
