@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'n
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { prepareCompanyTemplate, templateSource } from './prepare-company-template.mjs';
+import { prepareBackendTemplate, prepareCompanyTemplate, templateSource } from './prepare-company-template.mjs';
 import { contentDigest, verifyTemplateBundle } from '../templates/bundle.mjs';
 
 const root = fileURLToPath(new URL('../test-results/template-preparation/', import.meta.url));
@@ -18,6 +18,27 @@ async function fixture(t) {
   const manifest = JSON.parse(await readFile(path.join(sourceDirectory, 'manifest.json'), 'utf8'));
   return { directory, sourceDirectory, outputFile, manifest };
 }
+
+test('backend source/build targets carry an independent identical bundle and neutral runtime contract', async t => {
+  const f = await fixture(t);
+  const frontend = await prepareCompanyTemplate(f);
+  const source = path.join(f.directory, 'backend-src');
+  const built = path.join(f.directory, 'backend-dist');
+  for (const outputDirectory of [source, built]) {
+    const bundle = await prepareBackendTemplate({ sourceDirectory: f.sourceDirectory, outputDirectory });
+    assert.equal(bundle.digest, frontend.digest);
+    assert.deepEqual(await readFile(path.join(outputDirectory, 'company-landing.bundle.json')), await readFile(f.outputFile));
+    assert.deepEqual((await readdir(outputDirectory)).sort(), ['bundle.d.mts', 'bundle.mjs', 'company-landing.bundle.json']);
+  }
+  const previous = await readFile(path.join(built, 'company-landing.bundle.json'));
+  await rm(path.join(f.sourceDirectory, 'LICENSE'));
+  await assert.rejects(prepareBackendTemplate({ sourceDirectory: f.sourceDirectory, outputDirectory: built }));
+  assert.deepEqual(await readFile(path.join(built, 'company-landing.bundle.json')), previous);
+  assert.ok(!(await readdir(f.directory)).some(name => name.endsWith('.tmp') || name.endsWith('.previous')));
+  const absent = path.join(f.directory, 'absent-target');
+  await assert.rejects(prepareBackendTemplate({ sourceDirectory: f.sourceDirectory, outputDirectory: absent }));
+  await assert.rejects(readdir(absent));
+});
 
 test('fixed source prepares deterministic, self-contained files and compiled CSS', async (t) => {
   const f = await fixture(t);

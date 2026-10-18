@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig([
   globalIgnores([
-    '**/dist/**', '**/node_modules/**', 'frontend/public/template-assets/**', '.omo/**', '.playwright-mcp/**',
+    '**/dist/**', '**/node_modules/**', '**/template-assets/**', '.omo/**', '.playwright-mcp/**',
     'test-results/**', 'output/playwright/**', '.runtime/**', '.tools/**',
     'templates/company-landing/src/**', 'templates/company-landing/tailwind.config.cjs',
   ]),

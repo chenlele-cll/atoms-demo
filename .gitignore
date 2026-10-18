@@ -21,6 +21,9 @@ test-results/
 /.tools/
 /.runtime/
 /frontend/public/template-assets/
+/backend/src/template-assets/
+/backend/src/template-assets.*.tmp/
+/backend/src/template-assets.*.previous/
 
 # Local-only assignment source material; do not publish.
 /docs/product/assignment.md

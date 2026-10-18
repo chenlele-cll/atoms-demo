@@ -12,6 +12,10 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const require = createRequire(import.meta.url);
 export const templateSource = path.join(root, 'templates/company-landing');
 export const templateOutput = path.join(root, 'frontend/public/template-assets/company-landing.bundle.json');
+export const backendTemplateDirectory = (target) => {
+  if (!['backend-src', 'backend-dist'].includes(target)) throw new Error('模板准备目标无效。');
+  return path.join(root, 'backend', target === 'backend-src' ? 'src' : 'dist', 'template-assets');
+};
 
 async function collectFiles(directory, base = directory) {
   const result = [];
@@ -112,8 +116,33 @@ export async function prepareCompanyTemplate({ sourceDirectory = templateSource,
   return bundle;
 }
 
+export async function prepareBackendTemplate({ outputDirectory = backendTemplateDirectory('backend-src'), sourceDirectory = templateSource } = {}) {
+  const stage = `${outputDirectory}.${randomUUID()}.tmp`;
+  const previous = `${outputDirectory}.${randomUUID()}.previous`;
+  let moved = false;
+  try {
+    const bundle = await prepareCompanyTemplate({ sourceDirectory, outputFile: path.join(stage, 'company-landing.bundle.json') });
+    const identity = Object.fromEntries(Object.entries(bundle).filter(([key]) => !['files', 'digest'].includes(key)));
+    const runtime = await readFile(path.join(root, 'templates/bundle.mjs'), 'utf8');
+    const types = await readFile(path.join(root, 'templates/bundle.d.mts'), 'utf8');
+    await writeFile(path.join(stage, 'bundle.mjs'), `${runtime}\nexport const companyTemplateIdentity = ${canonicalJSON(identity)};\n`);
+    await writeFile(path.join(stage, 'bundle.d.mts'), `${types}\nexport const companyTemplateIdentity: TemplateIdentity;\n`);
+    try { await rename(outputDirectory, previous); moved = true; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    try { await rename(stage, outputDirectory); }
+    catch (error) { if (moved) await rename(previous, outputDirectory); throw error; }
+    await rm(previous, { recursive: true, force: true });
+    return bundle;
+  } finally { await rm(stage, { recursive: true, force: true }); }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  prepareCompanyTemplate().then((bundle) => {
+  const args = process.argv.slice(2);
+  const target = args.length === 0 ? 'frontend' : args.length === 2 && args[0] === '--target' ? args[1] : null;
+  const prepare = target === 'frontend' ? () => prepareCompanyTemplate() : ['backend-src', 'backend-dist'].includes(target)
+    ? () => prepareBackendTemplate({ outputDirectory: backendTemplateDirectory(target) })
+    : () => Promise.reject(new Error('Usage: prepare-company-template.mjs [--target frontend|backend-src|backend-dist]'));
+  prepare().then((bundle) => {
     console.log(`Prepared ${bundle.id} v${bundle.version}: ${Object.keys(bundle.files).length} files, SHA-256 ${bundle.digest}`);
   }).catch((error) => {
     console.error(error instanceof Error ? error.message : '模板准备失败。');

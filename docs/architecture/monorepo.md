@@ -22,6 +22,7 @@
 - `backend/src/app.ts` 构建应用并注册路由，不监听端口；`server.ts` 负责环境加载、监听和进程生命周期。
 - 路由负责 HTTP 边界。生成和存储职责随首次实现形成实际模块，不持续堆入路由，也不预建空的 service、repository 或通用依赖注入层。
 - backend/src/model 维护单供应商客户端、延迟配置、独立探针和安全错误，AI SDK/OpenAI/Zod 仅在 backend 声明。探针文件和工具不依赖模板或项目模块，不新增浏览器可用的计费接口；真实调用与替身测试分别记录。
+- backend/src/contracts、storage、projects、templates 分别维护公开 Zod 契约、SQLite 存储/迁移、配置/安全错误及后端目录。项目 routes 通过注入调用这些具体模块，不把 SQL 放入 HTTP handler；浏览器目前尚未消费这些契约，不新增共享 workspace 包。
 
 ## Workspace and toolchain
 
@@ -32,6 +33,8 @@
 - TypeScript 的公共编译约束在 [tsconfig.base.json](../../tsconfig.base.json)，应用差异保留在各自配置中；ESLint 使用根目录统一入口。
 - 前后端产物分别写入各自的 `dist/`，生产后端构建排除测试。测试源码随项目维护；依赖目录、构建产物和本地运行产物不入库。
 - 前端 dev/build 先运行 scripts/prepare-company-template.mjs，从模板源生成忽略的 frontend/public/template-assets/company-landing.bundle.json；Vite 将它复制到 dist。模板源码不导入宿主 React 树，预览运行依赖与宿主安装依赖分开，样式提前编译。来源及改动见 [模板适配说明](../../templates/company-landing/ADAPTATIONS.md)。
+- 同一准备脚本支持 frontend/backend-src/backend-dist 三个独立目标。后端准备目录含 bundle JSON 与同源中立校验模块/类型，不维护第二套文件规则；src 资源被忽略，构建会准备 src 并将对应副本放入 dist，编译产物独立于前端目录。typecheck/test 也先准备 src，使全新安装可独立运行检查。
+- 后端固定 better-sqlite3 13.0.3、@types/better-sqlite3 9.6.0、@fastify/cookie 11.1.3、@fastify/rate-limit 11.2.1，复用现有 Zod 4.6.7。SQLite 13 自带 N-API 平台预构建且没有安装脚本，本次无需新增 pnpm 脚本许可；保留已有 esbuild 许可和 es5-ext 拒绝。目标平台 frozen install 后必须执行真实绑定读写，不能以声明或复制别处 node_modules 代替。
 
 ## Adding shared code
 
