@@ -134,12 +134,15 @@ docs/
     development.md    开发规范
     verification.md   验证与交付
     lifecycle.md      起停行为与后续接口约定
+    git-workflow.md   Git 工作流
+    skills.md         技能来源与使用范围
   product/
     assignment.md     原始题目整理稿，仅本地保留
 scripts/
   smoke.cjs            浏览器端到端冒烟脚本（pnpm smoke）
 AGENTS.md              开发与交付约定
 DESIGN.md              当前启动页面的最小 UI 约定
+.agents/skills/        固定上游 Git 技能
 README.md              本文件
 package.json           workspace 根：命令、工具链版本、共享开发依赖
 pnpm-workspace.yaml    workspace 成员声明与 pnpm 设置
@@ -151,9 +154,20 @@ eslint.config.mjs      前后端共用 lint 配置
 
 没有预建空的业务目录。生成、存储、迁移与预览模块随首次实现建立。
 
+## 项目 Skills
+
+Skills 的完整文件保存在本仓库中：复用上游的 Git 技能位于 `.agents/skills/`。这些文件作为项目交付内容纳入版本控制，使用规范不依赖开发者机器上的全局 skill 安装。上游版本、许可证及使用边界见 [Skills 说明](./docs/engineering/skills.md)。
+
+| Skill | 用途 | 来源与适配 |
+| --- | --- | --- |
+| [git-commit](./.agents/skills/git-commit/SKILL.md) | 用户请求提交时分析差异、按范围暂存并生成 Conventional Commit | 复用 `github/awesome-copilot` 原版，固定上游提交 |
+| [yeet](./.agents/skills/yeet/SKILL.md) | 用户明确请求暂存、提交、推送并创建 PR 时使用 | 复用 `openai/skills` 原版；执行前遵循仓库 Git 工作流 |
+
 ## 项目资料
 
-- [Agent 工作入口](./AGENTS.md)：按任务选择文档与检查；前后端细则分别见 [前端指南](./frontend/AGENTS.md) 和 [后端指南](./backend/AGENTS.md)。
+- [Agent 工作入口](./AGENTS.md)：按任务选择文档、Skills 与检查；前后端细则分别见 [前端指南](./frontend/AGENTS.md) 和 [后端指南](./backend/AGENTS.md)。
+- [Git 工作流](./docs/engineering/git-workflow.md)：任务编号、分支命名、提交格式、验证及合并约定。
+- [Skills 说明](./docs/engineering/skills.md)：上游技能来源、固定版本、触发条件和升级方式。
 - [生命周期指南](./docs/engineering/lifecycle.md)：Process Compose 开发编排、现有起停入口与后续 manager、基础设施契约。
 - [文档索引](./docs/README.md)：产品参考、技术决策及 Monorepo、开发、验证和生命周期规范的职责与阅读时机。
 - [技术栈调研与初始化建议](./docs/architecture/stack-decisions.md)：选型依据及适用边界。

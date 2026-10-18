@@ -25,9 +25,18 @@ Use [README.md](README.md) for project scope, current setup, and production star
 | Documentation or navigation | [Documentation index](docs/README.md) and the document that owns the rule |
 | Startup, shutdown, process scripts, or infrastructure | [Lifecycle](docs/engineering/lifecycle.md) |
 | A failing check or unexpected behavior | The affected application's guide and [Verification](docs/engineering/verification.md); reproduce the reported failure before claiming a fix |
+| Skills installation or update | [Skill sources and usage](docs/engineering/skills.md) |
+| Branch, commit, push, merge, or PR | [Git workflow](docs/engineering/git-workflow.md) and the skill routing below |
 | Selecting checks or preparing handoff | [Verification](docs/engineering/verification.md) |
 
 Implementation rules live in [Development conventions](docs/engineering/development.md). UI rules are maintained in [DESIGN.md](DESIGN.md); update the owning contract when rules change rather than copying them into this map.
+
+## Skill routing
+
+- For an authorized commit, load [git-commit](.agents/skills/git-commit/SKILL.md). Before staging, group changes by concrete purpose and follow the [commit granularity and message rules](docs/engineering/git-workflow.md#changes-and-commits); each message must identify the specific changes rather than only a broad feature.
+- Use [yeet](.agents/skills/yeet/SKILL.md) only when the user explicitly requests the full stage/commit/push/PR flow.
+- For a push-only request, follow the [push procedure](docs/engineering/git-workflow.md#push-procedure), preserving uncommitted work and creating no new commit or PR.
+- Repository task scope, naming, validation, authentication, and authorization rules apply to upstream skills. Keep upstream files unchanged; their fixed revisions and licenses are recorded in [skills.md](docs/engineering/skills.md).
 
 ## Reliable commands
 

@@ -9,6 +9,8 @@
 | `engineering/` | [development.md](./engineering/development.md) | 类型、接口、配置、日志及生成与存储规则；修改对应代码时阅读，规则变化时更新 |
 | `engineering/` | [verification.md](./engineering/verification.md) | 检查选择、已有覆盖和验收证据；验证任务时阅读，检查与覆盖变化时更新 |
 | `engineering/` | [lifecycle.md](./engineering/lifecycle.md) | 起停行为与计划中的进程、工具和基础设施契约；调整命令、进程或基础设施时阅读并更新 |
+| `engineering/` | [git-workflow.md](./engineering/git-workflow.md) | 任务编号、分支、提交、推送与合并约定；开展版本控制操作时阅读，流程变化时更新 |
+| `engineering/` | [skills.md](./engineering/skills.md) | 上游技能来源、固定版本与触发范围；使用或更新项目技能时阅读 |
 | `product/` | `assignment.md`（仅本地） | 原始题目参考材料；存在时可供本地查阅，由 `.gitignore` 排除，不能复制到公开文档 |
 
 公开项目的目标、当前实现状态与运行命令见根目录 [README.md](../README.md)。原始题目材料不随仓库发布，克隆后不存在属于预期情况。
