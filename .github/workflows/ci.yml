@@ -23,7 +23,9 @@ jobs:
   quality:
     name: Quality (Ubuntu)
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 25
+    env:
+      ATOMS_VERIFY_RUN_ID: gh-${{ github.run_id }}-${{ github.run_attempt }}-quality
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,22 +40,14 @@ jobs:
           cache: true
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
-      - name: Lint, types and backend tests
-        run: pnpm check
-      - name: Empty infrastructure tests
-        run: pnpm test:infra
-      - name: Build and browser smoke
-        run: |
-          google-chrome --version
-          pnpm smoke
-      - name: Validate OpenSpec artifacts
-        run: pnpm openspec validate --all --strict --no-interactive
+      - name: Isolated product acceptance
+        run: pnpm verify:product
       - name: Upload browser evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: browser-smoke-ubuntu
-          path: test-results/smoke/*.png
+          path: test-results/gen-regression/${{ env.ATOMS_VERIFY_RUN_ID }}/export/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -61,7 +55,9 @@ jobs:
     name: Full lifecycle (macOS)
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_lifecycle }}
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 45
+    env:
+      ATOMS_VERIFY_RUN_ID: gh-${{ github.run_id }}-${{ github.run_attempt }}-lifecycle
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -83,8 +79,6 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: full-lifecycle-macos
-          path: |
-            test-results/smoke/*.png
-            test-results/manager/**/report.json
+          path: test-results/gen-regression/${{ env.ATOMS_VERIFY_RUN_ID }}/export/
           if-no-files-found: ignore
           retention-days: 7

@@ -205,13 +205,18 @@ POST 沿用精确 Origin、JSON 与 cookie；生成体最大 32 KiB，prompt 修
 
 生成流专项同样先 `pnpm build`，再运行 `pnpm smoke:generation-stream`；需要 Chrome 和空闲 3001/5173/4173。它以 fixture SDK 上游验证浏览器经 dev/preview 的首帧、终态、取消、断线查询及所属后端重启，报告在忽略的 `test-results/generation-stream/<id>/report.json`。跨字节 UTF-8 解码使用明确的注释夹具，实际业务帧仅为允许的元数据；不调用真实模型，不证明候选预览或最终服务器反代通过。详细前提与覆盖见 [Verification](./docs/engineering/verification.md#generation-stream)。
 
-既有工程与生命周期验收运行；模板专项另按上节执行：
+统一产品回归与完整专项回归：
 
 ```sh
+pnpm verify:product
 pnpm verify
 ```
 
-先选择项目 Node/pnpm 并完成 bootstrap，准备本机 Google Chrome、GitHub 下载网络及 pnpm 缓存，让 3001/5173/4173 端口空闲。该入口串行执行诊断、工程检查、空基础设施与 manager 回归、构建/浏览器 smoke、OpenSpec 严格校验，失败即停止，通常需要数分钟。覆盖矩阵、各步骤前提与产物位置见 [完整本地验收](./docs/engineering/verification.md#integrated-local-acceptance)。
+product（20 分钟总预算）在新源副本中执行 offline frozen install、SQLite 绑定读写、check、模板准备、infra、一次生产构建、原诊断 smoke 和完整工作台主路径；full（40 分钟）再加入 doctor、manager 及模板/项目/事件流/候选专项。各步骤有单独上限，首错停止，不自动重试；未选择项明确为 NOT_SELECTED，默认不调用真实模型或部署服务。
+
+先选择项目 Node/pnpm、frozen install 准备本平台缓存，安装 Chrome/npx/Git，让 3001/5173/4173 空闲；full 还需 bootstrap 的固定 Process Compose 和 manager 首次安装回归所需 GitHub 网络。副本不复制 node_modules 或真实 .env，缺 offline 缓存/native 绑定会阻塞；外部 Sandpack 仍需网络。原 smoke/专项入口保留原用途，`pnpm smoke` 独立运行仍自带 build。
+
+产物在忽略的 `test-results/gen-regression/<runId>/`；本地默认新 UUID，可用 `ATOMS_VERIFY_RUN_ID` 指定全新合法标识，拒绝复用旧目录。仅 `export/` 的投影摘要与白名单遮罩截图可分享；`source/` 和 `private/` 的副本、日志、数据库与原始截图留本地。状态/退出、覆盖、脱敏与前提见 [集成本地验收](./docs/engineering/verification.md#integrated-local-acceptance)。
 
 日常按变更范围选择以下命令：
 
@@ -226,7 +231,7 @@ pnpm test:infra
 
 各命令的实际内容、浏览器前提、已有覆盖和按变更选择检查的要求，统一见 [验证规范](./docs/engineering/verification.md)。检查通过只证明对应范围，不代表尚未实现的产品能力已完成。
 
-[GitHub Actions 配置](./.github/workflows/ci.yml) 已提供：PR、main 推送和手动触发运行 Ubuntu 工程检查、infra 测试、构建/浏览器 smoke 与 OpenSpec 校验；手动可开启 macOS 完整生命周期验收。配置需发布到 GitHub 后才能取得远端运行结果，触发方式、固定来源和覆盖边界见 [CI 说明](./docs/engineering/verification.md#github-actions)。
+[GitHub Actions 配置](./.github/workflows/ci.yml) 已提供：PR、main 推送和手动触发运行 Ubuntu 的 verify:product；手动可开启 macOS 的完整 verify 验收。配置需发布到 GitHub 后才能取得远端运行结果，触发方式、固定来源和覆盖边界见 [CI 说明](./docs/engineering/verification.md#github-actions)。
 
 交互式浏览器检查使用仓库官方 Playwright Skill 和 `pnpm playwright`，无需全局安装。固定版本、具名会话及截图路径见 [浏览器验收入口](./docs/engineering/skills.md#browser-verification)。
 

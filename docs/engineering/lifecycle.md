@@ -113,6 +113,14 @@ bootstrap、doctor 和四个核心命令支持 `--json`；logs 使用文本。st
 
 回归入口为 `pnpm test:manager`：隔离副本使用离线 frozen install，端口必须空闲，需要已安装的固定 Process Compose。覆盖和证据见 [Verification](./verification.md#lifecycle-scenarios) 与 [OPS-002 tasks](../../openspec/changes/ops-002-manager/tasks.md)。
 
+## Integrated verification lifecycle
+
+GEN-008 的 product/full 入口使用 `.runtime/verify.lock`（proper-lockfile）对同一 realpath 仓库立即互斥，不与 manager 或数据库锁混用。锁心跳 10 秒，见到已有锁即返回 VERIFY_BUSY，不接管硬杀后的未知残留；只调用本次 release，不自动删锁或按端口杀进程。3001/5173/4173 先真实 bind，之后仍可能发生监听竞争，实际启动失败必须非零并保留占用者。
+
+每个命令有 deadline，总预算 product 20 分钟/full 40 分钟。统一父级记录直接子进程、其真实后代及 suite 显式登记的 detached 服务；浏览器 runner 保留自己的正常关闭职责。PID、启动时间、完整命令及父子关系共同确认归属，发信号前再次核对，身份不明不发送；不只终止 pnpm 留下服务。正常/失败/信号收尾预算 10 秒，先 SIGTERM 并给正常 finally 机会，必要时仅升级已确认仍存活的所属进程。deadline、未知身份或清理不完整均非整体通过，停止后续占端口步骤。
+
+子 suite 复用 `scripts/verification/processes.cjs` 的身份核对，原 standalone 清理/信号场景保留。父级即使补救遗留进程也不能把子 suite 误报的清理通过当作成功。原始日志/进程账本只在本次 private，公开报告仅记录安全分类。SIGINT/TERM 不再启动新步骤，分别退出 130/143；硬杀/断电不保证 finally，下一次入口拒绝未知锁或端口。隔离源/数据和本地/导出边界见 [Verification](./verification.md#integrated-local-acceptance)。
+
 ## Native Process Compose
 
 `OPS-001` 使用官方 [v1.122.0 发布](https://github.com/F1bonacc1/process-compose/releases/tag/v1.122.0)，不需要 Docker、额外守护服务或 npm 运行时依赖。版本文件是工具版本，YAML 中的 `version: "0.5"` 是配置格式版本。

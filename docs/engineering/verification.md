@@ -20,30 +20,40 @@
 
 ## Integrated local acceptance
 
-`VER-001` 将现有检查串联为完整本地验收：
+`GEN-008` 在 VER-001 基础上提供两个固定范围，由 [verify.mjs](../../scripts/verify.mjs) 和 [registry.mjs](../../scripts/verification/registry.mjs) 统一编排：
 
 ```sh
+pnpm verify:product
 pnpm verify
 ```
 
-使用 `.nvmrc` 的 Node 和根 package.json 的 pnpm，先完成 `./manager.sh bootstrap`。本机需安装 Google Chrome，能够访问固定 Process Compose 的 GitHub 发布，并有可用于隔离副本 offline frozen install 的 pnpm 缓存。bootstrap 的根安装通常会准备相应依赖；缺少缓存时先修复安装前提，不让测试自行更新 lockfile。
+product 总预算 20 分钟，full 总预算 40 分钟；每步另有上限，且不得超过剩余总预算。无参数 `node scripts/verify.mjs` 或 `--help` 只显示说明，非法 profile 不启动；没有任意命令、跳过必需项或自动重试开关。`ATOMS_VERIFY_RUN_ID` 可指定 1–80 位字母/数字/下划线/短横线、首位字母或数字的全新标识，未设置则生成 UUID；目录存在即拒绝复用。
 
-3001/5173/4173 端口需空闲；先正常停止自己启动的开发实例。完整入口不停止现有程序，不修改真实环境文件，也不在工作副本制造故障。manager 与 smoke 使用相同端口，统一入口用 shell `&&` 保持串行，任一步失败即返回非零并跳过后续步骤。完整执行通常需要数分钟，网络较慢时更久；日常小改动继续按上表选择检查。
+使用 `.nvmrc` 的 Node 和根 package.json 的 pnpm，先 frozen install 准备当前平台缓存。必须有系统 Google Chrome、npx、Git 和可用的 SQLite N-API 绑定；每次副本独立 offline frozen install，保留工作区 allowBuilds，不使用 ignore-scripts，也不复制已有 node_modules。缺缓存/绑定返回 blocked，不自动联网修复安装或修改 lockfile。full 另需已完成 `./manager.sh bootstrap` 的固定 Process Compose；manager 首次安装回归需要 GitHub 下载网络。两种范围的真实 Sandpack/bundler 与依赖下载仍需外网，离线依赖安装不代表浏览器离线可用。
 
-| 顺序 | 现有入口 | 验收范围 | 证据与限制 |
+3001/5173/4173 必须空闲，真实 bind 预检能识别非 HTTP 占用者；入口不停止现有实例。固定顺序如下，full 不嵌套 product，不重复完整应用构建：
+
+| 顺序 | product | full | 执行与证据 |
 | --- | --- | --- | --- |
-| 1 | `./manager.sh doctor` | 固定工具链、依赖、原生配置、实例、端口及环境文件元信息 | 输出逐项诊断；Chrome 在 doctor 中是可选项，但后续 smoke 必需 |
-| 2 | `pnpm check` | 契约准备、lint、两应用类型、契约准备与前后端测试 | Node test 输出；不验证浏览器或进程归属 |
-| 3 | `pnpm test:infra` | 无配置接口、重复/并发调用、文件保护与未接入配置拒绝 | `test-results/infra/`；没有真实容器或数据卷 |
-| 4 | `pnpm test:manager` | 隔离安装、诊断、日志、幂等/并发起停、失败回滚、归属和清理 | `test-results/manager/`；真实前后端及固定 Process Compose，需要网络与缓存 |
-| 5 | `pnpm smoke` | 两应用生产构建、真实浏览器、独立启动/API 代理、窄屏与错误恢复、本地生产入口 | `test-results/smoke/`；已含 build，不额外重复构建，不验证线上部署 |
-| 6 | `pnpm openspec validate --all --strict --no-interactive` | 当前所有 change/spec 的结构与元数据 | CLI 输出；不验证其他 change 的产品实现或任务完成情况 |
+| 前置检查、源副本、offline install、SQLite 读写 | 必须 | 必须；先 doctor | 真实脚本/工具/浏览器/端口；新源副本与私有 DB |
+| pnpm check | 必须 | 必须 | lint/types，调度控制、契约准备、两应用测试；命令退出统计，数量未知时 null |
+| pnpm test:template、pnpm test:infra | 必须 | 必须 | 模板准备与原有基础设施保护，infra 保留原入口自有隔离 |
+| pnpm test:manager | NOT_SELECTED | 必须 | 原入口的固定工具与独立进程 fixture，不复制或重复安装原工具 |
+| pnpm build | 一次 | 一次 | 副本中完整构建并记录 SHA-256 身份 |
+| node scripts/smoke.cjs | 必须 | 必须 | 消费该构建，保留诊断/独立启动/代理/窄屏断言；独立 pnpm smoke 仍自带 build |
+| smoke:template / projects / generation-stream / candidate | NOT_SELECTED | 各一次、串行 | 原拥有者的真实编译、归属、恢复、取消、采用竞争及控制测试 |
+| pnpm smoke:workspace | 必须 | 必须 | 可见创建→真实 SDK 工具→SQLite→真实 Sandpack 报价→采用→重开及手机路径 |
+| OpenSpec --all --strict | 必须 | 必须 | 原仓库当前工件；校验身份与应用输入分别记录 |
 
-根脚本只组合上述入口，没有增加依赖、测试框架、自动归档或 Git 操作。需要保留完整日志时重定向到忽略的 `test-results/`，同时记录退出码、版本、实际差异或源码 hash。失败后先查看对应输出，按本文件选择受影响检查，不把未执行的后续步骤记为通过。
+输入来自 Git 可见的当前实际文件，含未提交实现；只选根构建配置、README、CI、两应用、共用包、模板和 scripts。排除 .env/认证、私有题目、数据、node_modules、生成资产、dist 和运行产物；拒绝越界链接。副本复制前后及运行前后比较源身份，每个浏览器 suite 前后比较构建身份；变化为 STALE_INPUT/STALE_BUILD，不能把旧副本通过算在后来代码上。OpenSpec/工程文档另记工件身份，不因任务勾选制造应用源码失效。普通模型配置/数据库/代理和继承 NODE_OPTIONS 均不进入白名单子进程环境；显式 SDK fixture 用假凭据和 loopback 传输，额外 Node fetch 守卫拒绝远端模型端点。默认入口永不运行 live 探针或目标部署。
 
-Agent 路由、文档英文路径、技能来源与项目配置范围通过工件和文件检查核对；交互式 Playwright CLI 验收独立使用具名会话，并只关闭本次会话。这些检查不等于各宿主会自动选择同名技能；具体发现限制见 [Skills](./skills.md#browser-verification) 和 [OpenSpec](./openspec.md#skill-entry-points)。
+[verify.test.mjs](../../scripts/verify.test.mjs) 纳入 pnpm check，用自有临时 Git/文件与真实控制子进程验证计划、安装/native 失败、源副本、超时/总预算、信号、detached 清理、未知身份、报告和导出边界；其证据标 control-test，不能当成应用通过。业务断言继续由各原 suite 拥有，覆盖映射以登记的 owner/coverage 为准，不复制另一套产品流程或任务清单。
 
-本次实际结果维护在 [VER-001 tasks](../../openspec/changes/ver-001-integrated-verification/tasks.md)，原始证据位于忽略的 `test-results/ver-001/`。目标平台、耗时、已执行项与未验证能力以该记录为准；CI 配置与远端执行边界见下节，生成、持久化、外部基础设施与最终服务器需在各自接入时另行验收。
+每个 browser suite 用单一 [evidence.cjs](../../scripts/verification/evidence.cjs) 随实际断言形成报告。父级同时要求退出 0、本次 run/profile/source/build 身份、最少必需 case、全部断言和清理通过；缺失、空、旧、全跳过、身份或退出矛盾均失败。主输出只显示阶段、状态、原因和本次报告位置，不解析 PASS 文本作为证据。普通 check/build 不伪造用例数量。首错停止，后续为 not-run/EARLIER_FAILURE；未选择为 not-run/NOT_SELECTED，不能报告 passed。状态 passed/failed/blocked/cancelled/not-run 分开；0 通过、1 断言/协议/普通超时/清理失败、2 前置未就绪，SIGINT/TERM 为 130/143；不明超时仍 failed。
+
+本次目录为 `test-results/gen-regression/<runId>/{source,private,export}`，summary JSON/Markdown 逐步原子发布。source、副本运行数据、原日志、清单与子报告只留本地 private/source；分享仅取 export。export 只含字段投影后的摘要、覆盖标签和明确白名单截图；截图采集时遮罩输入、对话、源码、项目标题、错误正文和整个生成预览，须有匹配的脱敏声明及字节摘要，未确认的原始 PNG 不导出。路径穿越、链接、旧身份和被替换截图拒绝；失败可导出安全摘要，仍保留非零结果。
+
+同仓库 product/full 使用互斥锁；身份与有界清理规则见 [Lifecycle](./lifecycle.md#integrated-verification-lifecycle)。本 change 的真实 full 和另一个 runId 的 product 实测维护在 [GEN-008 tasks](../../openspec/changes/gen-008-integrated-regression/tasks.md)。历史 VER-001/GEN-001～007 记录保留，不改写成新入口的执行记录。真实模型、最终部署和 hosted CI 独立标记未运行。
 
 ## GitHub Actions
 
@@ -51,14 +61,14 @@ Agent 路由、文档英文路径、技能来源与项目配置范围通过工�
 
 | Job | 触发与 runner | 执行内容 |
 | --- | --- | --- |
-| `quality` / Quality (Ubuntu) | PR、main push、workflow_dispatch；ubuntu-24.04 | frozen install → check → test:infra → smoke（含 build）→ OpenSpec 严格校验 |
-| `lifecycle` / Full lifecycle (macOS) | 仅 workflow_dispatch 且 full_lifecycle=true；macos-15 arm64 | bootstrap → pnpm verify，包含固定 Process Compose 安装与完整故障回归 |
+| `quality` / Quality (Ubuntu) | PR、main push、workflow_dispatch；ubuntu-24.04 | frozen install → pnpm verify:product；25 分钟 job 上限 |
+| `lifecycle` / Full lifecycle (macOS) | 仅 workflow_dispatch 且 full_lifecycle=true；macos-15 arm64 | bootstrap → pnpm verify（full）；45 分钟 job 上限 |
 
-每个 job 使用独立 runner，同一 job 的端口场景串行执行。默认日常检查不下载 Process Compose，完整回归按需开启；本地测试通过不能替代首次 Linux/macOS hosted runner 结果。GitHub 官方 [runner 列表](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) 列出上述标准 runner；[Ubuntu 24.04 镜像清单](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md) 包含 Chrome，日常 job 先检查其版本再运行 smoke。镜像内容仍会更新，实际失败应按对应 step 诊断。
+每个 job 使用独立 runner，同一 job 的端口场景串行执行。默认日常检查不下载 Process Compose，完整回归按需开启；本地测试通过不能替代首次 Linux/macOS hosted runner 结果。GitHub 官方 [runner 列表](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) 列出上述标准 runner；[Ubuntu 24.04 镜像清单](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md) 包含 Chrome，验收前置实际启动 Chrome 后再进入检查。镜像内容仍会更新，实际失败应按对应 step 诊断。
 
-Node 读取 .nvmrc，pnpm 读取 package.json，依赖使用唯一 lockfile 执行 frozen install。只由 pnpm action 缓存 store，setup-node 自动缓存关闭；不缓存 node_modules、工具目录或运行状态。各 job 分别有 10/15 分钟超时；同事件、PR 或分支的新运行取消旧运行，手动验收与自动检查使用独立分组。
+Node 读取 .nvmrc，pnpm 读取 package.json，依赖使用唯一 lockfile 执行 frozen install。只由 pnpm action 缓存 store，setup-node 自动缓存关闭；不缓存 node_modules、工具目录或运行状态。各 job 分别有 25/45 分钟超时；同事件、PR 或分支的新运行取消旧运行，手动验收与自动检查使用独立分组。
 
-工作流使用只读 contents 权限，checkout 不保留凭据，不使用 pull_request_target、应用 secrets 或部署权限。完成或失败时仅上传 smoke PNG 和可选的 manager 汇总 report.json，保留七天；没有文件时忽略上传，不上传 fixture、.env、认证状态或整个 .runtime。
+工作流使用只读 contents 权限，checkout 不保留凭据，不使用 pull_request_target、应用 secrets 或部署权限。GEN-008 通过 run_id/run_attempt/job 组成唯一合法 ATOMS_VERIFY_RUN_ID；上传路径只指向本次 test-results/gen-regression/<runId>/export/，不用历史递归 glob。完成或失败均以 always 上传白名单摘要/遮罩截图，保留七天；不设置 continue-on-error，上传成功不会掩盖验收非零。未生成文件可忽略，不上传 source/private、fixture DB、原日志、环境或认证状态。
 
 ### Fixed action sources
 
@@ -75,7 +85,7 @@ Node 读取 .nvmrc，pnpm 读取 package.json，依赖使用唯一 lockfile 执�
 
 配置发布后，检查 Actions 的 CI 工作流与 Quality (Ubuntu) 结果。需要完整验收时，在 Run workflow 中开启 full_lifecycle；[手动触发入口](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch) 需先让工作流存在于默认分支。分支保护与必需检查不由该 YAML 自动配置，取得实际成功的检查名称后再按明确任务接入。
 
-本步本地使用固定 [actionlint 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12) 校验工作流 YAML 和表达式，并核对固定上游输入；不向项目新增 linter 依赖。日常 job 的对应命令在本机执行，完整生命周期源码未变时复用 VER-001 实测与哈希。实际结果见 [CI-001 tasks](../../openspec/changes/ci-001-github-actions/tasks.md)，本地证据位于忽略的 test-results/ci-001/。
+本步本地使用固定 [actionlint 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12) 校验工作流 YAML 和表达式，并核对固定上游输入；不向项目新增 linter 依赖。历史 CI-001 的配置和本地证据保留于 [CI-001 tasks](../../openspec/changes/ci-001-github-actions/tasks.md)。GEN-008 保留四个固定 Action SHA，重新核对其 action.yml 输入并用同版 actionlint 校验新的 job/表达式；本地 full/product 的实际结果见 GEN-008，未提交/推送/触发 hosted run。
 
 ## Existing coverage
 
@@ -118,7 +128,7 @@ pnpm smoke:template
 
 产物在忽略的 `test-results/template-baseline/<runId>/`，包含本次 digest、用例结果、清理状态、截图及私有诊断；交互复核使用独立 `gen-001` Playwright 会话，截图在 output/playwright/。外部 SDK 的非关键统计请求失败不代表模板交互通过或失败，真实编译和控件断言仍分别检查。
 
-当前 `pnpm verify` 和既有 CI 保留原工程/生命周期/连通覆盖，不自动执行新增模板专项；完整模板验收需显式运行上述命令，后续 GEN-008 再整合。manager 的隔离副本补充模板源/准备脚本并排除旧生成资产，以验证独立 dev 命令不依赖原工作目录缓存。实际结果和未验证范围见 [GEN-001 任务记录](../../openspec/changes/gen-001-company-template-baseline/tasks.md)，模板通过不能替代模型、持久化、完整 Top 1 或公网部署验收。
+GEN-008 已将模板准备纳入两种范围、模板浏览器专项纳入 full；product 明确不选择该专项。manager 的隔离副本补充模板源/准备脚本并排除旧生成资产，以验证独立 dev 命令不依赖原工作目录缓存。实际结果和未验证范围见 [GEN-001 任务记录](../../openspec/changes/gen-001-company-template-baseline/tasks.md)，模板通过不能替代模型、持久化、完整 Top 1 或公网部署验收。
 
 ## Model access
 
@@ -161,7 +171,7 @@ pnpm smoke:projects
 
 同一 smoke:projects 命令随后运行 project-smoke-control.test.mjs，以真实外部 HTTP 占用者和活动浏览器分别验证端口保护、SIGINT=130、SIGTERM=143、十秒内退出、最终取消报告、临时目录删除和端口释放。只清理本次 runner 所属进程，不接管其他测试或用户服务。
 
-这些验证证明持久化和 HTTP/浏览器传输，不证明真实模型生成、候选编译/采用、完整工作台或线上部署。默认 verify/CI 仍不自动加入新项目专项，后续 GEN-008 再整合。实际完成与证据见 [GEN-003 tasks](../../openspec/changes/gen-003-project-persistence-api/tasks.md)。
+这些验证证明持久化和 HTTP/浏览器传输，不证明真实模型生成、候选编译/采用、完整工作台或线上部署。GEN-008 full 已纳入项目专项，product 保持 NOT_SELECTED。实际完成与证据见 [GEN-003 tasks](../../openspec/changes/gen-003-project-persistence-api/tasks.md)。
 
 ## Bounded generation
 
@@ -242,21 +252,34 @@ pnpm smoke:generation-stream
 
 桌面与 320/375px 检查宿主/frame 真实宽度、长路径、按钮高度、键盘焦点及临时输入重置；检查实际 iframe sandbox/allow/referrerPolicy、其他窗口消息不能采用、父页面读取被跨源拒绝。外部 bundler 只收到代码/依赖，不传平台凭据或对话。报告及必要截图在忽略的 test-results/candidate-review/<id>/，source=fixture；不上传数据库、cookie 或完整代码，只清理所属服务与数据。本地明确测试代码的编译/采用不等于 GEN-010 真实模型或业务验收，也不构成 GEN-009 最终反代/部署通过。
 
-默认 `pnpm verify` 与既有 CI 尚未自动串联候选专项，需显式执行上述命令。保留的混合工作区结果见 [GEN-006 tasks](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md#implementation-evidence)，独立任务分支的实际验证另记在 [隔离验证记录](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md#isolated-review-evidence)，不以历史混合工作区通过代替。
+GEN-008 已将候选专项串联到 `pnpm verify`（full），product 保持 NOT_SELECTED。保留的混合工作区结果见 [GEN-006 tasks](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md#implementation-evidence)，独立任务分支的实际验证另记在 [隔离验证记录](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md#isolated-review-evidence)，合并后的实际检查与剩余边界见 [Integration evidence](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md#integration-evidence)，不以历史混合工作区通过代替。
 
 ## Project workspace
 
-GEN-007 的 `workspace-messages.test.ts` 验证真实 SQLite 最新/更早页及原增量兼容。前端 `workspace-*.test.ts` 覆盖 JSON/SSE 边界、跨块 UTF-8、帧顺序/关联/终态/上限、单次会话初始化、StrictMode 订阅、取消竞争、丢末帧查询、原 ID 恢复、有界轮询、存储过期/不可用、会话和项目隔离。
+GEN-007 增加 `backend/test/workspace-messages.test.ts` 的真实 SQLite 最新/更早页和原增量协议兼容测试，以及 `frontend/test/workspace-*.test.ts` 的 JSON、SSE 和应用控制器测试。覆盖 single-flight、401/404/503、安全错误、UTF-8/CRLF 跨块、同块多帧、心跳/截断/顺序/关联/双终态/超限、有界 reader/计时器、JSON 分支、StrictMode 订阅重放、取消与成功竞争、丢末帧查询、原 ID 恢复、隐藏/限次查询、存储过期/不可用、会话和项目隔离。纯测试不替代浏览器和实际 SDK 链路。
 
-先 `pnpm check`、`pnpm build`，再 `pnpm smoke:workspace`；其他专项按上节串行运行。工作台专项从可见表单走真实 SDK 的受控 loopback 上游、工具、SQLite、真实 Sandpack 报价、明确采用及重开，dev/preview 分别执行。覆盖错误/取消/断流/未知响应、只读源码与 API 一致、消息顺序/阅读锚点、跨项目草稿、会话过期、原生链接及 1280/1024/768/375/320px 布局。无生产假模型开关，不以注入 compiled 替代编译。
+```sh
+pnpm install --frozen-lockfile
+pnpm check
+pnpm smoke
+pnpm smoke:workspace
+pnpm smoke:candidate
+pnpm smoke:projects
+pnpm smoke:generation-stream
+pnpm smoke:template
+```
 
-报告在忽略的 `test-results/workspace/<runId>/report.json`，source=fixture、realModelCalls=0。复用旧报告时必须比较 sourceHashes 并明确变化文件；旧结果不能冒充本次执行。实际结果及剩余限制见 [GEN-007 tasks](../../openspec/changes/gen-007-project-workspace/tasks.md)。现有 verify/CI 保留基线范围，新增专项显式运行；最终真实模型与部署仍独立验收。
+端口专项串行，smoke 含 build，后续消费同源构建；需要 Chrome、空闲 3001/5173/4173 和外部 Sandpack/依赖下载网络。`workspace-smoke.cjs` 以可见输入/点击创建并生成，真实 SDK 经受控 loopback 上游返回 list_files/read_files/submit_files，真实编排和 SQLite 保存，再操作真实 Sandpack 报价、明确采用、刷新及所属后端重启。主路径不用 page.evaluate 代替表单或注入 compiled；evaluate 仅用于读取事实、布局/滚动、API 比对及故障断言。
+
+dev/preview 分别覆盖示例不提交、创建去重/丢响应/离页晚到、未配置模型、受理活动、消息无双气泡、报价计算、原请求丢终帧恢复、取消/离页断流、采用丢响应查询、基线身份、源码不执行且与 API 一致、上游限流/拒绝及真实编译失败、A/B/过期会话、延迟会话确认前快捷键零创建且就绪后正常提交、新标签/前进后退/未知路径、跨项目草稿、73 条历史的最新/更早顺序与阅读锚点，以及 1280/1024/768/375/320px 的宿主宽度、局部源码滚动和键盘焦点。历史消息仅在所属后端停止时向本次测试数据库预置，与主路径实际生成区分；候选竞争/CAS/未知采用和预览隔离继续执行 GEN-006 专项。
+
+每次使用独立前端/构建后端副本和数据目录，测试 launcher 只注入假配置与本地 SDK 传输；不读取真实环境或调用计费模型。生成次数来自真实 HTTP 计数，报告 `source=fixture`、`realModelCalls=0`，位于忽略的 `test-results/workspace/<runId>/report.json`；清理仅作用于所属进程/浏览器/数据。端口预检拒绝时保留外部占用者。GEN-008 的 product/full 都已串联工作台专项；CI 配置复用相应入口，hosted 执行另行确认。实际结果维护在 [GEN-007 tasks](../../openspec/changes/gen-007-project-workspace/tasks.md)；本地 fixture 成功不替代 GEN-010 真实模型或 GEN-009 最终部署验收。
 
 ## Lifecycle scenarios
 
 `OPS-001` 的原生配置验收使用真实进程，检查双服务与单服务启动、HTTP readiness、健康响应及前端 API 代理、所属进程故障恢复、就绪持续失败、外部端口冲突和停止后的进程清理。核对状态时同时检查是否运行、就绪、退出码与重试次数，不把 `process list` 命令成功当作项目健康；注意 [原生状态及就绪限制](./lifecycle.md#behavior-and-limits)，退出码可能属于前一轮进程。原生记录见 [OPS-001](../../openspec/changes/ops-001-process-compose/tasks.md)。
 
-`pnpm test:manager` 执行 [manager.test.mjs](../../scripts/manager.test.mjs)，在含空格和深路径的隔离副本中使用真实前后端及固定工具，验证重复/并发调用、重启、原生故障恢复后的状态、外部端口保护、就绪超时、中断回滚、调用者硬杀后的锁恢复、supervisor 退出、陈旧 PID、跨副本隔离、未知 socket 和强制停止。它需要 3001/5173 空闲、项目 Node/pnpm、固定 Process Compose 和本机 pnpm 依赖缓存；隔离副本以 offline frozen install 安装，不复制环境文件。产物在忽略的 `test-results/manager/`，需等待 stale 锁和停止截止时间；不会在工作副本自动安装缺失工具，首次安装场景仅操作隔离副本。`pnpm check` 包含 lint、类型、契约准备和两应用单元测试，生命周期变更额外执行本命令；完整验收已由上述 `pnpm verify` 串联。
+`pnpm test:manager` 执行 [manager.test.mjs](../../scripts/manager.test.mjs)，在含空格和深路径的隔离副本中使用真实前后端及固定工具，验证重复/并发调用、重启、原生故障恢复后的状态、外部端口保护、就绪超时、中断回滚、调用者硬杀后的锁恢复、supervisor 退出、陈旧 PID、跨副本隔离、未知 socket 和强制停止。它需要 3001/5173 空闲、项目 Node/pnpm、固定 Process Compose 和本机 pnpm 依赖缓存；隔离副本以 offline frozen install 安装，不复制环境文件。产物在忽略的 `test-results/manager/`，需等待 stale 锁和停止截止时间；不会在工作副本自动安装缺失工具，首次安装场景仅操作隔离副本。`pnpm check` 包含 lint、类型、调度/契约准备和两应用单元测试，生命周期变更额外执行本命令；完整验收已由上述 `pnpm verify` 串联。
 
 该回归还包含 OPS-003：无 node_modules/工具的副本使用真实官方网络下载安装，验证重复 bootstrap、环境文件及 lockfile 保护；受控下载替身验证校验失败和中断清理。doctor 覆盖缺失/错误版本、配置、端口和健康实例，不输出环境值；logs 覆盖服务/行数限制、在线读取、跟随取消及停止后读取。首次安装场景需要 GitHub 网络；其他副本安装复用 pnpm 缓存。测试不访问开发者的真实环境文件，fixture 内只创建测试值。
 
