@@ -18,14 +18,16 @@
 
 ## Configuration and logging
 
-- 秘密保留在后端配置，前端环境变量与生成预览均视为公开内容。配置在后端边界解析，非法配置应在开始服务前失败。
+- 秘密保留在后端配置，前端环境变量与生成预览均视为公开内容。监听配置在开始服务前解析；可选模型配置仅在显式调用边界校验，健康接口与普通服务启动不依赖模型凭据。
 - 后端使用 Fastify 的结构化日志；错误以 `{ err }` 传递。默认不记录提示词、生成文件正文、凭据或会话令牌。
 - 修改实际命令或配置时，同步更新 README 与相关 `.env.example`；模板只放必要名称、说明和安全示例值。
 - 环境文件、持久数据和本地工具产物遵循 `.gitignore`；原始题目材料保持本地参考用途。
 
+模型客户端固定官方 `https://api.openai.com/v1`，不读取 SDK 的 OPENAI_BASE_URL 覆盖，不跟随重定向。先将供应商异常转为 `ModelError` 的允许字段（code、HTTP status 或 null、retryable），再交给日志或报告；不记录 SDK 异常 cause、原始 body、headers、提示词或文件正文。`retryable` 仅为提示，不触发重试。分类为 configuration、authentication、model_access、quota_rate_limit、upstream、network、refusal、invalid_output、truncated、timeout、cancelled；报告缺失用量使用 null。SDK 的原始 warning 文本也不进入日志。
+
 ## Generation when implemented
 
-当前尚无模型生成实现。接入时遵守以下边界：
+当前模型模块提供有限调用与能力样例与 runner，尚无项目生成实现。`client.run` 建立操作截止时间，内部 `session.step` 每次只执行一个模型步骤；工具分派和下一步必须留在同一作用域内，并在分派前检查取消。探针中的 `/App.tsx` 仅做结构/路径/字节检查，`inspect_fixture` 只使用公开内存数据；二者不读写项目、不执行代码。后续接入项目生成时继续遵守以下边界：
 
 - 对文件路径、依赖范围、输出体积、步骤数和总时长设置限制；模型结果通过 schema 校验后仍需验证实际编译与交互。
 - 生成代码在隔离的预览或执行环境中运行，不能在宿主后端进程中执行，也不能获得后端凭据。
