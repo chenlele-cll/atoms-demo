@@ -66,7 +66,7 @@ chmod 600 deploy.env.local.yml
 - 默认外部 8443、后端 3001，首次端口空闲；更新核对监听 PID 属于受管后端或 Nginx，不能凭 HTTP 响应推断归属。
 - 既有根/current/unit/站点需有本部署的归属记录/标记。未知目录、配置、drop-in 或监听者拒绝，不自动采用人工旧部署。
 
-SSH 严格验证已有 known_hosts；先正常 SSH 人工核对指纹。Ansible 的原生 password_mechanism=sshpass 自动处理密码提示，通过 `sshpass -d<fd>` 的匿名管道传递 inventory 字面密码，不把它拼进 shell、argv 或 SSHPASS 环境；不需要人工输入密码或授权公钥作为密码模式的必经步骤。清理外部 SSHPASS/SSH_ASKPASS/ANSIBLE_*，保持单次提示、零自动重试。连接采用 Ansible 原生 ControlMaster/ControlPersist，仅在本次命令的随机 0700 临时 socket 目录内复用；结束/取消向所属 socket 发送退出请求，不接管用户全局连接。短 socket 路径支持深层源码副本。认证拒绝仍非零，不循环尝试密码、不关闭校验或自动改服务器认证。[Ansible 官方选项](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/ssh_connection.html#parameter-password_mechanism)
+SSH 严格验证已有 known_hosts；先正常 SSH 人工核对指纹。Ansible 的原生 password_mechanism=sshpass 自动处理密码提示，通过 `sshpass -d<fd>` 的匿名管道传递 inventory 字面密码，不把它拼进 shell、argv 或 SSHPASS 环境；不需要人工输入密码或授权公钥作为密码模式的必经步骤。清理外部 SSHPASS/SSH_ASKPASS/ANSIBLE_*，保持单次提示、零自动重试。连接采用 Ansible 原生 ControlMaster/ControlPersist，仅在本次命令的随机 0700 临时 socket 目录内复用；结束/取消向所属 socket 发送退出请求，不接管用户全局连接。短 socket 路径支持深层源码副本。Ansible 在 no_log 结果外也可能输出连接错误；控制端先私有暂存，再对 inventory 密码做字面过滤后输出或保存命令日志。认证拒绝仍非零，不循环尝试密码、不关闭校验或自动改服务器认证。[Ansible 官方选项](https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/ssh_connection.html#parameter-password_mechanism)
 
 ## Commands
 

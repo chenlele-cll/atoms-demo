@@ -187,8 +187,19 @@ def run(command, timeout=90, log_path=None):
 
 def run_process(command, timeout, log_path, env):
     """Bounded process group; cancellation never leaves an SSH child running."""
-    log = open(log_path, "xb") if log_path else None
-    if log:
+    password = None
+    if Path(command[0]).name == "ansible-playbook" and "-i" in command:
+        import yaml
+        inventory = Path(command[command.index("-i") + 1])
+        if inventory.is_file():
+            try:
+                password = yaml.safe_load(inventory.read_text())["all"]["hosts"]["atoms"].get("ansible_password")
+            except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError):
+                raise InputError("Private inventory could not be read for protected command output.") from None
+    # Ansible may emit a transport error outside a no_log task's censored result.
+    # Keep that output private until exact credential redaction is complete.
+    log = open(log_path, "xb") if log_path else tempfile.TemporaryFile() if password else None
+    if log_path:
         os.chmod(log_path, 0o600)
     process = subprocess.Popen(command, cwd=ROOT, env=env,
                                stdout=log, stderr=subprocess.STDOUT if log else None, start_new_session=True)
@@ -205,7 +216,16 @@ def run_process(command, timeout, log_path, env):
         return 128 + error.signum if isinstance(error, Cancelled) else 130 if isinstance(error, KeyboardInterrupt) else 124
     finally:
         if log:
+            if password and not log_path:
+                log.flush()
+                log.seek(0)
+                sys.stdout.write(log.read().replace(password.encode(), b"<redacted>").decode(errors="replace"))
             log.close()
+            if password:
+                secret = password.encode()
+                if log_path:
+                    private = Path(log_path)
+                    private.write_bytes(private.read_bytes().replace(secret, b"<redacted>"))
 
 
 def require_tools():

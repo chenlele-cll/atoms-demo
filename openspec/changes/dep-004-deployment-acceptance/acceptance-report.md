@@ -1,6 +1,6 @@
 # Deployment Acceptance Report
 
-任务：`DEP-004`。**原 11 项完成，但用户实测暴露配置兼容性遗漏，新增 2.5 正在修复，当前 11/12**。真实 Ubuntu/systemd/Nginx、公网可信 IP HTTPS、A/B 更新、幂等/故障恢复及本地模型配置同步均有实际证据；生成和流式检查使用明确的测试上游，未调用计费模型。任务状态见 [tasks.md](./tasks.md)。
+任务：`DEP-004`。**12/12 完成，已修复用户实测的模型配置 503**。真实 Ubuntu/systemd/Nginx、公网可信 IP HTTPS、A/B 更新、幂等/故障恢复及本地模型配置同步均有实际证据；生成和流式检查使用明确的测试上游，未调用计费模型。任务状态见 [tasks.md](./tasks.md)。
 
 ## Authentication and target
 
@@ -53,9 +53,9 @@ B：`03b458e2-33aa-4315-a4d5-707b0eb4e914`，releaseDigest `8a9d721b4cff0cb4c481
 
 真实生产配置同步/幂等复测通过：同步 runId `62903c13-5e54-4b2d-94e5-950bb26b93d4`，重复 `4808bef3-86ff-411a-81a9-a901426ed613`；生产进程确认实际加载相同配置。最终 status `74ba5135-64be-4d18-865b-499ba799ad59` 为 healthy/deploymentVerified=true。候选 fixture 的预览、5000/7000/10000 报价、源码核对、采用、切回生产入口后同快照重开及 375/320px 无宿主溢出通过。
 
-专用 fixture 启动器/管理端口已移除/停止，历史失败 runId 的所属暂存已确认并清理，目标所属暂存数为 0；未来 schema 测试副本保留在私有 backups 证据目录，原库未改变。所属浏览器已关闭。最终保留 A、正常生产入口、真实模型配置和测试项目；B 完整保留。445 个 Git 可见文件未匹配当前凭据，本地/目标配置权限 0600。证据汇总为私有 acceptance-summary.json。
+专用 fixture 启动器/管理端口已移除/停止，历史失败 runId 的所属暂存已确认并清理，目标所属暂存数为 0；未来 schema 测试副本保留在私有 backups 证据目录，原库未改变。所属浏览器已关闭。前轮结束保留 A 和 B；用户反馈后的当前修复包为 C，身份与复核结果见下节。真实模型配置和测试项目均保留。445 个 Git 可见文件未匹配当前凭据，本地/目标配置权限 0600。证据汇总为私有 acceptance-summary.json。
 
-上述发布来自记录的冻结 A/B 源身份；并行 Agent 的后续工作区改动没有自动上线。本验收不替代真实模型业务质量或 GEN-010 的验收。
+上述 A/B 来自记录的冻结源身份；C 仅在 A 基础上纳入已实现的零超时逻辑，其他并行产品改动没有自动上线。本验收不替代真实模型业务质量或 GEN-010 的验收。
 
 ## Evidence and scope
 
@@ -69,4 +69,12 @@ B：`03b458e2-33aa-4315-a4d5-707b0eb4e914`，releaseDigest `8a9d721b4cff0cb4c481
 
 用户实际创建项目后出现 HTTP 503 MODEL_CONFIGURATION。只读复核确认 key 已在生产进程中，但 A 的 readModelConfig 拒绝同步的 MODEL_TIMEOUT_MS=0；原矩阵只验证配置字节和进程环境，未验证发布版本的解析兼容性。不得将旧 11/11 结论扩展为真实生成可用。
 
-修复在隔离 A 源副本复用工作区已经实现的零超时配置、模型客户端及生成协调逻辑，其他并行产品改动保留；用 GEN-009 生成新 UUID 包。部署门禁增加真实发布包解析检查，在停服和 no-op 前拒绝不兼容配置，保留当前状态/数据。验证结果待实际执行后补充，不触发计费模型。
+修复在隔离 A 源副本复用工作区已经实现的零超时配置、模型客户端及生成协调逻辑，其他并行产品改动保留；由 GEN-009 在 Ubuntu 构建并激活 C：`dfb06444-12b5-4d6c-a2f2-5ecdb25959db`，releaseDigest `0d6ce5a3d447ed6f5527ca8968143300f8fc51752ea49ab927291d8059e29f6f`。激活 runId `0409d301-ccd2-4fa1-8f0e-cf6fa0636239`；重复 `76045696-7312-478a-84ae-b9b1161e8138` 为 noop，进程 PID/启动身份、配置和数据摘要均不变。状态 runId `4b46bd85-2f7a-4c8b-846a-f7e53ecd7774` 为 healthy/deploymentVerified=true。
+
+部署门禁用所选包的真实 readModelConfig 解析合并后的值，在停服、切换和 no-op 前拒绝不兼容配置；status 同样校验当前包。无 key 时仍允许诊断部署。有 key 的旧 A 在修复前返回 MODEL_CONFIGURATION；C 对实际生产配置（包含原 key 和 timeout=0）解析成功。暂存 JSON 0600，校验不调用供应商。
+
+实际目标验证使用 C 的原始编译模块与生产配置，解析后将 key 替换为明确假值，在独立库/loopback HTTP 应用注入 SDK fixture；不替换线上 unit、不向用户项目写入测试内容。HTTP 受理、0 配置下持续运行、USER_CANCELLED 和候选保存全部通过（4 个本地 fixture HTTP 请求，1 次上游取消，真实模型请求 0）。公网 HTTPS 健康、原测试项目/采用快照、原模型配置、schema=3/quick_check=ok 和 Nginx 主身份保留；临时 fixture 已移除。
+
+隔离副本类型检查与 80 项模型/生成回归通过，含 62.410 秒的零超时真实 loopback SSE 测试；部署事务专项 15 项通过。第一次扩大检查暴露了 no_log 外的合成 SSH 凭据错误输出，并发真实部署还干扰了控制锁专项；保留失败，补充命令输出字面密码过滤并串行复测，最终部署全套 48 项中 47 通过、1 项按显式条件跳过（49.745 秒）。这不将跳过项算作通过。固定 Ansible 渲染和 OpenSpec 严格检查通过。
+
+证据在忽略的 `test-results/dep-004/model-config-1b94bb82-774a-4fd1-a15d-4be9fe16a477/`，包含诊断、来源选择、配置/数据/进程前后比较、目标 HTTP fixture 和 summary.json；449 个 Git 可见文件匹配真实凭据为 0。修复未调用计费模型，供应商实际生成质量仍由用户显式生成或 GEN-010 另行验证。
