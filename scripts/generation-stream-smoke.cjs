@@ -115,7 +115,7 @@ async function mode(name, port) {
   await ready(`http://127.0.0.1:${port}`, frontend); const context = await browser.newContext(); const page = await context.newPage();
   const pageErrors = []; page.on('pageerror', error => pageErrors.push(error.name));
   try {
-    await page.goto(`http://127.0.0.1:${port}`); await api(page, 'POST', '/api/session', {});
+    await page.goto(`http://127.0.0.1:${port}/diagnostics/connection`); await api(page, 'POST', '/api/session', {});
     const templates = await api(page, 'GET', '/api/templates'); const template = templates.body.items[0];
     const created = await api(page, 'POST', '/api/projects', { title: `${name} stream fixture`, templateId: template.id, templateVersion: template.version, templateDigest: template.digest });
     assert.equal(created.status, 201); const project = created.body; let success;
@@ -148,8 +148,8 @@ async function mode(name, port) {
 async function main() {
   await mkdir(output, { recursive: true }); for (const port of [3001, 5173, 4173]) await portFree(port);
   await access(path.join(root, 'backend/dist/storage/ownership.js')); await access(path.join(root, 'frontend/dist/index.html'));
-  await mkdir(deploy, { recursive: true }); await cp(path.join(root, 'backend/dist'), path.join(deploy, 'dist'), { recursive: true });
-  await cp(path.join(root, 'backend/package.json'), path.join(deploy, 'package.json')); await symlink(path.join(root, 'backend/node_modules'), path.join(deploy, 'node_modules'), 'dir');
+  const { prepareBackendRuntime } = await import('./prepare-backend-runtime.mjs');
+  await prepareBackendRuntime(root, deploy);
   await mkdir(browserRepo, { recursive: true });
   for (const name of ['package.json', 'tsconfig.base.json', 'templates']) await cp(path.join(root, name), path.join(browserRepo, name), { recursive: true });
   await cp(path.join(root, 'frontend'), path.join(browserRepo, 'frontend'), { recursive: true, filter: source => !['node_modules', '.env', 'data'].includes(path.basename(source)) && !path.basename(source).startsWith('.env.') });

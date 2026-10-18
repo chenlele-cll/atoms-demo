@@ -95,7 +95,7 @@ async function run() {
     const runtimeErrors = [];
     page.on('pageerror', (error) => runtimeErrors.push(error.message));
 
-    await page.goto('http://127.0.0.1:5173');
+    await page.goto('http://127.0.0.1:5173/diagnostics/connection');
     await page.getByRole('button', { name: '检查后端连接' }).click();
     await page.getByText('连接正常，前端已通过 /api 访问独立的 Fastify 服务。').waitFor();
     await page.screenshot({ path: path.join(artifacts, 'dev-desktop.png'), fullPage: true });
@@ -129,9 +129,14 @@ async function run() {
       waitForReady('http://127.0.0.1:3001/api/health', production),
       waitForReady('http://127.0.0.1:4173', preview),
     ]);
-    await page.goto('http://127.0.0.1:4173');
+    await page.goto('http://127.0.0.1:4173/diagnostics/connection');
     await page.getByRole('button', { name: '检查后端连接' }).click();
     await page.getByText('连接正常，前端已通过 /api 访问独立的 Fastify 服务。').waitFor();
+
+    await page.goto('http://127.0.0.1:4173');
+    await page.getByRole('heading', { name: /把你的想法/ }).waitFor();
+    await page.getByRole('button', { name: '创建并生成', exact: true }).waitFor();
+    assert.equal(await page.getByRole('textbox', { name: '你想创建什么？', exact: true }).isVisible(), true);
 
     assert.deepEqual(runtimeErrors, []);
     console.log('PASS: independent dev startup, /api proxy, 320/375/768/1280px layout,');

@@ -4,7 +4,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 项目目标是让用户通过自然语言生成和修改网页应用，交互预览结果，并保存项目与代码版本。
 
-当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成已实现；公开生成事件流/查询/取消已实现；候选预览/采用和完整工作台尚未实现，Top 1 尚未完成。
+当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成、公开生成事件流/查询/取消、候选预览/采用及创建/对话/预览/只读源码工作台已实现；本地工作台使用受控 SDK 上游验证，真实模型最终业务与部署验收仍需独立完成。
 
 ## 环境
 
@@ -36,10 +36,11 @@ pnpm dev:frontend
 ```
 
 - 前端：<http://127.0.0.1:5173>。
+- 连接诊断：<http://127.0.0.1:5173/diagnostics/connection>，保留原连接检查页面。
 - 企业官网模板基线：<http://127.0.0.1:5173/templates/company-landing>，也可从首页进入；不需要后端或模型密钥。
 - 后端健康接口：<http://127.0.0.1:3001/api/health>。
 - 前端请求相对路径 `/api/health`，Vite 将 `/api` 原样代理到后端。
-- 页面上的“检查后端连接”按钮验证 HTTP 状态与响应结构；后端不可用时显示失败反馈。
+- 诊断页的“检查后端连接”按钮验证 HTTP 状态与响应结构；后端不可用时显示失败反馈。
 - 两个进程相互独立，后端关闭时前端页面仍可加载。Vite 固定端口，冲突时直接报错。
 
 完成 bootstrap 后，也可通过 [manager.sh](./manager.sh) 一键管理两个开发进程：
@@ -63,6 +64,18 @@ pnpm dev:frontend
 ```
 
 当前三个命令均明确返回“未配置外部基础设施”（JSON 为 `not_configured`），重复执行成功，不安装工具或启动服务。真实服务在需要时通过 `INF-002` 接入 Docker Compose；检测到尚未接入的 Compose 配置时明确失败，见 [基础设施约定](./docs/engineering/lifecycle.md#infrastructure-contract)。
+
+## 创建与项目工作台
+
+首页填写名称与需求、选择模板，再点击“创建并生成”；示例只填入文本，Enter 换行，Ctrl/Cmd+Enter 提交，中文组合输入期间不提交。创建或生成没有自动重试；创建响应未知时保留输入并刷新真实列表。
+
+`/projects/:projectId` 展示持久对话、本次真实活动、原请求查询/取消、当前与候选预览及只读源码。候选保存后先检查预览，再明确“使用这个版本”；新需求始终使用当前已采用版本。内部聊天/预览/代码切换保留连接，离开项目关闭原连接并取消未完成运行。刷新读取已保存项目，待确认请求只查询原 ID。消息默认最新 50 条，可加载更早；内存草稿不承诺刷新恢复，会话失效不能认领旧项目。模型未配置仍保留已创建项目和需求。
+
+候选直达入口为 `/projects/:projectId/candidates/:versionId`。`GET /api/projects/:projectId/versions/:versionId` 返回完整不可变版本、成功 run 或 null、changedFiles、currentVersionId 与 adoptionAvailability；`POST /api/projects/:projectId/versions/:versionId/adopt` 严格接受 `{expectedCurrentVersionId}`（最多 1 KiB），以同项目成功候选、parent/当前基线和无活动运行为条件 CAS 更新当前引用。有效目标已当前时幂等返回；不实现历史恢复。两接口每 IP 每分钟分别 60/10 次，沿用会话归属、Origin/JSON 与 no-store 边界。
+
+真实编译和采用确认分别展示；丢响应后查询当前事实，仍为旧版本保持待确认，不自动更换 expected 重发。Sandpack iframe 仅收到代码/依赖，不接收平台会话、对话或后端凭据；编译反馈不是服务端证明或最终业务验收。前后端通过 `packages/contracts` 共用公开 schema，独立 dev/build/typecheck/test 自动准备包；生产后端须包含共用包输出及运行依赖，见 [Monorepo](./docs/architecture/monorepo.md#shared-contract-build)。
+
+构建后可分别执行 `pnpm smoke:candidate` 和 `pnpm smoke:workspace`。需要 Chrome、空闲 3001/5173/4173 和外部 Sandpack 网络；端口专项串行执行，使用独立数据与受控 fixture，不调用计费模型。覆盖与证据边界见 [Verification](./docs/engineering/verification.md#candidate-review)。
 
 ## 企业官网模板基线
 
@@ -110,11 +123,12 @@ pnpm smoke:template
 | POST /api/projects | `{templateId,templateVersion,templateDigest,title}`；201 `{project,currentVersion,latestRun:null}` |
 | GET /api/projects?limit=20&cursor=… | 当前会话的 `{items,nextCursor}`；最多 50 条元数据，不含代码 |
 | GET /api/projects/:projectId | `{project,currentVersion,latestRun}`，当前版本含完整 snapshot |
-| GET /api/projects/:projectId/messages?afterSequence=0&limit=20 | `{items,nextAfterSequence}`，按序号升序，最多 50 条 |
+| GET /api/projects/:projectId/messages?afterSequence=0&limit=20 | `{items,nextAfterSequence}`，原增量协议，按序号升序，最多 50 条 |
+| GET /api/projects/:projectId/messages?direction=backward&limit=50 | `{items,nextBeforeSequence,latestSequence}`；可用互斥的 `beforeSequence=N` 取更早页，items 始终升序 |
 
 新项目原子保存服务端可信模板 v0，消息为空、没有生成记录；模板冲突返回 409，客户端不能注入文件或所有者。匿名 cookie 为 HttpOnly、SameSite=Strict、Path=/api，有效期 30 天，复用不延长；HTTPS 配置启用 Secure。数据库只保存 token 摘要。清理 cookie 或到期后会失去旧项目入口，没有找回或认领接口；数据不会自动删除。有效会话访问他人的项目与不存在项目均为 404，无会话为 401。
 
-会话初始化默认每 IP 每分钟 30 次，创建项目 10 次；每会话最多 20 个项目。超限分别返回带 Retry-After 的 429 或项目配额 409；上述 POST 请求体最多 8 KiB。错误统一 `{error:{code,message},requestId}`，私有响应 no-store。消息/run/候选由生成内核写入，没有任意代码写入、版本采用或分享接口；候选保存保持当前版本不变。契约与限制见 [Development](./docs/engineering/development.md#project-persistence)，真实验证见 [Verification](./docs/engineering/verification.md#project-persistence)。
+会话初始化默认每 IP 每分钟 30 次，创建项目 10 次；每会话最多 20 个项目。超限分别返回带 Retry-After 的 429 或项目配额 409；上述 POST 请求体最多 8 KiB。错误统一 `{error:{code,message},requestId}`，私有响应 no-store。消息/run/候选由生成内核写入，没有任意代码写入或分享接口；候选保存保持当前版本不变，采用需用户明确操作。契约与限制见 [Development](./docs/engineering/development.md#project-persistence)，真实验证见 [Verification](./docs/engineering/verification.md#project-persistence)。
 
 ## 模型能力探针
 

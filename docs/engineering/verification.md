@@ -96,7 +96,7 @@ Node 读取 .nvmrc，pnpm 读取 package.json，依赖使用唯一 lockfile 执�
 
 ## Template baseline
 
-`GEN-001` 的企业官网基线入口为 `/templates/company-landing`，保留首页连接检查，不需要后端或模型配置。它是固定开源模板预览，不是模型成果；来源、许可和改动见 [模板说明](../../templates/company-landing/ADAPTATIONS.md)。
+`GEN-001` 的企业官网基线入口为 `/templates/company-landing`，连接检查迁至 `/diagnostics/connection`，不需要后端或模型配置。它是固定开源模板预览，不是模型成果；来源、许可和改动见 [模板说明](../../templates/company-landing/ADAPTATIONS.md)。
 
 ```sh
 pnpm test:template
@@ -154,7 +154,7 @@ pnpm smoke:projects
 
 端口场景串行执行；smoke 已含 build，另外两项浏览器专项使用该构建，不重复构建。连接 smoke 的后端源码/生产进程改用隔离 cwd 和临时 DATABASE_PATH，正常关闭后才删除临时数据；不接触开发者数据库。项目专项复用 playwright-core 与系统 Chrome，不增加测试框架或产品测试页：
 
-- 在独立前端副本的已有首页，用浏览器 fetch('/api/...') 分别走 dev/preview 代理，检查公开目录不创建 cookie、HttpOnly/Strict/Path cookie、模板创建、空对话及刷新恢复。
+- 在独立前端副本的诊断页，用浏览器 fetch('/api/...') 分别走 dev/preview 代理，检查公开目录不创建 cookie、HttpOnly/Strict/Path cookie、模板创建、空对话及刷新恢复。
 - 独立上下文 A/B 的列表、详情及对话隔离；其他归属与不存在项目为相同 404 错误结构。
 - 后端部署布局仅含自己的 dist、package 和当前平台依赖，不含前端或原模板源；停止后通过内部入口写入明确的测试消息/run/候选，保留原 cookie 与数据库后重启，比较完整快照摘要、项目 ID、消息序号和当前版本不变。临时移走目录 JSON 时，已保存项目仍能由 store 读回；正式 server 仍要求加载可用目录后监听。
 - 测试进程、浏览器和临时数据库均归本次所有，信号中止不启动后续场景；端口冲突不停止占用者。报告在忽略的 test-results/project-persistence/<runId>/，运行目录在清理后删除。
@@ -218,6 +218,22 @@ DEP-003 将同一入口扩展为离线 plan 文本/JSON、原生分阶段流程�
 这些测试只用隔离配置、命令/SSH 替身和本地 builtin 模块，不读取真实 inventory、连接真实服务器或调用模型；不将 fixture 结果当成服务器通过。plan/check/status 与接入说明见 [Deployment](./deployment.md)，缺依赖的 apply 仍明确失败。本次框架证据在忽略的 test-results/dep-003/framework/；真实 Nginx/systemd、公网 TLS/流、更新/回退和数据保留仍待后续接点及 DEP-004 目标验收，DEP-001 连接问题保持独立记录。默认 check/verify/CI 不自动安装 Python 工具或执行部署检查。
 
 DEP-004 的[验收矩阵](../../openspec/changes/dep-004-deployment-acceptance/design.md)和[实际状态](../../openspec/changes/dep-004-deployment-acceptance/acceptance-report.md)分别维护场景断言与证据。框架可先完成，GEN-009 发布包及真实 apply 接点仍待实现，目标部署场景未运行；入口拒绝、模板渲染、纯决策与 fixture 成功不得替代幂等部署、更新、失败恢复或数据保留验收。
+
+## Candidate review
+
+GEN-006 使用现有 Node 测试器；根 check 包含契约准备和两端测试，无新增 DOM 框架。`prepare-contracts.test.mjs` 在 offline frozen 独立副本验证无 dist 构建、并发准备、缓存/输出缺失/输入变化及准备失败阻止 dev。后端真实 SQLite/injection 覆盖归属、完整快照、成功关联、同父竞争 CAS、幂等、活动/孤立 running、回滚与重开；前端覆盖预览键/旧事件/错误锁定/超时、采用确认/未知/冲突及 HTTP/schema/摘要/关联/正文/取消/截止。
+
+先 `pnpm build`，再按顺序运行 `pnpm smoke:template`、`pnpm smoke:candidate`、`pnpm smoke:projects`、`pnpm smoke:generation-stream`。需要项目 Node/pnpm、Chrome/npx、空闲 3001/5173/4173 与外部 Sandpack/bundler 网络。各专项使用相同构建、独立数据，只清理所属进程。候选专项预置明确 fixture succeeded/候选，验证真实报价、编译/运行错误、bundler 阻断/重试、采用竞争、丢响应查询、重启和 iframe 隔离；桌面与 320/375px 真实宽度、焦点、临时输入也分别断言。
+
+报告在忽略的 `test-results/candidate-review/<runId>/`，source=fixture；不调用计费模型、不上传数据库/cookie/完整代码。实际任务证据见 [GEN-006 tasks](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md)，不能替代最终模型业务或部署验收。
+
+## Project workspace
+
+GEN-007 的 `workspace-messages.test.ts` 验证真实 SQLite 最新/更早页及原增量兼容。前端 `workspace-*.test.ts` 覆盖 JSON/SSE 边界、跨块 UTF-8、帧顺序/关联/终态/上限、单次会话初始化、StrictMode 订阅、取消竞争、丢末帧查询、原 ID 恢复、有界轮询、存储过期/不可用、会话和项目隔离。
+
+先 `pnpm check`、`pnpm build`，再 `pnpm smoke:workspace`；其他专项按上节串行运行。工作台专项从可见表单走真实 SDK 的受控 loopback 上游、工具、SQLite、真实 Sandpack 报价、明确采用及重开，dev/preview 分别执行。覆盖错误/取消/断流/未知响应、只读源码与 API 一致、消息顺序/阅读锚点、跨项目草稿、会话过期、原生链接及 1280/1024/768/375/320px 布局。无生产假模型开关，不以注入 compiled 替代编译。
+
+报告在忽略的 `test-results/workspace/<runId>/report.json`，source=fixture、realModelCalls=0。复用旧报告时必须比较 sourceHashes 并明确变化文件；旧结果不能冒充本次执行。实际结果及剩余限制见 [GEN-007 tasks](../../openspec/changes/gen-007-project-workspace/tasks.md)。现有 verify/CI 保留基线范围，新增专项显式运行；最终真实模型与部署仍独立验收。
 
 ## Lifecycle scenarios
 
