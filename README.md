@@ -154,6 +154,7 @@ docs/
     skills.md         技能来源与使用范围
     openspec.md       OpenSpec 入口、工件和配置归属
   product/
+    core-paths.md      核心路径、模板生成策略、范围与验收目标
     assignment.md     原始题目整理稿，仅本地保留
 scripts/
   check-dev-port.cjs   托管服务启动前检查固定端口，不终止占用者
@@ -198,6 +199,7 @@ Skills 的完整文件保存在本仓库中：复用上游的 Git、Playwright �
 
 ## 项目资料
 
+- [核心功能路径与生成质量方案](./docs/product/core-paths.md)：Top 1 模板起步与真实生成、Top 2 对话修改与版本恢复、Top 3 固定版本分享的范围与验收目标；产品能力尚待实现。
 - [Agent 工作入口](./AGENTS.md)：按任务选择文档、Skills 与检查；前后端细则分别见 [前端指南](./frontend/AGENTS.md) 和 [后端指南](./backend/AGENTS.md)。
 - [Git 工作流](./docs/engineering/git-workflow.md)：任务编号、分支命名、提交格式、验证及合并约定。
 - [OpenSpec 指南](./docs/engineering/openspec.md)：项目 CLI、上下文、技能与变更工件。

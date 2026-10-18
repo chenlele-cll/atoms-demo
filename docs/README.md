@@ -4,6 +4,7 @@
 
 | 目录 | 文档 | 内容与阅读时机 |
 | --- | --- | --- |
+| `product/` | [core-paths.md](./product/core-paths.md) | 应用场景与核心路径优先级、模板生成策略、范围与验收目标；实施产品能力前阅读，具体任务在 OpenSpec change 中跟踪 |
 | `architecture/` | [stack-decisions.md](./architecture/stack-decisions.md) | 选型依据、候选比较与适用条件；重新评估技术决策时阅读并更新 |
 | `architecture/` | [monorepo.md](./architecture/monorepo.md) | 目录职责、依赖方向、workspace 与工具链边界；调整应用组织和共享代码时阅读并更新 |
 | `engineering/` | [development.md](./engineering/development.md) | 类型、接口、配置、日志及生成与存储规则；修改对应代码时阅读，规则变化时更新 |
