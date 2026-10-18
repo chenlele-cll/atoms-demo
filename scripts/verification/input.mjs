@@ -14,7 +14,7 @@ export function allowedInput(name) {
   const parts = name.split('/');
   if (parts.some(part => ['.git', 'node_modules', 'dist', 'data', '.runtime', '.tools', 'test-results', 'template-assets', 'coverage'].includes(part) || /^(?:\.build-|\.previous-|\.env(?!\.example$))/.test(part))) return false;
   if (/\.(?:sqlite|db)(?:-.*)?$|\.(?:pem|key|p12)$|(?:credentials|storageState|auth-state)/i.test(name)) return false;
-  return rootFiles.has(name) || /^(?:frontend|backend|packages|templates|scripts)\//.test(name) || name.startsWith('.github/workflows/');
+  return rootFiles.has(name) || name === 'deploy/nginx.conf.template' || /^(?:frontend|backend|packages|templates|scripts)\//.test(name) || name.startsWith('.github/workflows/');
 }
 export function cleanEnvironment(input = process.env) {
   const result = {};
@@ -67,7 +67,7 @@ export async function copiedInputs(root, select = allowedInput) {
     for (const item of await readdir(path.join(root, prefix), { withFileTypes: true })) {
       const name = path.posix.join(prefix, item.name);
       if (item.isDirectory()) {
-        if ((!prefix && ['frontend', 'backend', 'packages', 'templates', 'scripts', '.github'].includes(item.name)) || allowedInput(name + '/file')) await visit(name);
+        if ((!prefix && ['frontend', 'backend', 'packages', 'templates', 'scripts', '.github', 'deploy'].includes(item.name)) || allowedInput(name + '/file')) await visit(name);
       } else if (allowedInput(name) && select(name)) names.push(name);
     }
   }

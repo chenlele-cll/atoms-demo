@@ -1,0 +1,44 @@
+worker_processes 1;
+daemon off;
+pid {{PREFIX}}/nginx.pid;
+error_log {{PREFIX}}/error.log warn;
+events { worker_connections 256; }
+http {
+  access_log off;
+  client_body_temp_path {{PREFIX}}/client_temp;
+  proxy_temp_path {{PREFIX}}/proxy_temp;
+  types { text/html html; text/css css; application/javascript js mjs; application/json json; image/svg+xml svg; image/png png; image/x-icon ico; font/woff2 woff2; }
+  default_type application/octet-stream;
+  server {
+    listen 127.0.0.1:8080;
+    server_name 127.0.0.1;
+    root {{STATIC}};
+    client_max_body_size 32k;
+    location ~ (^|/)\. { return 404; }
+    location ~* \.(sqlite|db|env)(-|$|\.) { return 404; }
+    location ~ ^/api(?:/|$) {
+      proxy_pass http://127.0.0.1:3001;
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+      proxy_set_header Host $http_host;
+      proxy_set_header Origin $http_origin;
+      proxy_set_header X-Forwarded-For $remote_addr;
+      proxy_set_header X-Forwarded-Host $http_host;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header Forwarded "";
+      proxy_buffering off;
+      proxy_cache off;
+      proxy_ignore_client_abort off;
+      proxy_intercept_errors off;
+      proxy_next_upstream off;
+      gzip off;
+      proxy_connect_timeout 5s;
+      proxy_read_timeout 150s;
+      proxy_send_timeout 30s;
+    }
+    location /assets/ { try_files $uri =404; add_header Cache-Control "public, max-age=31536000, immutable"; }
+    location /template-assets/ { try_files $uri =404; add_header Cache-Control "no-cache"; }
+    location = /index.html { add_header Cache-Control "no-cache"; }
+    location / { try_files $uri $uri/ /index.html; }
+  }
+}

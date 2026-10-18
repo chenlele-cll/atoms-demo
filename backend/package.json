@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "files": ["dist"],
   "scripts": {
     "dev": "node ../scripts/prepare-contracts.mjs && node ../scripts/prepare-company-template.mjs --target backend-src && tsx watch src/server.ts",
     "build": "node ../scripts/prepare-contracts.mjs && node ../scripts/prepare-company-template.mjs --target backend-src && tsc -p tsconfig.build.json && node ../scripts/prepare-company-template.mjs --target backend-dist",
