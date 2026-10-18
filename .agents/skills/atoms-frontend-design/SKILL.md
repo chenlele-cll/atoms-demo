@@ -59,6 +59,9 @@ Use semantic CSS custom properties when implementing these values. These are the
 - Place a small number of actionable example prompts below the composer. Selecting one must populate or submit an actual prompt according to its explicit label.
 - Show recent projects when persistence is implemented; otherwise show an honest empty state. Preserve user-entered text after recoverable errors.
 - Use generous entry-page whitespace without pushing the composer below the initial viewport on common laptop screens. Avoid unnecessary promotional sections.
+- Follow the Atoms website's entry hierarchy: a quiet top navigation, centered invitation and prompt composer, compact example prompts, then a separate recent-project section. Retain the approved cream/charcoal palette and system typography. Put the prompt first and arrange project name and template as supporting fields; stack those fields on narrow screens.
+- Recent projects link directly to real saved work in a responsive card grid. With no saved projects, use a compact explanatory empty state. Keep session errors and recovery actions near the composer.
+- Show the selected template's actual appearance next to its selection context. Bind thumbnails and interactive previews to the selected ID, version, and digest; show an honest unavailable state for missing matches. Open the full isolated preview in a native dialog on the creation page, preserve form drafts, and restore focus on close. Load the interactive runtime only when requested.
 
 ### Project Navigation
 

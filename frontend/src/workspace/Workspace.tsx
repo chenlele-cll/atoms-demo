@@ -5,7 +5,13 @@ import { internalClick } from './routing';
 import styles from './Workspace.module.css';
 import { HistoryPane } from './HistoryPane';
 import { operationBlocks } from './history-state';
+import { TemplateSelectionPreview } from './TemplateSelectionPreview';
 const VersionPane = lazy(() => import('./VersionPane').then(module => ({ default: module.VersionPane })));
+
+function Icon({ name }: { name: 'spark' | 'plus' | 'arrow' | 'project' | 'grid' }) {
+  const paths = { spark: 'm12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z', plus: 'M12 5v14M5 12h14', arrow: 'M5 12h14m-6-6 6 6-6 6', project: 'M4 5h6l2 3h8v12H4V5Z', grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z' };
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
+}
 
 export function ProductLink({ href, navigate, children, className }: { href: string; navigate: (path: string) => void; children: ReactNode; className?: string | undefined }) {
   const click = (event: MouseEvent<HTMLAnchorElement>) => { if (internalClick(event)) { event.preventDefault(); navigate(href); } };
@@ -14,16 +20,16 @@ export function ProductLink({ href, navigate, children, className }: { href: str
 export function Navigation({ state, app, navigate }: { state: WorkspaceState; app: WorkspaceController; navigate: (path: string) => void }) {
   const [open, setOpen] = useState(false);
   return <aside className={styles.navigation}>
-    <div className={styles.brand}><ProductLink href="/" navigate={navigate}>atoms<span>创作工作台</span></ProductLink>
+    <div className={styles.brand}><ProductLink href="/" navigate={navigate}><span className={styles.brandMark}><Icon name="spark" /></span>atoms<span className={styles.brandCaption}>创作工作台</span></ProductLink>
       <button className={styles.menu} type="button" aria-expanded={open} aria-controls="project-navigation" onClick={() => setOpen(value => !value)}>项目导航</button></div>
     <nav id="project-navigation" aria-label="项目导航" data-open={open}>
-      <ProductLink href="/" navigate={navigate} className={styles.newProject}>＋ 新建项目</ProductLink>
+      <ProductLink href="/" navigate={path => { setOpen(false); navigate(path); }} className={styles.newProject}><Icon name="plus" />新建项目</ProductLink>
       <p className={styles.eyebrow}>最近项目</p>
       {state.projects.length === 0 ? <p className={styles.muted}>当前会话还没有项目。</p> : state.projects.map(project => <ProductLink key={project.id} href={`/projects/${project.id}`}
         navigate={path => { setOpen(false); navigate(path); }} className={state.route.kind === 'project' && state.route.projectId === project.id ? styles.selectedProject : styles.projectLink}>
-        <span title={project.title}>{project.title}</span><small>{project.templateId}</small></ProductLink>)}
+        <span title={project.title}>{project.title}</span><small>项目工作台</small></ProductLink>)}
       {state.cursor && <button type="button" onClick={() => void app.refreshProjects(true)}>加载更多项目</button>}
-      <div className={styles.navFooter}><ProductLink href="/templates/company-landing" navigate={navigate}>模板原版</ProductLink><ProductLink href="/diagnostics/connection" navigate={navigate}>连接诊断</ProductLink></div>
+      <div className={styles.navFooter}><ProductLink href="/templates/company-landing" navigate={navigate}><Icon name="grid" />模板原版</ProductLink><ProductLink href="/diagnostics/connection" navigate={navigate}>连接诊断<span aria-hidden="true">↗</span></ProductLink><p>从想法出发，一步步构建。</p></div>
     </nav>
   </aside>;
 }
@@ -33,32 +39,40 @@ const examples = [
 ];
 export function Creation({ state, app }: { state: WorkspaceState; app: WorkspaceController }) {
   const composing = useRef(false);
+  const selectedTemplate = state.templates.find(template => template.id === state.home.templateId);
   const shortcut = (event: KeyboardEvent<HTMLTextAreaElement>) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.nativeEvent.isComposing && !composing.current) { event.preventDefault(); void app.create(); } };
   return <main className={styles.creation}>
-    <p className={styles.eyebrow}>从一个可靠的模板开始</p><h1>把你的想法，<br />变成可运行的应用。</h1>
-    <p className={styles.intro}>描述你要解决的问题。生成后先检查预览，再决定是否使用。</p>
+    <header className={styles.homeHeader}><span>你的创作空间</span><a href="/templates/company-landing"><Icon name="grid" />浏览起始模板<Icon name="arrow" /></a></header>
+    <section className={styles.creationHero} aria-labelledby="creation-heading">
+    <div className={styles.heroHeading}><p className={styles.eyebrow}><Icon name="spark" />让想法开始生长</p><h1 id="creation-heading">你想把什么想法<br />变成现实？</h1>
+    <p className={styles.intro}>用自然语言描述，让你的下一个应用从这里开始。</p></div>
     <form className={styles.composer} onSubmit={event => { event.preventDefault(); if (!composing.current) void app.create(); }}>
-      <label htmlFor="project-title">项目名称 <span className={styles.muted}>可选，留空为“新项目”</span></label>
-      <input id="project-title" maxLength={120} value={state.home.title} onChange={event => app.editHome({ title: event.target.value })} placeholder="例如：品牌官网报价工具" disabled={state.home.status === 'submitting'} />
-      <label htmlFor="home-prompt">你想创建什么？</label>
-      <textarea id="home-prompt" maxLength={4000} rows={5} value={state.home.prompt} onChange={event => app.editHome({ prompt: event.target.value })}
+      <label className={styles.promptLabel} htmlFor="home-prompt">你想创建什么？</label>
+      <textarea id="home-prompt" maxLength={4000} rows={3} value={state.home.prompt} onChange={event => app.editHome({ prompt: event.target.value })}
         onKeyDown={shortcut} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
-        placeholder="例如：给企业官网添加一个可交互的报价工具…" disabled={state.home.status === 'submitting'} />
+        placeholder="描述你的想法，例如：为我的品牌官网添加一个在线报价工具，选择服务后就能实时计算价格…" disabled={state.home.status === 'submitting'} />
+      <div className={styles.creationOptions}><div><label htmlFor="project-title">项目名称 <span className={styles.muted}>（可选）</span></label>
+      <input id="project-title" maxLength={120} value={state.home.title} onChange={event => app.editHome({ title: event.target.value })} placeholder="为你的想法起个名字" disabled={state.home.status === 'submitting'} /></div><div>
       <label htmlFor="template-choice">起始模板</label>
       <select id="template-choice" value={state.home.templateId} onChange={event => app.editHome({ templateId: event.target.value })} disabled={state.home.status === 'submitting' || !state.templates.length}>
         {!state.templates.length && <option value="">{state.loading ? '正在读取模板…' : '暂无可用模板'}</option>}
         {state.templates.map(template => <option key={template.id} value={template.id}>{template.name} · v{template.version}</option>)}
-      </select>
+      </select></div></div>
+      {selectedTemplate && <TemplateSelectionPreview key={`${selectedTemplate.id}:${selectedTemplate.version}:${selectedTemplate.digest}`} template={selectedTemplate} />}
       <div className={styles.composerActions}><span className={styles.note}>Enter 换行 · Ctrl/Cmd + Enter 提交</span>
         <button className={styles.primary} type="submit" disabled={!state.home.sessionReady || !state.templates.length || state.home.status === 'submitting' || !state.home.prompt.trim()}>
-          {state.home.status === 'submitting' ? '正在创建…' : '创建并生成'}</button></div>
+          {state.home.status === 'submitting' ? '正在创建…' : '创建并生成'}<Icon name="arrow" /></button></div>
     </form>
-    <div className={styles.examples} aria-label="示例需求">{examples.map(([label, prompt]) => <button type="button" key={label} onClick={() => app.editHome({ prompt: prompt ?? '' })}>{label}</button>)}</div>
+    <div className={styles.examples} aria-label="示例需求"><span>试试这些想法</span>{examples.map(([label, prompt]) => <button type="button" key={label} onClick={() => app.editHome({ prompt: prompt ?? '' })}><Icon name="plus" />{label}</button>)}</div>
     {state.home.message && <p role="status" aria-live="polite" data-create-state={state.home.status}>{state.home.message}</p>}
     {state.error && <section className={styles.error} role="alert"><p>{state.error}</p><button type="button" onClick={() => app.activate(state.route, true)}>重试读取</button></section>}
     {!state.home.sessionReady && !state.loading && <button type="button" onClick={() => app.restartSession()}>重新开始会话</button>}
-    <section className={styles.recent} aria-label="最近项目"><h2>继续已有项目</h2><p className={styles.muted}>{state.loading ? '正在读取当前会话…' : state.projects.length ? '从左侧项目导航继续，或刷新实际列表。' : '还没有项目。明确创建后，项目会出现在这里。'}</p>
-      <button type="button" onClick={() => void app.refreshProjects()}>刷新项目列表</button></section>
+    </section>
+    <section className={styles.recent} aria-label="最近项目"><div className={styles.sectionHeading}><div><p className={styles.eyebrow}>你的作品</p><h2>继续已有项目</h2></div><button type="button" onClick={() => void app.refreshProjects()}>刷新项目列表</button></div>
+      {state.projects.length ? <div className={styles.projectGrid}>{state.projects.map(project => <a className={styles.projectCard} key={project.id} href={`/projects/${project.id}`}><span className={styles.projectCardIcon}><Icon name="project" /></span><h3 title={project.title}>{project.title}</h3><p>打开项目，继续创作</p><span className={styles.cardArrow}><Icon name="arrow" /></span></a>)}</div>
+        : <div className={styles.emptyProjects}><span className={styles.projectCardIcon}><Icon name="project" /></span><div><h3>{state.loading ? '正在读取你的项目…' : '你的第一个作品，从这里开始'}</h3><p>{state.loading ? '正在读取当前会话。' : '在上方描述想法，创建后的项目会保存在这里。'}</p></div></div>}
+    </section>
+    <footer className={styles.homeFooter}>描述想法<span aria-hidden="true">/</span>预览与调整<span aria-hidden="true">/</span>选择满意的版本</footer>
   </main>;
 }
 const activityNames = { 'request-started': '模型请求已发出', 'request-finished': '模型请求已结束', 'tool-started': '工具开始', 'tool-finished': '工具完成', 'agent-started': 'OpenCode 已开始实现', 'agent-finished': 'OpenCode 已完成代码修改', 'agent-tool-finished': 'OpenCode 工具完成', validated: '候选结构已校验', saved: '候选已保存', ended: '任务已结束' };
