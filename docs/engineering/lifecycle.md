@@ -276,3 +276,13 @@ GEN-009 提供 `pnpm release:build [--json]` 和 `pnpm smoke:deployment --releas
 真实切换采用停机操作：先验收目标平台新包 → 所属监督器停止旧后端并确认退出 → 冷备份 DB 及仍存在的 WAL/SHM → 使用包内 SQLite 对备份只读 quick_check → 设置 backend cwd、外置 DATABASE_PATH/APP_ORIGINS 和 frontend 静态根 → 对所属配置执行 nginx -t → 启动单个后端并检查健康/同源/项目重开 → reload 所属 Nginx。不要复制运行中的单个 sqlite 文件，不删除 generation.lock；硬杀后按 30s stale 等待，验收保留 32s 窗口。
 
 失败切回先停止本次新进程，再启用保留的兼容旧包和原数据，重新验收。若新 schema 已不兼容旧程序，禁止自动降级、恢复旧备份覆盖当前数据或将 DB 路径换成空库；保留现场并单独评审。首次 GEN-009 使用同一发布包和错误配置演练失败后重启，只证明数据保留与操作流程，不代表跨版本迁移/数据库回滚已验证。
+
+## Live acceptance lifecycle
+
+GEN-010 的 `pnpm smoke:live --live --release /absolute/package --deployment-report /absolute/deployment-summary.json` 显式消费同一已通过 GEN-009 的包，默认帮助/默认 check/verify/CI 不发起 live。原包只读；模型配置仅从调用进程环境取得，不读取开发 .env/DB 或任何登录缓存。已有私有配置可由执行者在外部监督器或受控终端加载后注入，禁止把密钥作为 CLI 参数、浏览器文本、发布文件或报告内容。
+
+本次布局为 test-results/live-generation/<runId>/{releases,shared,private,export}。只在共享部署互斥锁下使用 3001/8080，未知监听不接管；真实 Node dist/server.js 和前台独立 prefix Nginx 由 GEN-009 的身份与有界清理辅助管理，没有 Vite/tsx/fixture 注入。每例从原模板新建项目，studio/schedule 各提交一次，最多各 6 次供应商请求、合计 12 次；MODEL_TIMEOUT_MS 默认/本地为 0（无累计期限），保留 MODEL_MAX_OUTPUT_TOKENS 和步骤预算，不自动补跑。
+
+自动化成功后保留原包、本次 shared/atoms.sqlite、private/author-storage.json 和截图；停止所有所属服务。视觉复核使用 `node scripts/live-review-server.mjs --run /absolute/run`，仅重开相同生产包与 DB，不传模型配置；按仓库 Playwright skill 加载私有作者状态并浏览已保存项目，禁止重新生成。关闭复核浏览器后，对本次 review-server 发送 SIGTERM，核对 private/review-server-cleanup.json；不停止系统 Nginx 或未知进程。
+
+实际观察后写 private/manual-review.json，绑定 run/release/harness/caseVersion，包含两例 1366/320/375px 的七项具体质量观察和 private/manual/<case>-<width>.png 字节摘要。`pnpm review:live --run /absolute/run` 仅校验并合并已有复核，检查复核服务的无模型配置及清理记录，不调用模型；缺项/旧身份/变更 harness/越界证据不允许通过。原始截图、会话、日志、provider request ID 和 DB 留 private/shared，export 仅安全摘要。

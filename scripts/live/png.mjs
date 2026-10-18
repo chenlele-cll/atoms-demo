@@ -1,0 +1,9 @@
+import {crc32,inflateSync} from 'node:zlib';
+// Validate screenshot bytes, dimensions and bounded decoded rows; never infer visual quality.
+export function validatePng(bytes,width){
+ if(!Buffer.isBuffer(bytes)||bytes.length<60||bytes.length>20*1024*1024||bytes.subarray(0,8).toString('hex')!=='89504e470d0a1a0a')throw Error('REVIEW_EVIDENCE');
+ let offset=8,header,ended=false;const data=[];
+ while(offset<bytes.length){if(offset+12>bytes.length)throw Error('REVIEW_EVIDENCE');const size=bytes.readUInt32BE(offset);if(size>bytes.length-offset-12)throw Error('REVIEW_EVIDENCE');const kind=bytes.toString('ascii',offset+4,offset+8);const chunk=bytes.subarray(offset+4,offset+8+size);if(crc32(chunk)!==bytes.readUInt32BE(offset+8+size))throw Error('REVIEW_EVIDENCE');const value=bytes.subarray(offset+8,offset+8+size);if(!header&&kind!=='IHDR')throw Error('REVIEW_EVIDENCE');if(kind==='IHDR'){if(header||size!==13)throw Error('REVIEW_EVIDENCE');header={width:value.readUInt32BE(0),height:value.readUInt32BE(4),depth:value[8],color:value[9],compression:value[10],filter:value[11],interlace:value[12]};}if(kind==='IDAT')data.push(value);offset+=12+size;if(kind==='IEND'){if(size!==0||offset!==bytes.length)throw Error('REVIEW_EVIDENCE');ended=true;}}
+ if(!ended||!header||header.width!==width||header.height<300||header.height>20000||header.depth!==8||![2,6].includes(header.color)||header.compression!==0||header.filter!==0||header.interlace!==0||!data.length)throw Error('REVIEW_EVIDENCE');
+ let decoded;try{decoded=inflateSync(Buffer.concat(data),{maxOutputLength:64*1024*1024});}catch{throw Error('REVIEW_EVIDENCE');}const stride=1+width*(header.color===6?4:3);if(decoded.length!==stride*header.height)throw Error('REVIEW_EVIDENCE');for(let row=0;row<header.height;row++)if(decoded[row*stride]>4)throw Error('REVIEW_EVIDENCE');return header;
+}

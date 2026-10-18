@@ -289,6 +289,14 @@ releaseId 创建、复用、配置更新与回滚规则统一维护在 [发布�
 
 本地检查生产前端产物可运行 `pnpm --filter @atoms/frontend preview`，访问 <http://127.0.0.1:4173>；该命令同样代理 `/api`，仅用于本地验收，不替代生产静态服务器。
 
+## Top 1 真实模型验收
+
+`pnpm smoke:live --live --release /absolute/package --deployment-report /absolute/deployment-summary.json` 显式运行两个公开需求：工作室报价/案例筛选，以及公开课组合筛选。它只从进程环境取得已有批准供应商的 OPENAI_API_KEY、MODEL_ID、可选 OPENAI_BASE_URL、MODEL_TIMEOUT_MS、MODEL_MAX_OUTPUT_TOKENS，不读取开发 .env 或数据库。每例生成一次、每例最多六次请求，两例计划最多十二次；沿用现有预算，失败即停，不探针、不自动补跑。无参数/--help 只说明，默认 check/verify/CI 无 live。
+
+先完成工程/产品回归，再为有观测元数据的代码执行 release:build 与匹配 smoke:deployment。使用项目 Node/pnpm、系统 Chrome、Nginx 和独占 3001/8080；Sandpack 编译仍需网络。自动化成功后只显示“视觉复核待完成”；按 [Lifecycle](./docs/engineering/lifecycle.md#live-acceptance-lifecycle) 重开已有项目、实际复核并 `pnpm review:live --run /absolute/run` 后才能宣布最终通过。凭据不进入命令参数/浏览器/产物/报告，输出与请求边界不是金额封顶。
+
+覆盖与实际状态见 [GEN-010 验证](./docs/engineering/verification.md#live-generation-acceptance)，现场顺序见 [演示指引](./docs/product/demo-guide.md)。真实两例未通过前，不将 fixture、旧 quote 候选或编译成功称为 Top 1 业务通过。
+
 ## 本机生产包与 Nginx 验收
 
 先选择 .nvmrc 的 Node、固定 pnpm，安装系统 Chrome，并准备可执行 Nginx（入口不会自动安装）。可按 [Nginx 官方源码安装说明](https://nginx.org/en/docs/configure.html) 安装在项目忽略目录，再将 NGINX_BIN 指向其绝对路径；也可使用 PATH 中已有 Nginx。依赖需有当前平台的本地 pnpm 缓存，Sandpack 真实编译仍需网络。

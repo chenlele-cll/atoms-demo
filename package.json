@@ -14,7 +14,7 @@
     "build": "pnpm -r build",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm test:release && pnpm test:verification && pnpm test:contracts && pnpm --filter @atoms/backend test && pnpm --filter @atoms/frontend test",
+    "test": "pnpm test:live && pnpm test:release && pnpm test:verification && pnpm test:contracts && pnpm --filter @atoms/backend test && pnpm --filter @atoms/frontend test",
     "test:contracts": "node --test scripts/prepare-contracts.test.mjs",
     "test:manager": "node --test scripts/manager.test.mjs",
     "test:infra": "node --test scripts/infra.test.mjs",
@@ -38,7 +38,10 @@
     "release:build": "node scripts/release.mjs",
     "test:release": "node --test scripts/release.test.mjs",
     "smoke:deployment": "node scripts/deployment-smoke.cjs",
-    "test:deployment-control": "node --test scripts/deployment-control.test.mjs"
+    "test:deployment-control": "node --test scripts/deployment-control.test.mjs",
+    "smoke:live": "node scripts/live-smoke.cjs",
+    "review:live": "node scripts/live-review.mjs",
+    "test:live": "node --test scripts/live.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

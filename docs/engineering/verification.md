@@ -366,3 +366,40 @@ release 控制用例覆盖固定 CLI、已有输出保护、输入排除/越界 
 所有服务由本次 runner 管理，未创建 Vite/tsx；只有 frontend 静态根可以公开，JS/CSS MIME 与缓存、缺资源/API/私有文件、后端离线均有实际断言。产物搬迁前后重新比较清单；原包保持只读。总预算 10 分钟，正常就绪 30s、真实预览最多 70s、清理最多 10s，硬杀单独等待 32s stale。缺前提、断言、取消或清理失败均非零；不能通过跳过必需场景报告成功。
 
 `test-results/deployment/<runId>/{releases,shared,private,export}` 保留本次证据，分享只取 export 的白名单 JSON/Markdown 摘要；不导出截图、源码/需求/对话、cookie/DB、原日志/配置或密钥。live 模型、公网 HTTPS、hosted CI 永远单独标 not-run。本次平台/耗时/实际命令与 GEN-010 交接身份在 [GEN-009 tasks](../../openspec/changes/gen-009-local-release-validation/tasks.md)，本地成功不代表服务器发布或跨版本数据库迁移通过。
+
+## Live generation acceptance
+
+GEN-010 增加 `pnpm test:live`、`pnpm smoke:live --live --release /absolute/package --deployment-report /absolute/summary.json` 和 `pnpm review:live --run /absolute/run`。固定公开需求与独立 oracle 位于 scripts/live-cases.mjs；主例验证 2300/3200/6200 报价、非法数量与 3/2/1 案例筛选，第二例验证 4/3/2/0/4 活动 AND 筛选及空状态。可访问标签、role=status 结果、region 和 article 契约在生成前固定，不迁就生成结果放宽，也不提供业务组件实现给模型。
+
+默认 check 包含无真实调用的 live 控制测试及 backend/model-observation.test.ts，覆盖计划失败即停、零自动重试、最多十二次、仅查询原 requestId、预种/自动采用/错关联拒绝、白名单与未知用量、报告/质量记录绑定。真实 SDK fixture 测试核对 dispatch/response/SDK 结束、同一 signal、取消与零额外请求；control-test、fixture、not-run 与实际 live 不混用。私有生产日志的请求数来自传输调用，不将三个事件相加计费；provider 确认响应和网络发起分开，缺用量为 null，已知部分和已知样本数另列。
+
+live 预检验证发布清单/平台/ABI、同 releaseDigest 的 GEN-009 完整报告、观测模块、模型配置、Chrome/Nginx 和空闲端口；不运行付费探针。先 frozen install/check/verify:product，运行字节有变化时 release:build 并 smoke:deployment；live 各例一次可见提交→真实工具/SQLite 候选→实际编译/业务/窄屏→源码核对→明确采用→刷新/重开/原生产后端重启/异会话拒绝。新数据独立，原发布包与开发数据库不修改；读文件、采用、换宽度、重启零新增模型请求。第一例失败/未知停止第二例，不修补候选或再付费修复。
+
+自动化通过仅令 automation=passed，visualReview/acceptance 仍 not-run。实施者须按仓库 Playwright skill 实际复核两个已采用成果，在桌面和两个窄屏分别查看视觉层次/发现性/重叠裁切/控件可读性/原内容/FAQ/校验反馈，保存实际截图与绑定记录，关闭无模型复核服务后再合并。完整自动化、调用边界、质量和清理全部通过才更新 Top 1。报告在 test-results/live-generation/<runId>/，只分享 export；provider IDs/源码/需求/原日志/会话/截图/DB 留私有。源或需求变化必须新证据，不能用旧记录背书。
+
+真实 live 默认无累计总期限，不用 10 分钟硬截止终止生成；清理 10 秒，首部/心跳、查询与编译仍保留独立故障边界。0 表示自动化与清理通过，最终业务验收仍看 acceptance；缺前置 2，断言/普通超时/清理失败 1，中断 130/143。计数和输出上界不等于金额硬封顶；用量不足不估账单。具体本轮日期/平台/命令/结果见 [GEN-010 tasks](../../openspec/changes/gen-010-live-generation-acceptance/tasks.md)，现场操作见 [demo-guide](../product/demo-guide.md)。公网/Top 2/3/hosted CI 独立记录，不由本地两例推断任意需求成功率。
+
+### Live preflight signal controls
+
+`pnpm test:live` 默认执行 17 项无供应商请求控制；SIGINT/SIGTERM 实际子进程专项默认 skipped，不能当作通过。要执行该专项，先保证当前工作副本的标准验收锁空闲，显式提供本平台实际发布包与匹配的完整部署报告：
+
+```sh
+ATOMS_LIVE_CONTROL_RELEASE=/absolute/package \
+ATOMS_LIVE_CONTROL_DEPLOYMENT_REPORT=/absolute/deployment-summary.json pnpm test:live
+```
+
+该专项只启动自身的预检子进程，使用系统白名单环境、不传模型凭据、以 fetch 守卫拒绝网络；在初始报告写入后分别发送 SIGINT/SIGTERM，要求退出 130/143、cancelled/SIGNAL、source=not-run 和 cleanup=passed。没有产品生成 POST，不消耗真实生成计划。缺依赖或已有锁不可用不能伪装成通过；只向本次直接创建的子进程发信号。本次独立快照上 17 项全部通过；根工作区默认 16 项通过、专项 1 项跳过，不能把此前持锁状态下失败的专项当作通过。
+
+2026-10-18 的真实用例结果见 GEN-010：发布部署 16 项通过，studio 在 60 秒总期限超时，4 次 dispatch/3 次 response，无候选；schedule、真实候选的采用/重开/三宽度业务及最终视觉复核未运行。后续调整期限或上下文策略需保留本轮失败并明确新一轮调用范围，默认检查不会自动补跑。
+
+### Unlimited duration regression
+
+MODEL_TIMEOUT_MS 默认和显式 0 均不安排操作累计截止。generation-integration.test.ts 通过真实 SDK/本地 HTTP/SQLite 和受控单调时钟，验证三步累计 540 秒（每步前进 180 秒）仍保存未采用候选；另测 0 下取消会关闭实际连接。既有显式正期限的中止/回滚/迟到栅栏测试保留。workspace-stream.test.ts 用受控计时器和实际 ReadableStream 连续心跳跨过旧 150 秒，仍接收严格关联终态；首部/无数据故障与显式有限 totalMs 继续验证。该时钟测试不是声称实际等待了 9 分钟；真实慢模型结果单独记在本轮 GEN-010 证据。
+
+真实墙钟专项可单独开启（默认 check 跳过，避免每次增加约一分钟）：
+
+```sh
+ATOMS_LONG_GENERATION_TEST=1 pnpm --filter @atoms/backend exec tsx --test test/generation-unlimited-network.test.ts
+```
+
+该用例使用随机 loopback 端口、实际 Fastify/SSE/AI SDK/SQLite 和明确的本地模拟上游，首个上游响应实际延迟 61.5 秒。要求受理先返回、至少五次心跳、三步骤生成 succeeded、候选保存且当前仍为原模板；没有供应商调用或真实密钥。本次实际用例耗时 61759.8175ms，通过。测试本身的 80/90 秒看门狗只用于发现挂起，并不配置产品任务期限。
