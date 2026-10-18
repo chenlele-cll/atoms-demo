@@ -206,7 +206,26 @@ export class ProjectStore {
       const project = this.project(input.projectId);
       if (project.currentVersionId !== input.baseVersionId) throw new ProjectError('BASE_VERSION_CHANGED');
       const baseVersion = this.version(input.projectId, input.baseVersionId);
-      const rows: unknown[] = this.db.prepare(`SELECT ${messageColumns} FROM messages WHERE project_id=? ORDER BY sequence DESC LIMIT 10`).all(input.projectId);
+      // UNION deduplicates nodes so even a corrupt cycle terminates before any acceptance writes.
+      const lineage = `WITH RECURSIVE lineage(id,parent,kind,sequence) AS (
+        SELECT id,parent_version_id,kind,sequence FROM versions WHERE project_id=@project AND id=@base
+        UNION
+        SELECT v.id,v.parent_version_id,v.kind,v.sequence FROM versions v JOIN lineage l ON v.id=l.parent WHERE v.project_id=@project
+      )`;
+      const bindings = { project: input.projectId, base: input.baseVersionId };
+      const chain = parse(z.array(z.object({ id: idSchema, parent: idSchema.nullable(), kind: z.enum(['template', 'generated']),
+        sequence: z.number().int().nonnegative() })), this.db.prepare(`${lineage} SELECT * FROM lineage`).all(bindings));
+      const nodes = new Map(chain.map(node => [node.id, node]));
+      if (!chain.length || chain.some(node => node.kind === 'template'
+        ? node.parent !== null || node.sequence !== 0
+        : node.parent === null || !nodes.has(node.parent) || (nodes.get(node.parent)?.sequence ?? node.sequence) >= node.sequence) ||
+        chain.filter(node => node.kind === 'template').length !== 1) throw new ProjectError('DATA_CORRUPT');
+      const rows: unknown[] = this.db.prepare(`${lineage}
+        SELECT ${messageColumns} FROM messages WHERE project_id=@project AND role IN ('user','assistant') AND EXISTS (
+          SELECT 1 FROM generation_runs r JOIN lineage l ON l.id=r.result_version_id
+          WHERE r.id=messages.run_id AND r.project_id=@project AND r.status='succeeded'
+            AND l.kind='generated' AND r.base_version_id=l.parent
+        ) ORDER BY sequence DESC LIMIT 10`).all(bindings);
       const history = rows.map(row => parse(messageSchema, row));
       const totalHistory = parse(z.object({ count: z.number().int() }), this.db.prepare('SELECT count(*) AS count FROM messages WHERE project_id=?').get(input.projectId)).count;
       const run = this.createRun({ projectId: input.projectId, baseVersionId: input.baseVersionId, requestId: input.requestId,
