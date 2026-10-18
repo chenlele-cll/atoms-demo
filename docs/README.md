@@ -8,7 +8,7 @@
 | `architecture/` | [stack-decisions.md](./architecture/stack-decisions.md) | 选型依据、候选比较与适用条件；重新评估技术决策时阅读并更新 |
 | `architecture/` | [monorepo.md](./architecture/monorepo.md) | 目录职责、依赖方向、workspace 与工具链边界；调整应用组织和共享代码时阅读并更新 |
 | `engineering/` | [development.md](./engineering/development.md) | 类型、接口、配置、日志及生成与存储规则；修改对应代码时阅读，规则变化时更新 |
-| `engineering/` | [verification.md](./engineering/verification.md) | 检查选择、已有覆盖和验收证据；验证任务时阅读，检查与覆盖变化时更新 |
+| `engineering/` | [verification.md](./engineering/verification.md) | 检查选择、pnpm verify 本地验收与覆盖矩阵；验证任务时阅读，检查与覆盖变化时更新 |
 | `engineering/` | [lifecycle.md](./engineering/lifecycle.md) | manager 初始化/诊断/起停/日志、空基础设施入口与原生 Process Compose；调整命令、进程或基础设施时阅读并更新 |
 | `engineering/` | [git-workflow.md](./engineering/git-workflow.md) | 任务编号、分支、提交、推送与合并约定；开展版本控制操作时阅读，流程变化时更新 |
 | `engineering/` | [skills.md](./engineering/skills.md) | 上游技能来源、固定版本与触发范围；使用或更新项目技能时阅读 |

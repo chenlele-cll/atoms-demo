@@ -18,6 +18,33 @@
 
 为有意义的边界与失败处理添加聚焦测试，不为纯文字编写断言，也不以重复实现细节的测试代替行为验证。检查通过后，只因新的改动、失败或未解决疑点才扩大或重复测试。
 
+## Integrated local acceptance
+
+`VER-001` 将现有检查串联为完整本地验收：
+
+```sh
+pnpm verify
+```
+
+使用 `.nvmrc` 的 Node 和根 package.json 的 pnpm，先完成 `./manager.sh bootstrap`。本机需安装 Google Chrome，能够访问固定 Process Compose 的 GitHub 发布，并有可用于隔离副本 offline frozen install 的 pnpm 缓存。bootstrap 的根安装通常会准备相应依赖；缺少缓存时先修复安装前提，不让测试自行更新 lockfile。
+
+3001/5173/4173 端口需空闲；先正常停止自己启动的开发实例。完整入口不停止现有程序，不修改真实环境文件，也不在工作副本制造故障。manager 与 smoke 使用相同端口，统一入口用 shell `&&` 保持串行，任一步失败即返回非零并跳过后续步骤。完整执行通常需要数分钟，网络较慢时更久；日常小改动继续按上表选择检查。
+
+| 顺序 | 现有入口 | 验收范围 | 证据与限制 |
+| --- | --- | --- | --- |
+| 1 | `./manager.sh doctor` | 固定工具链、依赖、原生配置、实例、端口及环境文件元信息 | 输出逐项诊断；Chrome 在 doctor 中是可选项，但后续 smoke 必需 |
+| 2 | `pnpm check` | lint、两应用类型、后端接口/配置边界 | Node test 输出；不验证浏览器或进程归属 |
+| 3 | `pnpm test:infra` | 无配置接口、重复/并发调用、文件保护与未接入配置拒绝 | `test-results/infra/`；没有真实容器或数据卷 |
+| 4 | `pnpm test:manager` | 隔离安装、诊断、日志、幂等/并发起停、失败回滚、归属和清理 | `test-results/manager/`；真实前后端及固定 Process Compose，需要网络与缓存 |
+| 5 | `pnpm smoke` | 两应用生产构建、真实浏览器、独立启动/API 代理、窄屏与错误恢复、本地生产入口 | `test-results/smoke/`；已含 build，不额外重复构建，不验证线上部署 |
+| 6 | `pnpm openspec validate --all --strict --no-interactive` | 当前所有 change/spec 的结构与元数据 | CLI 输出；不验证其他 change 的产品实现或任务完成情况 |
+
+根脚本只组合上述入口，没有增加依赖、测试框架、自动归档或 Git 操作。需要保留完整日志时重定向到忽略的 `test-results/`，同时记录退出码、版本、实际差异或源码 hash。失败后先查看对应输出，按本文件选择受影响检查，不把未执行的后续步骤记为通过。
+
+Agent 路由、文档英文路径、技能来源与项目配置范围通过工件和文件检查核对；交互式 Playwright CLI 验收独立使用具名会话，并只关闭本次会话。这些检查不等于各宿主会自动选择同名技能；具体发现限制见 [Skills](./skills.md#browser-verification) 和 [OpenSpec](./openspec.md#skill-entry-points)。
+
+本次实际结果维护在 [VER-001 tasks](../../openspec/changes/ver-001-integrated-verification/tasks.md)，原始证据位于忽略的 `test-results/ver-001/`。目标平台、耗时、已执行项与未验证能力以该记录为准；生成、持久化、外部基础设施与最终服务器需在各自接入时另行验收。
+
 ## Existing coverage
 
 `pnpm check` 依次运行 ESLint、前后端类型检查和后端测试。当前 [app.test.ts](../../backend/test/app.test.ts) 与 [config.test.ts](../../backend/test/config.test.ts) 共六个测试，覆盖健康接口、API 404、配置默认值、配置覆盖、非法端口和空监听地址。
@@ -39,7 +66,7 @@
 
 `OPS-001` 的原生配置验收使用真实进程，检查双服务与单服务启动、HTTP readiness、健康响应及前端 API 代理、所属进程故障恢复、就绪持续失败、外部端口冲突和停止后的进程清理。核对状态时同时检查是否运行、就绪、退出码与重试次数，不把 `process list` 命令成功当作项目健康；注意 [原生状态及就绪限制](./lifecycle.md#behavior-and-limits)，退出码可能属于前一轮进程。原生记录见 [OPS-001](../../openspec/changes/ops-001-process-compose/tasks.md)。
 
-`pnpm test:manager` 执行 [manager.test.mjs](../../scripts/manager.test.mjs)，在含空格和深路径的隔离副本中使用真实前后端及固定工具，验证重复/并发调用、重启、原生故障恢复后的状态、外部端口保护、就绪超时、中断回滚、调用者硬杀后的锁恢复、supervisor 退出、陈旧 PID、跨副本隔离、未知 socket 和强制停止。它需要 3001/5173 空闲、项目 Node/pnpm、固定 Process Compose 和本机 pnpm 依赖缓存；隔离副本以 offline frozen install 安装，不复制环境文件。产物在忽略的 `test-results/manager/`，需等待 stale 锁和停止截止时间；不会在工作副本自动安装缺失工具，首次安装场景仅操作隔离副本。`pnpm check` 仍只含 lint、类型与后端单元测试，生命周期变更额外执行本命令。`VER-001` 后续整合更完整验收。
+`pnpm test:manager` 执行 [manager.test.mjs](../../scripts/manager.test.mjs)，在含空格和深路径的隔离副本中使用真实前后端及固定工具，验证重复/并发调用、重启、原生故障恢复后的状态、外部端口保护、就绪超时、中断回滚、调用者硬杀后的锁恢复、supervisor 退出、陈旧 PID、跨副本隔离、未知 socket 和强制停止。它需要 3001/5173 空闲、项目 Node/pnpm、固定 Process Compose 和本机 pnpm 依赖缓存；隔离副本以 offline frozen install 安装，不复制环境文件。产物在忽略的 `test-results/manager/`，需等待 stale 锁和停止截止时间；不会在工作副本自动安装缺失工具，首次安装场景仅操作隔离副本。`pnpm check` 仍只含 lint、类型与后端单元测试，生命周期变更额外执行本命令；完整验收已由上述 `pnpm verify` 串联。
 
 该回归还包含 OPS-003：无 node_modules/工具的副本使用真实官方网络下载安装，验证重复 bootstrap、环境文件及 lockfile 保护；受控下载替身验证校验失败和中断清理。doctor 覆盖缺失/错误版本、配置、端口和健康实例，不输出环境值；logs 覆盖服务/行数限制、在线读取、跟随取消及停止后读取。首次安装场景需要 GitHub 网络；其他副本安装复用 pnpm 缓存。测试不访问开发者的真实环境文件，fixture 内只创建测试值。
 

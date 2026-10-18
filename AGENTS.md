@@ -54,10 +54,13 @@ pnpm dev:backend
 pnpm check
 pnpm build
 pnpm smoke
+pnpm verify
 pnpm openspec list --json
 ```
 
 The independent development commands use separate terminals; [manager.sh](manager.sh) provides setup, diagnostics, lifecycle commands and application logs after the [lifecycle prerequisites](docs/engineering/lifecycle.md#manager-commands). `infra start/stop/status` is available as an explicit no-configuration result; actual infrastructure integration remains future work. Do not mix manager and native operations on the same instance. Select verification by change scope using the verification guide.
+
+`pnpm verify` runs the full local acceptance sequence; read its [prerequisites and coverage](docs/engineering/verification.md#integrated-local-acceptance) first. Keep port-using suites sequential. Daily focused checks remain selected by the change matrix.
 
 ## Always-on boundaries
 

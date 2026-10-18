@@ -18,6 +18,7 @@
     "test:manager": "node --test scripts/manager.test.mjs",
     "test:infra": "node --test scripts/infra.test.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "verify": "./manager.sh doctor && pnpm check && pnpm test:infra && pnpm test:manager && pnpm smoke && pnpm openspec validate --all --strict --no-interactive",
     "smoke": "pnpm build && node scripts/smoke.cjs"
   },
   "devDependencies": {

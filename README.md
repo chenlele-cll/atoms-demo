@@ -79,6 +79,16 @@ pnpm dev:frontend
 
 ## 验证
 
+完整本地验收统一运行：
+
+```sh
+pnpm verify
+```
+
+先选择项目 Node/pnpm 并完成 bootstrap，准备本机 Google Chrome、GitHub 下载网络及 pnpm 缓存，让 3001/5173/4173 端口空闲。该入口串行执行诊断、工程检查、空基础设施与 manager 回归、构建/浏览器 smoke、OpenSpec 严格校验，失败即停止，通常需要数分钟。覆盖矩阵、各步骤前提与产物位置见 [完整本地验收](./docs/engineering/verification.md#integrated-local-acceptance)。
+
+日常按变更范围选择以下命令：
+
 ```sh
 pnpm check
 pnpm build
