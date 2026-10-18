@@ -92,7 +92,7 @@ for(const native of [true,false])test(`actual isolated release pipeline ${native
   const boundary=lock.indexOf('\n---\n');assert.ok(boundary>=0);
   const applicationLock=lock.slice(boundary);const packagesAt=applicationLock.indexOf('\npackages:\n'),snapshotsAt=applicationLock.indexOf('\nsnapshots:\n');
   assert.ok(packagesAt>=0&&snapshotsAt>packagesAt);
-  const select=section=>section.split(/(?=^  \S)/m).filter(block=>/^  (?:better-sqlite3@13\.0\.3|node-addon-api@[^:]+):/m.test(block)).join('');
+  const select=section=>section.split(/(?=^ {2}\S)/m).filter(block=>/^ {2}(?:better-sqlite3@13\.0\.3|node-addon-api@[^:]+):/m.test(block)).join('');
   const packages=native?select(applicationLock.slice(packagesAt+'\npackages:\n'.length,snapshotsAt)):'';
   const snapshots=native?select(applicationLock.slice(snapshotsAt+'\nsnapshots:\n'.length)):'';
   const application=applicationLock.slice(0,packagesAt).replace(/\nimporters:\n[\s\S]*$/,importers)+
@@ -121,4 +121,12 @@ test('runtime and evidence parents reject existing symlinks without writing outs
 
 test('a busy release build preserves its own safe blocked report without taking ownership',()=>temp(async folder=>{
   const unlock=await acquireRunLock(folder);try{assert.equal(await buildRelease(folder,true),2);const{readdir}=await import('node:fs/promises');const ids=await readdir(path.join(folder,'.runtime/release-build'));assert.equal(ids.length,1);const report=JSON.parse(await readFile(path.join(folder,'.runtime/release-build',ids[0],'report.json'),'utf8'));assert.equal(report.reason,'VERIFY_BUSY');assert.equal(report.status,'blocked');assert.equal(report.cleanup,'passed');assert.equal(report.completeBuilds,0);}finally{await unlock();}
+}));
+
+
+test('release inventory and validation stop cooperatively on cancellation without changing the package',()=>temp(async folder=>{
+ const identity=await fixture(folder);const controller=new AbortController();const pending=inventory(folder,{signal:controller.signal});controller.abort();
+ await assert.rejects(pending,error=>error.name==='AbortError');
+ await assert.rejects(validateRelease(folder,{signal:controller.signal}),error=>error.name==='AbortError');
+ assert.equal((await validateRelease(folder)).releaseDigest,identity.releaseDigest);
 }));
