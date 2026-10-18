@@ -40,6 +40,17 @@ pnpm dev:frontend
 - 页面上的“检查后端连接”按钮验证 HTTP 状态与响应结构；后端不可用时显示失败反馈。
 - 两个进程相互独立，后端关闭时前端页面仍可加载。Vite 固定端口，冲突时直接报错。
 
+完成固定版 Process Compose 安装后，也可通过 [manager.sh](./manager.sh) 一键管理两个开发进程：
+
+```sh
+./manager.sh start
+./manager.sh status
+./manager.sh restart
+./manager.sh stop
+```
+
+健康实例重复 start 不重建，重复 stop 成功；并发修改串行执行，启动失败或中断会回滚。使用、JSON 状态、超时、固定工具安装及原生调试方式见 [生命周期指南](./docs/engineering/lifecycle.md#manager-commands)。托管 profile 使用固定本地端口和代理值；bootstrap、doctor、logs 与基础设施命令尚未实现。
+
 ## 配置
 
 默认值无需创建 `.env` 即可运行。如需覆盖，可参考各应用的 `.env.example` 在对应目录创建 `.env`：
@@ -60,6 +71,7 @@ pnpm dev:frontend
 pnpm check
 pnpm build
 pnpm smoke
+pnpm test:manager
 ```
 
 各命令的实际内容、浏览器前提、已有覆盖和按变更选择检查的要求，统一见 [验证规范](./docs/engineering/verification.md)。检查通过只证明对应范围，不代表尚未实现的产品能力已完成。
@@ -145,7 +157,10 @@ docs/
     assignment.md     原始题目整理稿，仅本地保留
 scripts/
   check-dev-port.cjs   托管服务启动前检查固定端口，不终止占用者
+  manager.mjs          短时运行的生命周期命令，调用 Process Compose
+  manager.test.mjs     隔离副本上的真实进程行为回归
   smoke.cjs            浏览器端到端冒烟脚本（pnpm smoke）
+manager.sh            一键本地 start/stop/restart/status 入口
 process-compose.yaml  原生本地开发进程与就绪、退出、日志配置
 .process-compose-version        固定 Process Compose 工具版本
 AGENTS.md              开发与交付约定

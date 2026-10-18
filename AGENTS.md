@@ -4,7 +4,7 @@ This file applies to the whole repository. Before editing an application, also r
 
 ## Project
 
-Atoms Demo has an independently runnable React + Vite frontend and Fastify + Node.js backend. Both use TypeScript; the frontend uses CSS Modules. The current application is a connection-check skeleton; generation, persistence, and generated-app preview are not implemented yet. Native Process Compose development configuration and OpenSpec are available; manager commands are planned.
+Atoms Demo has an independently runnable React + Vite frontend and Fastify + Node.js backend. Both use TypeScript; the frontend uses CSS Modules. The current application is a connection-check skeleton; generation, persistence, and generated-app preview are not implemented yet. Manager start/stop/restart/status, native Process Compose development configuration, and OpenSpec are available; use the lifecycle guide for prerequisites and process commands.
 
 Use [README.md](README.md) for project scope, current setup, and production startup. Use [docs/README.md](docs/README.md) to find documentation by responsibility.
 
@@ -56,7 +56,7 @@ pnpm smoke
 pnpm openspec list --json
 ```
 
-The independent development commands use separate terminals. Select verification by change scope using the verification guide. Planned manager and infrastructure commands must not be presented as available commands.
+The independent development commands use separate terminals; [manager.sh](manager.sh) provides start/stop/restart/status after the [lifecycle prerequisites](docs/engineering/lifecycle.md#manager-commands). Do not mix manager and native operations on the same instance. Select verification by change scope using the verification guide. Planned bootstrap/doctor/logs and infrastructure commands must not be presented as available commands.
 
 ## Always-on boundaries
 
