@@ -6,6 +6,17 @@ const path = require('node:path');
 const os = require('node:os');
 const { setTimeout: delay } = require('node:timers/promises');
 const { chromium } = require('playwright-core');
+const net = require('node:net');
+const { ownChild, signalOwned, groupAlive, closeBrowser } = require('./verification/processes.cjs');
+const { createEvidence } = require('./verification/evidence.cjs');
+const evidence = createEvidence('smoke');
+const report = { status: 'running', cleanup: 'not-run', cases: [] };
+let ownedBrowser; let interrupted;
+for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
+  interrupted = signal;
+  for (const child of children) signalOwned(child, 'SIGTERM');
+  void ownedBrowser?.close().catch(() => {});
+});
 
 const root = path.resolve(__dirname, '..');
 const artifacts = path.join(root, 'test-results', 'smoke');
@@ -19,19 +30,19 @@ function launch(args, cwd, node = false) {
   child.stdout.on('data', (chunk) => { output += chunk.toString(); });
   child.stderr.on('data', (chunk) => { output += chunk.toString(); });
   children.push(child);
+  ownChild(child);
   return { child, output: () => output };
 }
 
 function groupExists(child) {
-  if (!child.pid) return false;
-  try { process.kill(-child.pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+  return groupAlive(child);
 }
 async function stop(child) {
   if (!groupExists(child)) return;
-  process.kill(-child.pid, 'SIGTERM');
+  signalOwned(child, 'SIGTERM');
   const deadline = Date.now() + 5000;
   while (groupExists(child) && Date.now() < deadline) await delay(50);
-  if (groupExists(child)) process.kill(-child.pid, 'SIGKILL');
+  if (groupExists(child)) signalOwned(child, 'SIGKILL');
   const hardDeadline = Date.now() + 2000;
   while (groupExists(child) && Date.now() < hardDeadline) await delay(50);
   assert.equal(groupExists(child), false, 'Owned smoke process group leaked');
@@ -53,17 +64,12 @@ async function waitForReady(url, proc) {
 }
 
 async function assertPortFree(port) {
-  try {
-    await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(500) });
-  } catch {
-    return;
-  }
-  throw new Error(`Port ${port} is already in use`);
+  await new Promise((resolve, reject) => { const listener = net.createServer(); listener.once('error', () => reject(new Error(`Port ${port} is already in use`))); listener.listen(port, '127.0.0.1', () => listener.close(resolve)); });
 }
 
 async function openBrowser() {
   try {
-    return await chromium.launch({ channel: 'chrome', headless: true });
+    return await chromium.launch({ channel: 'chrome', headless: true, handleSIGINT: false, handleSIGTERM: false });
   } catch (error) {
     throw new Error(
       'Cannot launch Google Chrome via playwright-core. Install Chrome or set another browser channel.',
@@ -90,6 +96,7 @@ async function run() {
   ]);
 
   const browser = await openBrowser();
+  ownedBrowser = browser;
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     const runtimeErrors = [];
@@ -107,6 +114,7 @@ async function run() {
     }
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.screenshot({ path: path.join(artifacts, 'dev-mobile.png'), fullPage: true });
+    report.cases.push({ id: 'dev-connection-and-layout', status: 'passed', durationMs: null });
 
     await page.route('**/api/health', (route) => route.fulfill({
       contentType: 'application/json',
@@ -122,6 +130,7 @@ async function run() {
     await page.getByText(/后端返回 HTTP/).waitFor();
     assert.equal(await page.getByRole('button', { name: '检查后端连接' }).isEnabled(), true);
     await page.screenshot({ path: path.join(artifacts, 'dev-backend-offline.png'), fullPage: true });
+    report.cases.push({ id: 'invalid-response-and-offline-recovery', status: 'passed', durationMs: null });
 
     const production = launch([path.join(root, 'backend/dist/server.js')], backendWorkingDirectory, true);
     const preview = launch(['preview'], path.join(root, 'frontend'));
@@ -139,19 +148,24 @@ async function run() {
     assert.equal(await page.getByRole('textbox', { name: '你想创建什么？', exact: true }).isVisible(), true);
 
     assert.deepEqual(runtimeErrors, []);
+    report.cases.push({ id: 'production-proxy-and-creation-entry', status: 'passed', durationMs: null });
+    report.status = 'passed';
     console.log('PASS: independent dev startup, /api proxy, 320/375/768/1280px layout,');
     console.log('PASS: invalid response handling, backend-offline error and recovery,');
     console.log('PASS: production backend + frontend preview; no browser runtime errors.');
   } finally {
-    await browser.close();
+    await closeBrowser(browser);
   }
 }
 
 run().catch((error) => {
   console.error(error);
-  process.exitCode = 1;
+  report.status = interrupted ? 'cancelled' : 'failed';
+  process.exitCode = interrupted === 'SIGINT' ? 130 : interrupted ? 143 : 1;
 }).finally(async () => {
   const stopped = await Promise.allSettled(children.map(child => stop(child)));
   rmSync(backendWorkingDirectory, { recursive: true, force: true });
-  if (stopped.some(result => result.status === 'rejected')) process.exitCode = 1;
+  report.cleanup = stopped.some(result => result.status === 'rejected') ? 'failed' : 'passed';
+  if (report.cleanup === 'failed') { report.status = 'failed'; process.exitCode = 1; }
+  evidence.finish(report);
 });

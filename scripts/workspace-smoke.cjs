@@ -1,5 +1,9 @@
 /* global document, window, getComputedStyle, requestAnimationFrame */
+const { ownChild, signalOwned, closeBrowser, groupAlive: ownedGroupAlive } = require('./verification/processes.cjs');
+const { createEvidence } = require('./verification/evidence.cjs');
+const evidence = createEvidence('workspace');
 const assert = require('node:assert/strict');
+const {api,waitCompiled,taskFinished,createViaForm,assertQuote}=require('./verification/workspace-path.cjs');
 const { spawn } = require('node:child_process');
 const { randomUUID, createHash } = require('node:crypto');
 const { cp, mkdir, rm, symlink, writeFile, access } = require('node:fs/promises');
@@ -21,14 +25,8 @@ const children = new Set();
 const report = { runId, suite: 'workspace', source: 'fixture', status: 'running', cases: [], cleanup: 'not-run', realModelCalls: 0, fixtureModelRequests: 0 };
 let browser; let interrupted; let logs = ''; let backend; let upstream; let upstreamOrigin; let provider;
 
-function signalGroup(child, signal) {
-  if (!child?.pid) return;
-  try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-}
-function groupAlive(child) {
-  if (!child?.pid) return false;
-  try { process.kill(-child.pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; }
-}
+function signalGroup(child, signal) { signalOwned(child, signal); }
+function groupAlive(child) { return ownedGroupAlive(child); }
 async function stop(child) {
   if (!child) return;
   signalGroup(child, 'SIGTERM');
@@ -60,7 +58,7 @@ function launch(script, args, cwd, extra = {}) {
   const child = spawn(process.execPath, [script, ...args], { cwd, detached: true,
     env: { PATH: process.env.PATH ?? '', HOST: '127.0.0.1', PORT: '3001', DATABASE_PATH: database,
       API_PROXY_TARGET: 'http://127.0.0.1:3001', ...extra }, stdio: ['ignore', 'pipe', 'pipe'] });
-  children.add(child);
+  children.add(child); ownChild(child);
   child.on('error', () => { logs += 'Owned subprocess could not start.\n'; });
   child.stdout.on('data', data => { logs += data.toString(); }); child.stderr.on('data', data => { logs += data.toString(); });
   return child;
@@ -88,15 +86,6 @@ function digest(value) {
   const canonical = input => Array.isArray(input) ? `[${input.map(canonical).join(',')}]`
     : input !== null && typeof input === 'object' ? `{${Object.keys(input).sort().map(key => `${JSON.stringify(key)}:${canonical(input[key])}`).join(',')}}` : JSON.stringify(input);
   return createHash('sha256').update(canonical(value)).digest('hex');
-}
-async function api(page, method, url, body) {
-  check();
-  return page.evaluate(async input => {
-    const response = await fetch(input.url, { method: input.method, credentials: 'same-origin',
-      ...(input.body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(input.body) }),
-      signal: AbortSignal.timeout(10_000) });
-    return { status: response.status, body: await response.json(), cache: response.headers.get('cache-control') };
-  }, { method, url, body });
 }
 async function setup() {
   // Deployment layout deliberately has no frontend or root template source.
@@ -153,22 +142,6 @@ async function setupProvider() {
   await new Promise(resolve => upstream.listen(0,'127.0.0.1',resolve)); upstreamOrigin = `http://127.0.0.1:${upstream.address().port}`;
 }
 function releaseProvider() { if (!provider) return; for (const resolve of provider.holds.splice(0)) resolve(); provider.mode = 'normal'; }
-async function waitCompiled(page) {
-  await page.waitForFunction(() => ['compiled','compileError','runtimeError','timeout'].includes(document.querySelector('[data-preview-state]')?.getAttribute('data-preview-state')), undefined, { timeout: 70_000 });
-  assert.equal(await page.locator('[data-preview-state]').getAttribute('data-preview-state'),'compiled',await page.locator('[data-preview-state]').textContent());
-  return page.frameLocator('iframe');
-}
-async function taskFinished(page, status) {
-  await page.locator('[data-task-phase="terminal"]').waitFor({timeout:15_000});
-  if (status) assert.match(await page.locator('[data-task-phase]').textContent(),status);
-}
-async function createViaForm(page, title, prompt) {
-  await page.getByLabel('项目名称', { exact: false }).fill(title);
-  await page.getByRole('textbox',{name:'你想创建什么？',exact:true}).fill(prompt);
-  await page.getByRole('button',{name:'创建并生成',exact:true}).click();
-  await page.waitForURL(/\/projects\/[a-f0-9-]+$/,{timeout:10_000});
-  return page.url().split('/').at(-1);
-}
 async function mode(name, port) {
   const frontend = launch(path.join(root,'frontend/node_modules/vite/bin/vite.js'),name==='preview'?['preview']:[],path.join(browserRepo,'frontend'));
   await ready(`http://127.0.0.1:${port}`,frontend); const origin=`http://127.0.0.1:${port}`;
@@ -183,7 +156,7 @@ async function mode(name, port) {
       const prompt=page.getByRole('textbox',{name:'你想创建什么？',exact:true}); assert.match(await prompt.inputValue(),/报价/);
       assert.equal(provider.requests,0); assert.equal(posts.length,0);
       await page.waitForFunction(()=>document.querySelector('select#template-choice')?.value!=='');
-      for(const width of [1280,375,320]) {await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true);await page.screenshot({path:path.join(output,`${name}-creation-${width}.png`),fullPage:true,animations:'disabled'});}
+      for(const width of [1280,375,320]) {await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true);await evidence.screenshot(page,{path:path.join(output,`${name}-creation-${width}.png`),fullPage:true,animations:'disabled'});}
       await page.setViewportSize({width:1280,height:900});
       provider.firstHeld=true;
       projectId=await createViaForm(page,`${name} 企业官网报价演示`,(await prompt.inputValue())+`【${name} 主路径】`);
@@ -196,9 +169,7 @@ async function mode(name, port) {
       const pending=await api(page,'GET',`/api/projects/${projectId}`); assert.equal(pending.body.currentVersion.id,before.body.currentVersion.id);
       const versionId=pending.body.latestRun.resultVersionId; const result=await api(page,'GET',`/api/projects/${projectId}/versions/${versionId}`);
       assert.deepEqual(result.body.changedFiles,['/src/App.tsx',quotePath]); assert.equal(result.body.adoptionAvailability,'eligible');
-      const frame=page.frameLocator('iframe'); assert.equal(await frame.getByTestId('quote-total').textContent(),'5000');
-      await frame.getByLabel('页面数量',{exact:true}).fill('3'); assert.equal(await frame.getByTestId('quote-total').textContent(),'7000');
-      await frame.getByLabel('服务类型',{exact:true}).selectOption('commerce'); assert.equal(await frame.getByTestId('quote-total').textContent(),'10000');
+      await assertQuote(page);
       const composer=page.getByRole('textbox',{name:'描述下一步需求',exact:true}); await composer.fill('候选尚未采用时不能误用基线');
       assert.equal(await page.getByRole('button',{name:'生成候选',exact:true}).isDisabled(),true);
       await page.getByRole('button',{name:'代码',exact:true}).click(); await page.getByRole('combobox',{name:'选择文件',exact:true}).selectOption(quotePath);
@@ -212,7 +183,7 @@ async function mode(name, port) {
       await page.reload(); await waitCompiled(page); assert.equal(posts.length,1); assert.equal(provider.requests,3);
       const messages=await api(page,'GET',`/api/projects/${projectId}/messages?direction=backward&limit=50`); assert.equal(messages.body.items.length,2);
       assert.equal(await page.locator('[data-message-id]').count(),2); assert.equal(await page.locator('[data-pending-user]').count(),0);
-      await page.screenshot({path:path.join(output,`${name}-1280.png`),animations:'disabled'});
+      await evidence.screenshot(page,{path:path.join(output,`${name}-1280.png`),animations:'disabled'});
     });
     await scenario(`${name}: adopted base, IME/newline safety, active view switches and acknowledged cancellation`,async()=>{
       provider.mode='hold'; const composer=page.getByRole('textbox',{name:'描述下一步需求',exact:true});
@@ -240,7 +211,7 @@ async function mode(name, port) {
         await quantity.fill('1'); assert.equal(await frame.getByTestId('quote-total').textContent(),'5000');
         await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
         const frameWidth=await page.locator('iframe').evaluate(element=>element.getBoundingClientRect().width); assert.ok(frameWidth>250&&frameWidth<=width);
-        await page.screenshot({path:path.join(output,`${name}-${width}.png`),animations:'disabled'});
+        await evidence.screenshot(page,{path:path.join(output,`${name}-${width}.png`),animations:'disabled'});
       }
       await page.setViewportSize({width:1280,height:900});
     });
@@ -349,23 +320,32 @@ async function mode(name, port) {
       const foreign=await api(alien,'GET',`/api/projects/${projectId}`);assert.equal(foreign.status,404);await stranger.close();
       const sessionCount=sessions; await context.clearCookies(); await page.reload(); await page.getByRole('alert').filter({hasText:'会话'}).waitFor();
       assert.equal(await page.locator('iframe').count(),0); assert.equal(await page.locator('[data-message-id]').count(),0); assert.equal(sessions,sessionCount);
-      await page.locator('aside a[href="/"]').first().click(); await page.getByRole('button',{name:'重新开始会话',exact:true}).click();
+      await page.locator('aside a[href="/"]').first().click();
+      let releaseSession; const sessionGate=new Promise(resolve=>{releaseSession=resolve;}); let sessionReceived; const sessionResponse=new Promise(resolve=>{sessionReceived=resolve;});
+      const sessionMatch='**/api/session'; await page.route(sessionMatch,async route=>{const response=await route.fetch();sessionReceived();await sessionGate;await route.fulfill({response});});
+      let createRequests=0;const recordCreate=request=>{if(request.method()==='POST'&&request.url().endsWith('/api/projects'))createRequests++;};page.on('request',recordCreate);
+      await page.getByRole('button',{name:'重新开始会话',exact:true}).click(); let sessionTimer;
+      try{await Promise.race([sessionResponse,new Promise((_,reject)=>{sessionTimer=setTimeout(()=>reject(Error('Session fixture did not receive a response')),10_000);})]);}finally{clearTimeout(sessionTimer);}
+      const recoveringPrompt=page.getByRole('textbox',{name:'你想创建什么？',exact:true});await recoveringPrompt.fill('会话确认前快捷键不能创建');
+      assert.equal(await page.getByRole('button',{name:'创建并生成',exact:true}).isDisabled(),true);await recoveringPrompt.press('Control+Enter');assert.equal(createRequests,0);assert.equal(page.url(),origin+'/');
+      releaseSession();await page.unroute(sessionMatch);await page.locator('button[type="submit"]:not(:disabled)').waitFor();page.off('request',recordCreate);await recoveringPrompt.fill('');
       await page.waitForFunction(()=>document.querySelector('select#template-choice')?.value!==''); assert.equal(sessions,sessionCount+1);assert.equal(await page.locator(`nav a[href="/projects/${projectId}"]`).count(),0);
     });
     await scenario(`${name}: 320px visible keyboard creation, quote interaction and explicit adoption complete end to end`,async()=>{
       await page.setViewportSize({width:320,height:900}); const count=posts.length; const requests=provider.requests;
       await page.getByLabel('项目名称',{exact:false}).fill('手机报价演示'); const prompt=page.getByRole('textbox',{name:'你想创建什么？',exact:true}); await prompt.fill('添加一个可操作的报价控件，保留企业官网。');
+      await page.locator('button[type="submit"]:not(:disabled)').waitFor();
       await prompt.press('Control+Enter'); await page.waitForURL(/\/projects\/[a-f0-9-]+$/); await taskFinished(page,/候选已保存/);
       await page.getByRole('button',{name:'预览',exact:true}).click(); await waitCompiled(page);
       const frame=page.frameLocator('iframe'); await frame.getByLabel('页面数量',{exact:true}).fill('2'); assert.equal(await frame.getByTestId('quote-total').textContent(),String(6000+provider.revision*100));
       await page.getByRole('button',{name:'使用这个版本',exact:true}).click(); await page.locator('[data-adoption-state="confirmed"]').waitFor();
       assert.equal(posts.length,count+1); assert.equal(provider.requests,requests+3); const id=page.url().split('/').at(-1); const saved=await api(page,'GET',`/api/projects/${id}`); assert.equal(saved.body.project.currentVersionId,saved.body.latestRun.resultVersionId);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true); await frame.locator('body').evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-      await page.screenshot({path:path.join(output,`${name}-mobile-adopted.png`),animations:'disabled'});
+      await evidence.screenshot(page,{path:path.join(output,`${name}-mobile-adopted.png`),animations:'disabled'});
       await page.getByRole('button',{name:'聊天',exact:true}).click(); await page.getByRole('textbox',{name:'描述下一步需求',exact:true}).waitFor();
       await page.getByRole('button',{name:'项目导航',exact:true}).click(); await page.locator(`nav a[href="/projects/${id}"]`).waitFor();
     });
-  } catch(error) { await page.screenshot({path:path.join(output,`${name}-failure.png`),fullPage:true}).catch(()=>{}); throw error; }
+  } catch(error) { await evidence.screenshot(page,{path:path.join(output,`${name}-failure.png`),fullPage:true}).catch(()=>{}); throw error; }
   finally { await context.close(); await stop(frontend); }
 }
 async function main() {
@@ -374,8 +354,8 @@ async function main() {
   await mode('dev',5173); await stop(backend); provider.requests=0; provider.revision=0; await startBackend(); await mode('preview',4173); report.status='passed';
 }
 main().catch(error=>{report.status=interrupted?'cancelled':'failed';report.error=error.message;console.error(error.stack);process.exitCode=interrupted==='SIGINT'?130:interrupted?143:1;})
-  .finally(async()=>{releaseProvider();await browser?.close().catch(()=>{});const results=await Promise.allSettled([...children].map(stop));upstream?.closeAllConnections();if(upstream?.listening)await new Promise(resolve=>upstream.close(resolve));
+ .finally(async()=>{releaseProvider();const results=await Promise.allSettled([closeBrowser(browser),...[...children].map(stop)]);upstream?.closeAllConnections();if(upstream?.listening)await new Promise(resolve=>upstream.close(resolve));
   if(results.some(result=>result.status==='rejected')){report.cleanup='failed';process.exitCode=1;}else{report.cleanup='passed';await rm(runtime,{recursive:true,force:true});}
-   void logs;await mkdir(output,{recursive:true});await writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});
+  void logs;await mkdir(output,{recursive:true});await writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600});evidence.finish(report);
 console.log(`Workspace report: ${path.relative(root,path.join(output,'report.json'))}`);
  });

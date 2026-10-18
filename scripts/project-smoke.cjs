@@ -1,4 +1,7 @@
 /* global document */
+const { ownChild, signalOwned, groupAlive: ownedGroupAlive } = require('./verification/processes.cjs');
+const { createEvidence } = require('./verification/evidence.cjs');
+const evidence = createEvidence('projects');
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { randomUUID, createHash } = require('node:crypto');
@@ -20,14 +23,8 @@ const children = new Set();
 const report = { runId, suite: 'project-persistence', source: 'explicit-test-fixture', status: 'running', cases: [], cleanup: 'not-run', modelRequests: 0 };
 let browser; let interrupted; let logs = ''; let backend;
 
-function signalGroup(child, signal) {
-  if (!child.pid) return;
-  try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-}
-function groupAlive(child) {
-  if (!child.pid) return false;
-  try { process.kill(-child.pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; }
-}
+function signalGroup(child, signal) { signalOwned(child, signal); }
+function groupAlive(child) { return ownedGroupAlive(child); }
 async function stop(child) {
   if (!child) return;
   signalGroup(child, 'SIGTERM');
@@ -59,7 +56,7 @@ function launch(script, args, cwd, extra = {}) {
   const child = spawn(process.execPath, [script, ...args], { cwd, detached: true,
     env: { PATH: process.env.PATH ?? '', HOST: '127.0.0.1', PORT: '3001', DATABASE_PATH: database,
       API_PROXY_TARGET: 'http://127.0.0.1:3001', ...extra }, stdio: ['ignore', 'pipe', 'pipe'] });
-  children.add(child);
+  children.add(child); ownChild(child);
   child.on('error', () => { logs += 'Owned subprocess could not start.\n'; });
   child.stdout.on('data', data => { logs += data.toString(); }); child.stderr.on('data', data => { logs += data.toString(); });
   return child;
@@ -212,5 +209,6 @@ main().catch(error => {
   }
   await writeFile(path.join(output, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   if (report.status !== 'passed') await writeFile(path.join(output, 'diagnostic.log'), logs);
-  console.log(`Project persistence report: ${path.relative(root, path.join(output, 'report.json'))}`);
+  evidence.finish(report);
+console.log(`Project persistence report: ${path.relative(root, path.join(output, 'report.json'))}`);
 });

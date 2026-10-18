@@ -1,4 +1,7 @@
 /* global document, window, MutationObserver, getComputedStyle, requestAnimationFrame */
+const { ownChild, signalOwned, groupAlive: ownedGroupAlive } = require('./verification/processes.cjs');
+const { createEvidence } = require('./verification/evidence.cjs');
+const evidence = createEvidence('template');
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
@@ -35,15 +38,9 @@ async function portFree(port) {
   });
 }
 
-function groupExists(child) {
-  if (!child.pid) return false;
-  try { process.kill(-child.pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; }
-}
+function groupExists(child) { return ownedGroupAlive(child); }
 
-function signalGroup(child, signal) {
-  if (!child.pid) return;
-  try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-}
+function signalGroup(child, signal) { signalOwned(child, signal); }
 
 async function stop(child) {
   signalGroup(child, 'SIGTERM');
@@ -81,7 +78,7 @@ async function launch(mode) {
   if (interrupted) throw new Error('Interrupted');
   const args = ['--filter', '@atoms/frontend', mode];
   const child = spawn('pnpm', args, { cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
-  children.add(child);
+  children.add(child); ownChild(child);
   let output = '';
   child.stdout.on('data', (data) => { output = (output + data).slice(-128 * 1024); });
   child.stderr.on('data', (data) => { output = (output + data).slice(-128 * 1024); });
@@ -391,6 +388,7 @@ async function main() {
       process.exitCode ||= 1;
     }
     await writeFile(path.join(artifacts, 'report.json'), JSON.stringify(report, null, 2) + '\n');
+evidence.finish(report);
     console.log(`Template smoke report: ${path.relative(root, path.join(artifacts, 'report.json'))}`);
   }
 }

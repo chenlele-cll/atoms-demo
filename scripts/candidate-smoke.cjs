@@ -1,4 +1,7 @@
 /* global document, window, getComputedStyle, requestAnimationFrame */
+const { ownChild, signalOwned, closeBrowser, groupAlive: ownedGroupAlive } = require('./verification/processes.cjs');
+const { createEvidence } = require('./verification/evidence.cjs');
+const evidence = createEvidence('candidate');
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { randomUUID, createHash } = require('node:crypto');
@@ -22,23 +25,8 @@ const children = new Set();
 const report = { runId, suite: 'candidate-review', source: 'fixture', status: 'running', cases: [], cleanup: 'not-run', realModelCalls: 0, fixtureModelRequests: 0 };
 let browser; let interrupted; let logs = ''; let backend; let upstream; let upstreamOrigin; let tools; let bundle;
 
-function signalGroup(child, signal) {
-  if (!children.has(child) || !child.pid) return;
-  try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-}
-function groupAlive(child) {
-  if (!children.has(child) || !child.pid) return false;
-  try { process.kill(-child.pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; }
-}
-async function closeBrowser() {
-  if (!browser) return;
-  let timer;
-  try {
-    await Promise.race([browser.close(), new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error('Browser cleanup timed out')), 3000);
-    })]);
-  } finally { clearTimeout(timer); }
-}
+function signalGroup(child, signal) { signalOwned(child, signal); }
+function groupAlive(child) { return ownedGroupAlive(child); }
 async function stop(child) {
   if (!child) return;
   signalGroup(child, 'SIGTERM');
@@ -70,7 +58,7 @@ function launch(script, args, cwd, extra = {}) {
   const child = spawn(process.execPath, [script, ...args], { cwd, detached: true,
     env: { PATH: process.env.PATH ?? '', HOST: '127.0.0.1', PORT: '3001', DATABASE_PATH: database,
       API_PROXY_TARGET: 'http://127.0.0.1:3001', ...extra }, stdio: ['ignore', 'pipe', 'pipe'] });
-  children.add(child);
+  children.add(child); ownChild(child);
   child.on('error', () => { logs += 'Owned subprocess could not start.\n'; });
   child.stdout.on('data', data => { logs += data.toString(); }); child.stderr.on('data', data => { logs += data.toString(); });
   return child;
@@ -398,7 +386,7 @@ async function main() {
 }
 main().catch(error => { report.status = interrupted ? 'cancelled' : 'failed'; report.error = error.message; console.error(`Candidate smoke ${report.status}: ${error.message}`); process.exitCode = interrupted === 'SIGINT' ? 130 : interrupted ? 143 : 1; })
   .finally(async () => {
-    const results = await Promise.allSettled([closeBrowser(), ...[...children].map(stop)]);
+    const results = await Promise.allSettled([closeBrowser(browser), ...[...children].map(stop)]);
     upstream?.closeAllConnections(); if (upstream?.listening) await new Promise(resolve => upstream.close(resolve));
     if (results.some(result => result.status === 'rejected')) { report.cleanup = 'failed'; process.exitCode = 1; }
     else { report.cleanup = 'passed'; await rm(runtime, { recursive: true, force: true }); }
@@ -407,5 +395,6 @@ main().catch(error => { report.status = interrupted ? 'cancelled' : 'failed'; re
       process.exitCode = interrupted === 'SIGINT' ? 130 : 143;
     }
     void logs; await mkdir(output, { recursive: true }); await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+    evidence.finish(report);
     console.log(`Candidate review report: ${path.relative(root, path.join(output, 'report.json'))}`);
   });

@@ -1,4 +1,7 @@
 /* global window */
+const { ownChild, signalOwned, closeBrowser, groupAlive: ownedGroupAlive } = require('./verification/processes.cjs');
+const { createEvidence } = require('./verification/evidence.cjs');
+const evidence = createEvidence('generation-stream');
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
@@ -17,8 +20,8 @@ const report = { runId, suite: 'generation-stream', source: 'fixture', status: '
   upstreamRequests: 0, upstreamAborts: 0, realModelCalls: 0, preview: 'unverified', finalReverseProxy: 'unverified' };
 let browser; let backend; let interrupted; let upstream; let upstreamOrigin; let releaseNormal = false;
 const normalWaiters = []; let bufferedLogs = '';
-function signalGroup(child, signal) { if (child?.pid) try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; } }
-function alive(child) { if (!child?.pid) return false; try { process.kill(-child.pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; } }
+function signalGroup(child, signal) { signalOwned(child, signal); }
+function alive(child) { return ownedGroupAlive(child); }
 async function stop(child) {
   if (!child) return; signalGroup(child, 'SIGTERM'); const deadline = Date.now() + 6000;
   while (alive(child) && Date.now() < deadline) await delay(40);
@@ -38,7 +41,7 @@ async function portFree(port) {
 function launch(script, args, cwd) {
   check(); const child = spawn(process.execPath, [script, ...args], { cwd, detached: true,
     env: { PATH: process.env.PATH ?? '', API_PROXY_TARGET: 'http://127.0.0.1:3001' }, stdio: ['ignore', 'pipe', 'pipe'] });
-  children.add(child); child.on('error', () => { bufferedLogs += 'Owned process failed.\n'; });
+  children.add(child); ownChild(child); child.on('error', () => { bufferedLogs += 'Owned process failed.\n'; });
   child.stdout.on('data', data => { bufferedLogs += data.toString(); }); child.stderr.on('data', data => { bufferedLogs += data.toString(); }); return child;
 }
 async function ready(url, child) {
@@ -173,12 +176,13 @@ async function main() {
 }
 main().catch(error => { report.status = interrupted ? 'cancelled' : 'failed'; report.error = error.message; console.error(`Generation stream smoke ${report.status}: ${error.message}`); process.exitCode = interrupted === 'SIGINT' ? 130 : interrupted ? 143 : 1; })
   .finally(async () => {
-    await browser?.close().catch(() => {}); for (const resolve of normalWaiters.splice(0)) resolve();
-    const results = await Promise.allSettled([...children].map(stop));
+    for (const resolve of normalWaiters.splice(0)) resolve();
+    const results = await Promise.allSettled([closeBrowser(browser), ...[...children].map(stop)]);
     upstream?.closeAllConnections(); if (upstream?.listening) await new Promise(resolve => upstream.close(resolve));
     if (results.some(result => result.status === 'rejected')) { report.cleanup = 'failed'; process.exitCode = 1; }
     else { report.cleanup = 'passed'; await rm(runtime, { recursive: true, force: true }); }
     // Raw logs remain in memory: reports contain only protocol observations, never requests/cookies/SQL.
     void bufferedLogs; await mkdir(output, { recursive: true }); await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
-    console.log(`Report: ${path.relative(root, path.join(output, 'report.json'))}`);
+    evidence.finish(report);
+console.log(`Report: ${path.relative(root, path.join(output, 'report.json'))}`);
   });
