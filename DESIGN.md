@@ -1,27 +1,14 @@
-# Initial UI Contract
+# Atoms Design Guide
 
-This file covers the repository connection-check screen only. Product workspace design will be defined when its UI work begins.
+Atoms uses a Lovable-inspired warm, minimal AI creation workspace: cream surfaces, charcoal text and primary actions, fine borders, and restrained depth. This direction was approved for the platform UI.
 
-## Scope
+## Design Navigation
 
-- Show the project identity, initialization status, and an explicit backend connectivity check.
-- Do not display simulated conversations, generated applications, or inactive product controls.
-- Use native HTML elements, CSS Modules, and system fonts. No visual libraries or remote assets are needed for this screen.
+- [Atoms frontend design skill](.opencode/skills/atoms-frontend-design/SKILL.md): the authoritative product UI contract, including tokens, workspace layouts, components, interaction states, responsive behavior, and verification.
+- [Initial connection-check screen](.opencode/skills/atoms-frontend-design/references/initial-screen.md): the existing skeleton screen contract, retained until that screen is replaced or intentionally restyled.
 
-## Tokens
+## Usage
 
-- Background: `#f6f5f1`; surface: `#ffffff`; foreground: `#202823`; muted: `#59635d`.
-- Accent: `#20573e`; border: `#d7ddd7`; error: `#a52d25`.
-- Body font: system sans-serif; technical labels: system monospace.
-- Body: 16px / 1.6; heading: clamp(2rem, 6vw, 3.5rem); eyebrow: 12px.
-- Spacing scale: 8, 16, 24, 32, 48px. Content max width: 880px.
-- Border radius: 6px for buttons, 12px for the status panel.
+Before designing, implementing, or reviewing platform UI, load `atoms-frontend-design` or read its `SKILL.md` directly. Update that contract when introducing tokens or patterns; keep this file as navigation instead of duplicating the detailed rules.
 
-## Layout And States
-
-- Single-column document layout with a compact header and one status panel.
-- Page padding: 48px desktop, 24px at widths below 600px. Long technical strings must wrap.
-- Connectivity button: idle, disabled while checking, success, and failure feedback.
-- Status text uses a polite live region; color is never the only status indicator.
-- Buttons have a visible keyboard focus outline, at least 44px height, and readable contrast.
-- No decorative animation or external fonts. The screen must remain usable at 320px width.
+The product contract describes intended UI behavior, not implemented capabilities. Add controls alongside their working features. Generated applications may have their own design direction; the platform style is not imposed on their output.

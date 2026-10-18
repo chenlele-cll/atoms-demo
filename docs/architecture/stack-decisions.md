@@ -103,7 +103,7 @@ FastAPI 的 Pydantic 校验、OpenAPI 文档与 Python 工具生态具有实际�
 
 ## 6. Harness 与能力状态
 
-仓库入口由 [AGENTS.md](../../AGENTS.md) 导航，文档职责见 [文档索引](../README.md)。Git 操作与已落盘技能分别维护在 [Git workflow](../engineering/git-workflow.md) 和 [Skills 说明](../engineering/skills.md)。UI 约定维护在 [DESIGN.md](../../DESIGN.md)。
+仓库入口由 [AGENTS.md](../../AGENTS.md) 导航，文档职责见 [文档索引](../README.md)。Git 操作与已落盘技能分别维护在 [Git workflow](../engineering/git-workflow.md) 和 [Skills 说明](../engineering/skills.md)。UI 由 [DESIGN.md](../../DESIGN.md) 导航到已有的详细设计契约。
 
 当前已建立应用启动、连通检查与验证入口；OpenSpec 尚待接入。统一生命周期脚本、数据库迁移和生成预览随对应任务渐进接入；能力是否可用以实现及实际验证记录为准。
 

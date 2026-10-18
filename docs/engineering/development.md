@@ -45,6 +45,6 @@
 
 ## UI and handoff
 
-UI 规范维护在 [DESIGN.md](../../DESIGN.md)；在该契约维护 token 与交互约定，不在本文复制。
+UI 规范由 [DESIGN.md](../../DESIGN.md) 导航到现有设计 skill；在该契约维护 token 与交互约定，不在本文复制。
 
 按 [Verification](./verification.md) 收集实际结果；版本控制操作遵循 [Git workflow](./git-workflow.md)。

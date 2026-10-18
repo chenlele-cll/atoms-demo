@@ -6,7 +6,7 @@ Applies to `frontend/` and supplements the [repository map](../AGENTS.md). Repos
 
 | Change | Read |
 | --- | --- |
-| Components, layout, CSS, or visible interaction | [DESIGN.md](../DESIGN.md) |
+| Components, layout, CSS, or visible interaction | [DESIGN.md](../DESIGN.md), then the existing [atoms-frontend-design skill](../.opencode/skills/atoms-frontend-design/SKILL.md) |
 | HTTP client or response-driven state | [HTTP and runtime validation](../docs/engineering/development.md#http-and-runtime-validation); inspect the matching API contract |
 | Vite proxy, environment, or startup | [Lifecycle](../docs/engineering/lifecycle.md) and the current Vite configuration |
 | Dependencies or shared code | [Monorepo contract](../docs/architecture/monorepo.md) |

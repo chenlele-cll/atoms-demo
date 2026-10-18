@@ -141,7 +141,8 @@ docs/
 scripts/
   smoke.cjs            浏览器端到端冒烟脚本（pnpm smoke）
 AGENTS.md              开发与交付约定
-DESIGN.md              当前启动页面的最小 UI 约定
+DESIGN.md              平台设计入口，链接到详细设计 skill 与现有启动页约定
+.opencode/skills/atoms-frontend-design/   已确认的 Lovable 风格及工作台设计规范
 .agents/skills/        固定上游 Git 技能
 README.md              本文件
 package.json           workspace 根：命令、工具链版本、共享开发依赖
@@ -156,12 +157,15 @@ eslint.config.mjs      前后端共用 lint 配置
 
 ## 项目 Skills
 
-Skills 的完整文件保存在本仓库中：复用上游的 Git 技能位于 `.agents/skills/`。这些文件作为项目交付内容纳入版本控制，使用规范不依赖开发者机器上的全局 skill 安装。上游版本、许可证及使用边界见 [Skills 说明](./docs/engineering/skills.md)。
+Skills 的完整文件保存在本仓库中：复用上游的 Git 技能位于 `.agents/skills/`，现有设计 skill 位于 `.opencode/skills/`。这些文件作为项目交付内容纳入版本控制，使用规范不依赖开发者机器上的全局 skill 安装。上游版本、许可证及使用边界见 [Skills 说明](./docs/engineering/skills.md)。
 
 | Skill | 用途 | 来源与适配 |
 | --- | --- | --- |
+| [atoms-frontend-design](./.opencode/skills/atoms-frontend-design/SKILL.md) | 前端设计、实现与评审，约束平台配色、组件、工作台布局、交互状态、响应式与可访问性 | 基于 awesome-design-md 和 open-design 中的 Lovable 设计分析，按 Atoms 场景编写；来源链接与适配说明见 skill 正文 |
 | [git-commit](./.agents/skills/git-commit/SKILL.md) | 用户请求提交时分析差异、按范围暂存并生成 Conventional Commit | 复用 `github/awesome-copilot` 原版，固定上游提交 |
 | [yeet](./.agents/skills/yeet/SKILL.md) | 用户明确请求暂存、提交、推送并创建 PR 时使用 | 复用 `openai/skills` 原版；执行前遵循仓库 Git 工作流 |
+
+进行平台 UI 开发前，先阅读 [DESIGN.md](./DESIGN.md)，再加载对应 skill；工具无法自动发现时，直接读取仓库内的 `SKILL.md`。该设计 skill 已用于建立设计规范，产品工作台尚未实现。
 
 ## 项目资料
 
@@ -171,5 +175,6 @@ Skills 的完整文件保存在本仓库中：复用上游的 Git 技能位于 `
 - [生命周期指南](./docs/engineering/lifecycle.md)：Process Compose 开发编排、现有起停入口与后续 manager、基础设施契约。
 - [文档索引](./docs/README.md)：产品参考、技术决策及 Monorepo、开发、验证和生命周期规范的职责与阅读时机。
 - [技术栈调研与初始化建议](./docs/architecture/stack-decisions.md)：选型依据及适用边界。
+- [设计入口](./DESIGN.md)：平台采用 Lovable 风格的暖色极简 AI 创作工作台；详细规范位于项目级 [atoms-frontend-design skill](./.opencode/skills/atoms-frontend-design/SKILL.md)。规范已确定，产品工作台尚未实现。
 
 原始题目整理稿位于 `docs/product/assignment.md`，仅供本地参考，已由 `.gitignore` 排除，不随仓库发布。密钥、`.env` 和本地工具输出不进入版本控制。

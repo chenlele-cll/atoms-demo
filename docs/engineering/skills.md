@@ -1,6 +1,6 @@
 # Repository skills
 
-Git 技能复用上游实现，直接保存在 `.agents/skills/`。该目录可由 Codex 和 OpenCode 读取；工具未自动显示或存在同名全局技能时，按 `AGENTS.md` 中的仓库路径读取 `SKILL.md`。
+Git 技能复用上游实现，直接保存在 `.agents/skills/`。该目录可由 Codex 和 OpenCode 读取；工具未自动显示或存在同名全局技能时，按 `AGENTS.md` 中的仓库路径读取 `SKILL.md`。现有设计 skill 继续保存在 `.opencode/skills/atoms-frontend-design/`。
 
 ## Installed upstream skills
 

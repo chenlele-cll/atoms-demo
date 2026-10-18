@@ -29,7 +29,7 @@ Use [README.md](README.md) for project scope, current setup, and production star
 | Branch, commit, push, merge, or PR | [Git workflow](docs/engineering/git-workflow.md) and the skill routing below |
 | Selecting checks or preparing handoff | [Verification](docs/engineering/verification.md) |
 
-Implementation rules live in [Development conventions](docs/engineering/development.md). UI rules are maintained in [DESIGN.md](DESIGN.md); update the owning contract when rules change rather than copying them into this map.
+Implementation rules live in [Development conventions](docs/engineering/development.md). UI rules are reached through [DESIGN.md](DESIGN.md) and the existing design skill; update the owning contract when rules change rather than copying them into this map.
 
 ## Skill routing
 
