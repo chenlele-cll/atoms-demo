@@ -8,6 +8,8 @@ all:
       ansible_port: 22
       ansible_user: "ubuntu"
       ansible_password: "REPLACE_IN_PRIVATE_FILE"
+      # Password automation uses Ansible's native sshpass FD transport.
+      # Install sshpass >=1.06 on the controller; never use sshpass -p with secrets.
       # For key authentication, remove ansible_password and set:
       # ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
       # Optional overrides; see docs/engineering/deployment.md.

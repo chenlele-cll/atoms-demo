@@ -263,6 +263,8 @@ pnpm smoke:projects
 
 `DEP-002` 的 `./deploy.sh bootstrap` 显式准备固定 Ansible/Python 依赖；`./deploy.sh validate` 用真实 Ansible 做语法检查和离线模板渲染。`./deploy.sh test` 使用标准库 unittest：帮助/apply 无工具副本与含空格路径、离线重复 bootstrap、私有文件/字面密码/权限/重复 YAML 键/非法字段保护、真实 Ansible 官方传密与 SSH 失败脱敏、受控本地模块的前提通过/端口冲突/运行/未知状态、重复模板渲染、SIGINT/SIGTERM/超时下独立会话子进程清理与无关进程保护。
 
+当前密码路径使用 Ansible 原生 sshpass（控制端 >=1.06），测试执行真实 sshpass/Ansible 与隔离 SSH 提示夹具，检查引号/美元符/反斜杠完整传递、无密码 argv/env/ASKPASS、缺工具/旧版本拒绝及私钥不依赖 sshpass。夹具只能证明传递和失败/取消保护；真实目标是否接受凭据单独记录在 DEP-004，不因更换工具自动标为通过。
+
 DEP-003 已接入实际 apply 与成功状态检查。默认 test 覆盖控制端真实分派/私有请求/结果白名单、生产者原生包/篡改/跨平台拒绝/公开源快照、Ansible 配置与失败保护、锁内文件/真实 SQLite 事务。同包 no-op、源/ID 缓存、代码与独立配置更新、冷备份、兼容恢复、schema 不兼容保留及前向修复、成功元数据修复和互斥均有行为断言。事务单测使用显式 OS 替身，包清单由原生产者生成/验证，不给生产入口增加测试开关。
 
 可显式启用真实进程专项，两个包必须由 GEN-009 在本平台实际构建且 releaseId 不同，Nginx 必须支持 TLS；依赖缺失时默认测试显示 skipped，不能当作真实进程通过：
@@ -275,7 +277,7 @@ DEPLOY_TEST_NGINX=/absolute/nginx-with-tls ./deploy.sh test
 
 专项使用随机本地端口、自有 Nginx prefix、测试证书及显式测试 CA、生产模板/事务/校验器/HTTP 健康规则和真实 Node/SQLite。验证 HTTPS 创建项目、重复无重启、实际包切换、后端配置重启、代理单独 reload、坏配置拒绝、激活后健康失败恢复及原会话/快照重开；只替换 Ubuntu 服务管理适配，不修改产品包、不读取真实 .env/inventory、不连接真实服务器或模型。生产仍用系统 TLS 信任，不接受测试 CA 开关。本地成功不证明 systemd 沙箱、Ubuntu 权限或公网可达。
 
-证据分别保留在忽略的 test-results/dep-003/framework/（早期框架）和 completion/（补全实现）；命令见 [Deployment](./deployment.md)。默认 check/verify/CI 不安装 Python 工具或执行远端部署。DEP-004 的[验收矩阵](../../openspec/changes/dep-004-deployment-acceptance/design.md)和[实际状态](../../openspec/changes/dep-004-deployment-acceptance/acceptance-report.md)仍维护真实目标断言；GEN-009/DEP-003 代码已具备，专用 Ubuntu、目标产物/基线、可信 IP TLS、实际 SSH/sudo 和最终流式访问仍需目标验收，DEP-001 连接问题不因本机通过自动关闭。
+证据分别保留在忽略的 test-results/dep-003/framework/（早期框架）和 completion/（补全实现）；命令见 [Deployment](./deployment.md)。默认 check/verify/CI 不安装 Python 工具或执行远端部署。DEP-004 的[验收矩阵](../../openspec/changes/dep-004-deployment-acceptance/design.md)和[实际状态](../../openspec/changes/dep-004-deployment-acceptance/acceptance-report.md)仍维护真实目标断言；GEN-009/DEP-003 已在专用 Ubuntu 实测安装、A/B 更新、幂等执行、配置更新、故障/中断恢复与 schema 拒绝，并通过可信 IP HTTPS。旧 SSH 阻塞已由用户更正私有凭据解除；最终配置/流式与完整结论以 DEP-004 实际状态为准，本机测试仍不能替代目标证据。
 
 ## Candidate review
 

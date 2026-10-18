@@ -278,9 +278,11 @@ pnpm --filter @atoms/backend start
 
 前端将 `frontend/dist/` 交给已有 Web 服务器提供静态文件访问；将 `/api/` 原样转发到 `127.0.0.1:3001`。API 的 404 必须由后端返回，不能回退成前端 HTML。
 
-`DEP-002/003` 提供 [deploy.sh](./deploy.sh) 与固定 Ansible Core：`bootstrap` 准备本地工具，`plan` 离线查看实现阶段，`validate`/`test` 本地验证，`check`/`status` 只读检查。私有 inventory 从 [server.example](./server.example) 准备，可选模型补丁用 [deploy.env.example.yml](./deploy.env.example.yml)，已有私有文件保留。具体前提、命令和失败处理见 [部署指南](./docs/engineering/deployment.md)。
+`DEP-002/003` 提供 [deploy.sh](./deploy.sh) 与固定 Ansible Core：`bootstrap` 准备本地 Python 工具，`plan` 离线查看实现阶段，`validate`/`test` 本地验证，`check`/`status` 只读检查。密码自动化复用 Ansible 原生 sshpass 匿名 FD 传递，控制端需 sshpass >=1.06；私钥认证也可用。私有 inventory 从 [server.example](./server.example) 准备，可选模型补丁用 [deploy.env.example.yml](./deploy.env.example.yml)，已有私有文件保留。具体前提、命令和失败处理见 [部署指南](./docs/engineering/deployment.md)。
 
-`./deploy.sh apply --json` 已接入实际上传/构建和事务激活：默认查目标有效缓存，未命中则在 Ubuntu 以非 root 用户调用 GEN-009 构建；也支持显式 Linux 包或 `--release-id` 选择保留包。同包健康无重建/切换/重启，配置变化只处理受影响服务；冷备份和失败恢复保留现有 SQLite，schema 不兼容时拒绝自动回退。生产使用已有 Nginx + systemd 和可信 IP HTTPS。本机真实进程验证不替代 DEP-004 服务器验收，本轮未自动上线。
+`./deploy.sh apply` 默认同步本地私有 `backend/.env` 中非空的模型密钥、地址和模型参数，未提供的服务器设置保留。配置变化仅重启后端，同值重复执行不重启；密钥不进入发布包或前端。显式 `--env-file` 可替代本次默认配置来源。
+
+`./deploy.sh apply --json` 已接入实际上传/构建和事务激活：默认查目标有效缓存，未命中则在 Ubuntu 以非 root 用户调用 GEN-009 构建；也支持显式 Linux 包或 `--release-id` 选择保留包。同包健康无重建/切换/重启，配置变化只处理受影响服务；冷备份和失败恢复保留现有 SQLite，schema 不兼容时拒绝自动回退。生产使用已有 Nginx + systemd 和可信 IP HTTPS。真实 Ubuntu 的安装、更新、幂等、恢复、模型配置同步及公网浏览器/流式验收见 [DEP-004 记录](./openspec/changes/dep-004-deployment-acceptance/acceptance-report.md)；生成使用明确的测试上游，未运行计费模型。
 
 releaseId 创建、复用、配置更新与回滚规则统一维护在 [发布版本标识](./docs/engineering/lifecycle.md#deployment-release-identity)。包不可变，重复部署不得隐式重建；本机发布构建使用下述 GEN-009 入口，不能将 Mac 原生依赖包直接用于 Ubuntu。
 
