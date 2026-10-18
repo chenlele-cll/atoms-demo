@@ -53,6 +53,16 @@ pnpm dev:frontend
 
 健康实例重复 start 不重建，重复 stop 成功；并发修改串行执行，启动失败或中断会回滚。`logs backend --follow` 在另一个终端持续读取，Ctrl+C 只结束读取；停止后仍可读取当前保存的应用日志。JSON 诊断、超时、来源及原生调试方式见 [生命周期指南](./docs/engineering/lifecycle.md#manager-commands)。托管 profile 使用固定本地端口和代理值。
 
+基础设施入口已接入，选择项目 Node 后即可执行，无需先 bootstrap：
+
+```sh
+./manager.sh infra start
+./manager.sh infra status --json
+./manager.sh infra stop
+```
+
+当前三个命令均明确返回“未配置外部基础设施”（JSON 为 `not_configured`），重复执行成功，不安装工具或启动服务。真实服务在需要时通过 `INF-002` 接入 Docker Compose；检测到尚未接入的 Compose 配置时明确失败，见 [基础设施约定](./docs/engineering/lifecycle.md#infrastructure-contract)。
+
 ## 配置
 
 默认值无需创建 `.env` 即可运行。如需覆盖，可参考各应用的 `.env.example` 在对应目录创建 `.env`：
@@ -74,6 +84,7 @@ pnpm check
 pnpm build
 pnpm smoke
 pnpm test:manager
+pnpm test:infra
 ```
 
 各命令的实际内容、浏览器前提、已有覆盖和按变更选择检查的要求，统一见 [验证规范](./docs/engineering/verification.md)。检查通过只证明对应范围，不代表尚未实现的产品能力已完成。
@@ -161,11 +172,12 @@ docs/
 scripts/
   check-dev-port.cjs   托管服务启动前检查固定端口，不终止占用者
   manager.mjs          短时运行的生命周期命令，调用 Process Compose
-  setup.mjs            无需 node_modules 的 bootstrap / doctor 入口
+  setup.mjs            无需 node_modules 的 bootstrap / doctor / infra 入口
   manager.test.mjs     隔离副本上的真实进程行为回归
+  infra.test.mjs       空基础设施 CLI 的无依赖与副作用验证
   vendor/process-compose/         原样固定的官方安装器及许可证
   smoke.cjs            浏览器端到端冒烟脚本（pnpm smoke）
-manager.sh            本地 bootstrap/doctor/start/stop/restart/status/logs 入口
+manager.sh            本地 bootstrap/doctor/start/stop/restart/status/logs/infra 入口
 process-compose.yaml  原生本地开发进程与就绪、退出、日志配置
 .process-compose-version        固定 Process Compose 工具版本
 AGENTS.md              开发与交付约定

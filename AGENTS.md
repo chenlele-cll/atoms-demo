@@ -4,7 +4,7 @@ This file applies to the whole repository. Before editing an application, also r
 
 ## Project
 
-Atoms Demo has an independently runnable React + Vite frontend and Fastify + Node.js backend. Both use TypeScript; the frontend uses CSS Modules. The current application is a connection-check skeleton; generation, persistence, and generated-app preview are not implemented yet. Manager bootstrap/doctor/start/stop/restart/status/logs, native Process Compose development configuration, and OpenSpec are available. Use the lifecycle guide for prerequisites and process commands.
+Atoms Demo has an independently runnable React + Vite frontend and Fastify + Node.js backend. Both use TypeScript; the frontend uses CSS Modules. The current application is a connection-check skeleton; generation, persistence, and generated-app preview are not implemented yet. Manager bootstrap/doctor/start/stop/restart/status/logs/infra, native Process Compose development configuration, and OpenSpec are available; infra currently reports no external infrastructure configured. Use the lifecycle guide for prerequisites and process commands.
 
 Use [README.md](README.md) for project scope, current setup, and production startup. Use [docs/README.md](docs/README.md) to find documentation by responsibility.
 
@@ -57,7 +57,7 @@ pnpm smoke
 pnpm openspec list --json
 ```
 
-The independent development commands use separate terminals; [manager.sh](manager.sh) provides setup, diagnostics, lifecycle commands and application logs after the [lifecycle prerequisites](docs/engineering/lifecycle.md#manager-commands). Infrastructure commands remain planned. Do not mix manager and native operations on the same instance. Select verification by change scope using the verification guide.
+The independent development commands use separate terminals; [manager.sh](manager.sh) provides setup, diagnostics, lifecycle commands and application logs after the [lifecycle prerequisites](docs/engineering/lifecycle.md#manager-commands). `infra start/stop/status` is available as an explicit no-configuration result; actual infrastructure integration remains future work. Do not mix manager and native operations on the same instance. Select verification by change scope using the verification guide.
 
 ## Always-on boundaries
 

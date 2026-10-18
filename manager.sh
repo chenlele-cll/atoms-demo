@@ -6,6 +6,6 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 case "${1:-help}" in
-  bootstrap|doctor) exec node "$atoms_root/scripts/setup.mjs" "$@" ;;
+  bootstrap|doctor|infra) exec node "$atoms_root/scripts/setup.mjs" "$@" ;;
   *) exec node "$atoms_root/scripts/manager.mjs" "$@" ;;
 esac

@@ -16,6 +16,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @atoms/backend test",
     "test:manager": "node --test scripts/manager.test.mjs",
+    "test:infra": "node --test scripts/infra.test.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "smoke": "pnpm build && node scripts/smoke.cjs"
   },

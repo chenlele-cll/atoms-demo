@@ -199,6 +199,18 @@ async function doctor() {
 
 async function main() {
   const [command, ...args] = process.argv.slice(2);
+  if (command === 'infra') {
+    const [action, ...options] = args;
+    if (!['start', 'stop', 'status'].includes(action) || (options.length && (options.length !== 1 || options[0] !== '--json'))) throw new Error('Usage: ./manager.sh infra <start|stop|status> [--json]');
+    // Real infrastructure belongs to INF-002; never report an unhandled config as empty.
+    if (process.env.COMPOSE_FILE) throw new Error('COMPOSE_FILE is set; infrastructure integration requires INF-002. No infrastructure was changed.');
+    for (const filename of ['compose.yaml', 'compose.yml', 'docker-compose.yaml', 'docker-compose.yml']) {
+      if (await exists(path.join(root, filename))) throw new Error('Compose configuration detected; infrastructure integration requires INF-002. No infrastructure was changed.');
+    }
+    const result = { ok: true, action, state: 'not_configured', configured: false, services: [], message: '未配置外部基础设施' };
+    console.log(options.includes('--json') ? JSON.stringify(result) : result.message);
+    return;
+  }
   if (!['bootstrap', 'doctor'].includes(command) || (args.length && (args.length !== 1 || args[0] !== '--json'))) throw new Error('Usage: ./manager.sh <bootstrap|doctor> [--json]');
   const result = command === 'bootstrap' ? await bootstrap() : await doctor();
   if (args.includes('--json')) console.log(JSON.stringify(result));

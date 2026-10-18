@@ -344,6 +344,16 @@ test('manager lifecycle with real Process Compose and applications', { timeout: 
     const diagnostics = await success(cwd, 'doctor', '--json');
     assert.ok(diagnostics.ok);
     assert.ok(!JSON.stringify(diagnostics).includes(before.token));
+    const instanceBeforeInfra = await readFile(path.join(cwd, '.runtime/manager/state.json'));
+    const servicesBeforeInfra = (await status(cwd, 'healthy')).services.map(({ name, pid }) => ({ name, pid }));
+    for (const action of ['start', 'stop', 'status']) {
+      const result = await success(cwd, 'infra', action, '--json');
+      assert.equal(result.state, 'not_configured');
+      assert.equal(result.configured, false);
+    }
+    assert.deepEqual(await readFile(path.join(cwd, '.runtime/manager/state.json')), instanceBeforeInfra);
+    assert.deepEqual((await status(cwd, 'healthy')).services.map(({ name, pid }) => ({ name, pid })), servicesBeforeInfra);
+    report.empty_infra_preserves_running_apps = true;
     assert.notEqual((await command(cwd, 'bootstrap', '--json')).code, 0);
     const logs = await command(cwd, 'logs', 'backend', '--tail', '5');
     assert.equal(logs.code, 0, logs.stderr);

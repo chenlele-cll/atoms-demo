@@ -9,15 +9,15 @@
 | 开发后端 | 根目录运行 `pnpm dev:backend`；pnpm 将应用工作目录设为 `backend/` |
 | 开发前端 | 在另一个终端运行 `pnpm dev:frontend`；前后端进程相互独立 |
 | 停止开发服务 | 在各自终端按 Ctrl+C；后端入口处理 SIGINT、SIGTERM 并关闭 Fastify |
-| 本地工具与开发编排 | [manager.sh](../../manager.sh) 提供 bootstrap/doctor/start/stop/restart/status/logs，见下节 |
+| 本地工具与开发编排 | [manager.sh](../../manager.sh) 提供 bootstrap/doctor/start/stop/restart/status/logs/infra，见下节 |
 | 原生开发编排 | 根 [process-compose.yaml](../../process-compose.yaml) 管理前后端，操作见下节；工具版本由 [.process-compose-version](../../.process-compose-version) 固定 |
 | 生产后端 | 构建后运行 `pnpm --filter @atoms/backend start` |
 | 本地检查前端产物 | `pnpm --filter @atoms/frontend preview`；这是本地验收入口 |
-| 当前基础设施 | 没有独立数据库、容器或队列服务；现有连通页面无需模型凭据 |
+| 当前基础设施 | `infra start/stop/status` 明确报告未配置；没有独立数据库、容器或队列服务，现有连通页面无需模型凭据 |
 
 后端读取自身目录下的 `.env`，进程已有变量优先，配置经过解析后监听。前端开发及 preview 的代理目标来自其配置；生产反向代理由部署环境提供。
 
-当前已有 manager 的七个开发命令和 Process Compose 配置。本地编排不接管生产服务器。
+当前已有 manager 的七个开发命令、infra 空配置入口和 Process Compose 配置。本地编排不接管生产服务器。
 
 ## Manager commands
 
@@ -33,7 +33,7 @@
 ./manager.sh stop
 ```
 
-也可从其他目录以绝对路径调用，支持带空格或深路径的仓库。start/restart 默认等候 30 秒就绪，可加 `--timeout 1..120` 秒；额外在途检查和必要停止/回滚时间不计入该窗口。只有 bootstrap 安装缺失的项目工具和依赖，不自动安装全局 Node/pnpm 或升级已有工具。stop/status 需可用的 Node 和根依赖；bootstrap/doctor 的入口仅依赖 Node 标准库，在没有 node_modules 时也能执行。infra 仍按下文契约等待接入。
+也可从其他目录以绝对路径调用，支持带空格或深路径的仓库。start/restart 默认等候 30 秒就绪，可加 `--timeout 1..120` 秒；额外在途检查和必要停止/回滚时间不计入该窗口。只有 bootstrap 安装缺失的项目工具和依赖，不自动安装全局 Node/pnpm 或升级已有工具。stop/status 需可用的 Node 和根依赖；bootstrap/doctor/infra 的入口仅依赖 Node 标准库，在没有 node_modules 时也能执行。infra 用法见 [Infrastructure contract](#infrastructure-contract)。
 
 ### Bootstrap and diagnostics
 
@@ -158,7 +158,7 @@ mkdir -p .runtime/process-compose
 
 ## Planned manager contract
 
-`OPS-001` 原生配置、`OPS-002` 核心、`OPS-003` 工具入口已接入，保留应用独立运行方式。
+`OPS-001` 原生配置、`OPS-002` 核心、`OPS-003` 工具入口与 `INF-001` 空基础设施入口已接入，保留应用独立运行方式。
 
 | 命令 | 行为与当前状态 |
 | --- | --- |
@@ -169,6 +169,7 @@ mkdir -p .runtime/process-compose
 | `restart` | 已实现：同一锁内停止再启动，收敛到一组健康实例 |
 | `status` | 已实现：区分 stopped、starting、unready、healthy、failed |
 | `logs` | 已实现：在线快照/跟随、停止后当前文件读取，遵守 [日志规范](./development.md#configuration-and-logging) |
+| `infra start/stop/status` | 已实现：空配置明确返回 not_configured；真实服务留待 INF-002 接入 |
 
 幂等按目标状态定义：重复 start/stop 不增加实例或误报失败；restart 允许重启进程，最终只保留一组健康实例。
 
@@ -178,7 +179,22 @@ mkdir -p .runtime/process-compose
 
 ## Infrastructure contract
 
-`INF-001` 接入 `infra start / stop / status` 时，空配置应明确报告“未配置外部基础设施”，不拉取占位镜像，不把空操作描述为服务已启动。
+`INF-001` 已接入以下入口，和其他 manager 命令一样可从其他目录调用：
+
+```sh
+./manager.sh infra start
+./manager.sh infra stop
+./manager.sh infra status
+./manager.sh infra status --json
+```
+
+当前没有外部服务或 Compose 文件，三个动作均输出“未配置外部基础设施”并退出 0，可重复或并发执行。JSON 返回 `ok: true`、请求的 `action`、`state: "not_configured"`、`configured: false`、`services: []` 及同一提示；成功只表示空操作已处理，不表示服务运行或就绪。
+
+入口仅依赖 Node 标准库，不调用 Docker、Process Compose 或 pnpm，不安装工具、拉取镜像、读取应用环境文件、创建运行状态，也不改变应用实例或持久数据。当前应用没有外部依赖，普通 start/stop 不自动串联 infra。
+
+只接受 start/stop/status 和至多一个尾随 `--json`，非法参数退出 1。仓库根检测到 compose.yaml、compose.yml、docker-compose.yaml 或 docker-compose.yml（含目录或符号链接），或进程显式设置非空 `COMPOSE_FILE` 时，也退出 1，提示先通过 `INF-002` 接入；不读取配置内容或输出环境值，不把未处理的配置当成空配置。这是当前接入门槛，不替代将来的 Compose 配置校验。
+
+聚焦回归为 `pnpm test:infra`，无需 node_modules、Process Compose 或 Docker 的隔离副本覆盖 CLI 行为；测试 runner 本身使用项目 Node。真实运行中的前后端保护在 `pnpm test:manager` 覆盖，证据见 [INF-001 tasks](../../openspec/changes/inf-001-infrastructure-interface/tasks.md)。
 
 首次出现真实外部服务时，由 `INF-002` 接入 Docker Compose 并验证。基础设施就绪后再启动其依赖服务，停止按实际依赖逆序执行；停止不默认删除数据库文件或数据卷。
 

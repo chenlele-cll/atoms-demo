@@ -381,7 +381,7 @@ async function logs(opts) {
 
 function options(args) {
   const [command = 'help', ...rest] = args;
-  if (!['start', 'stop', 'restart', 'status', 'logs', 'help', '--help'].includes(command)) throw new Error('Usage: ./manager.sh <bootstrap|doctor|start|stop|restart|status|logs>; use help for options.');
+  if (!['start', 'stop', 'restart', 'status', 'logs', 'help', '--help'].includes(command)) throw new Error('Usage: ./manager.sh <bootstrap|doctor|start|stop|restart|status|logs|infra>; use help for options.');
   if (command === 'logs') {
     const opts = { command, service: 'all', tail: 50, follow: false };
     for (let i = 0; i < rest.length; i++) {
@@ -405,7 +405,7 @@ function options(args) {
 async function main() {
   const opts = options(process.argv.slice(2));
   if (['help', '--help'].includes(opts.command)) {
-    console.log('Usage: ./manager.sh <bootstrap|doctor|start|stop|restart|status> [--json]\nstart/restart: --timeout 1..120 (seconds, default 30)\nlogs [backend|frontend|all] [--tail 1..1000] [--follow]\nstatus exits: 0 healthy, 3 stopped, 2 starting/unready, 1 failed\nbootstrap requires the pinned Node/pnpm, runs the official tool installer and frozen install.');
+    console.log('Usage: ./manager.sh <bootstrap|doctor|start|stop|restart|status> [--json]\nstart/restart: --timeout 1..120 (seconds, default 30)\nlogs [backend|frontend|all] [--tail 1..1000] [--follow]\ninfra <start|stop|status> [--json] (currently no external infrastructure configured)\nstatus exits: 0 healthy, 3 stopped, 2 starting/unready, 1 failed\nbootstrap requires the pinned Node/pnpm, runs the official tool installer and frozen install.');
     return;
   }
   for (const dirname of [path.join(root, '.runtime'), runtime, socketDir, path.join(root, '.runtime/process-compose')]) await privateDir(dirname);
