@@ -7,7 +7,7 @@ import type { TemplateIdentity } from '../templates/companyLanding';
 import styles from './TemplateBaseline.module.css';
 
 export function TemplateAttempt({ expected, templateId = expected?.id ?? companyTemplate.id }: { expected?: TemplateIdentity; templateId?: string }) {
-  return <TemplateAttemptContent key={`${templateId}:${expected?.version}:${expected?.digest}`} templateId={templateId} {...(expected ? { expected } : {})} />;
+  return <TemplateAttemptContent key={`${templateId}:${expected?.id}:${expected?.version}:${expected?.digest}`} templateId={templateId} {...(expected ? { expected } : {})} />;
 }
 
 function TemplateAttemptContent({ templateId, expected }: { templateId: string; expected?: TemplateIdentity }) {
