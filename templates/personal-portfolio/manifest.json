@@ -1,0 +1,90 @@
+{
+  "id": "personal-portfolio",
+  "version": 1,
+  "name": "Personal Portfolio · React Engineer",
+  "category": "personal-portfolio",
+  "source": {
+    "repository": "https://github.com/veldig/react-engineer-portfolio",
+    "commit": "d859a81d974fc276943f0c398991746b75a1a413",
+    "license": "MIT",
+    "upstreamFiles": [
+      {
+        "path": "LICENSE", "localPath": "LICENSE",
+        "gitBlobSha1": "86093c89e04db9efd38a58f08762bf70ac314ff7",
+        "sha256": "9ea92f0b37f2f9600f8465e0f2bf57ce35da6ea4393d333aecca7104fb012025"
+      },
+      {
+        "path": "src/App.jsx", "localPath": "src/App.tsx",
+        "gitBlobSha1": "838e8c0a3810cb757929c4ef3e09cc43c3580a60",
+        "sha256": "6b20b321d90a2314c5a57823995dac90b76e04efabc0c485686e89f7d12d6da9"
+      },
+      {
+        "path": "src/main.jsx", "localPath": "src/main.tsx",
+        "gitBlobSha1": "b9a1a6deac8775b5598874b2bc3c7971d82cf211",
+        "sha256": "4b4b864dbe45253425d0c925337180ec07e204295179f80f59551216f466f618"
+      },
+      {
+        "path": "src/data/siteConfig.js", "localPath": "src/data/siteConfig.ts",
+        "gitBlobSha1": "51cd3a3b1e76449865ec32fcd59ffec497f69c44",
+        "sha256": "51ced32a06eae89b0ba43ba86d9946c623df773a9622af06acc450c704fe1d05"
+      },
+      {
+        "path": "src/components/Hero.jsx", "localPath": "src/components/Hero.tsx",
+        "gitBlobSha1": "a94c7c658c3f7990f3a1d367a045af24a723b2d3",
+        "sha256": "70ce5eb140150332f83b3d2672ff08de86400450b82688edd4d0f78c10e0f84a"
+      },
+      {
+        "path": "src/components/Navbar.jsx", "localPath": "src/components/Navbar.tsx",
+        "gitBlobSha1": "6a40b81a83e33d6ba51eaa9f3a48853fd0d5c9b2",
+        "sha256": "c2523354522090c3ca33528e08e3bf302c373faef69eda46793efeb20840f791"
+      },
+      {
+        "path": "src/components/About.jsx", "localPath": "src/components/About.tsx",
+        "gitBlobSha1": "896b58003e6f3af05706c7ef6788fb27ccfd14bc",
+        "sha256": "1549efc60d3adb02782214e3ac81d229cfa015ac3a05c85933eec516ab6f6053"
+      },
+      {
+        "path": "src/components/Experience.jsx", "localPath": "src/components/Experience.tsx",
+        "gitBlobSha1": "9134b9147e2f19048a8e0e6f414820cd80761be6",
+        "sha256": "a0b343f7d2c23815e061eaeefc7b7f6e24238efa2e3dca6b91b851b9b41b9ed4"
+      },
+      {
+        "path": "src/components/Projects.jsx", "localPath": "src/components/Projects.tsx",
+        "gitBlobSha1": "01538a09c637e8731089849993747946a3956cad",
+        "sha256": "98bc73803f48248afd090907b39bb88f6d22d4d305fe733c646fbb8c22d0e4a6"
+      },
+      {
+        "path": "src/components/Contact.jsx", "localPath": "src/components/Contact.tsx",
+        "gitBlobSha1": "f7d0a99b1c4e105e6c3ebcda48ba2216415eec0f",
+        "sha256": "dd79a60e664ec375b6698b462390285f5eda7b70a73c433bc9cbcc187424210c"
+      },
+      {
+        "path": "src/components/Footer.jsx", "localPath": "src/components/Footer.tsx",
+        "gitBlobSha1": "b8722419b0aa90a0f0e90dcd5b4671c6cc8cc3d9",
+        "sha256": "6f2f26b3628e9e0c085d92e638e553bb13711378851d4e19dd021c97929354aa"
+      },
+      {
+        "path": "src/index.css", "localPath": "src/index.css",
+        "gitBlobSha1": "326221a44f565097cf8426f51d3c1f6a1ba3a0a2",
+        "sha256": "663d4b0b003c2789190fe0c5b83bb9f1a8089b0dd84367094b1a6b9094ec78b6"
+      },
+      {
+        "path": "src/assets/headshot-placeholder.svg", "localPath": "src/assets/headshot-placeholder.svg",
+        "gitBlobSha1": "2ab40fb47e008a985198e2853f1a18e040634c4e",
+        "sha256": "777a07e296a9fd72ad89d36d2e8dbafb0a28afcc6b823b94047f7b1cf78287ee"
+      },
+      {
+        "path": "public/topo-pattern.svg", "localPath": "src/assets/topo-pattern.svg",
+        "gitBlobSha1": "ebfde18f01c2e823eaefe049d45b4b35da07df54",
+        "sha256": "20a45f33bfbb30183b9ecba643c8cfdb7c826d6aabc463fe666cb2b2a43ed813"
+      },
+      {
+        "path": "tailwind.config.js", "localPath": "tailwind.config.cjs",
+        "gitBlobSha1": "5e9a100b169cd3f1cc4ce5a447cf1340a3250269",
+        "sha256": "481c898ef6242df58f5bf45ebb86973aa43c881d5870a876859f3ccd0e8c5519"
+      }
+    ]
+  },
+  "entry": "/src/main.tsx",
+  "dependencies": { "react": "18.3.1", "react-dom": "18.3.1" }
+}

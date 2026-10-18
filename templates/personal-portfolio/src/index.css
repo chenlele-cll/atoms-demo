@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { scroll-behavior: smooth; scroll-padding-top: 6rem; }
+  body { @apply bg-dark-bg text-light-text font-sans antialiased; margin: 0; }
+  h1, h2, h3, h4, h5, h6 { @apply font-display text-white uppercase; }
+  * { min-width: 0; }
+  p, a, h1, h2, h3 { overflow-wrap: anywhere; }
+  button, a { touch-action: manipulation; }
+  button { cursor: pointer; }
+  a, button { min-height: 44px; }
+  a { display: inline-flex; align-items: center; }
+  :focus-visible { outline: 2px solid #ccff00; outline-offset: 4px; }
+  dialog { color: #e5e5e5; }
+}
+
+@layer components {
+  .section-title { @apply font-display text-[clamp(2.5rem,8vw,5rem)] md:text-8xl font-bold mb-12 md:mb-16; }
+  .portfolio-button { @apply inline-flex items-center justify-center px-4 py-2 min-h-[44px] border border-gray-700 text-gray-300 font-mono text-xs uppercase tracking-widest hover:border-fluo hover:text-fluo transition-colors; }
+  .filter-button[aria-pressed="true"] { @apply bg-fluo text-black border-fluo; }
+}
+
+#root { width: 100%; margin: 0; }
+.text-outline { color: transparent; -webkit-text-stroke: 1px white; }
+.portfolio-nav { background: rgba(10, 10, 10, .93); border-bottom: 1px solid #222; backdrop-filter: blur(12px); }
+.hire-link { transform: skewX(-10deg); }
+.hire-link:hover { background: white; }
+.menu-toggle { border: 1px solid #444; padding: 8px 12px; font: 12px monospace; }
+.project-dialog { padding: 0; border: 1px solid #ccff00; background: #121212; width: min(640px, calc(100% - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; }
+.project-dialog::backdrop { background: rgba(0, 0, 0, .85); }
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 100; padding: 12px; background: #ccff00; color: black; }
+.skip-link:focus { top: 12px; }
+@media (max-width: 767px) {
+  .mobile-links { position: absolute; top: 100%; left: 0; width: 100%; max-height: calc(100dvh - 76px); overflow-y: auto; padding: 24px; flex-direction: column; background: #0a0a0a; border-bottom: 1px solid #ccff00; gap: 8px; }
+  .mobile-links a { width: 100%; justify-content: center; font-size: 20px; }
+  .mobile-links .hire-link { margin-top: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
