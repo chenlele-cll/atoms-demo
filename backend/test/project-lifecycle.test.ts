@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
 import Database from 'better-sqlite3';
-import { migrate } from '../src/storage/migrations.js';
+import { migrate, migrations } from '../src/storage/migrations.js';
 
 const backend = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let compiled = ''; let temporary = '';
@@ -96,7 +96,7 @@ test('normal production shutdown retains its database and a second process can r
       }
       assert.ok(ready, instance.output()); instance.child.kill('SIGTERM');
       assert.equal((await instance.finished).code, 0);
-      const sql = new Database(database); assert.equal(sql.pragma('user_version', { simple: true }), 3); sql.close();
+      const sql = new Database(database); assert.equal(sql.pragma('user_version', { simple: true }), migrations.at(-1)?.version); sql.close();
     } finally { if (instance.child.exitCode === null) instance.child.kill('SIGKILL'); await instance.finished; }
   }
 });

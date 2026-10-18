@@ -7,6 +7,7 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import Database from 'better-sqlite3';
+import { migrations } from '../src/storage/migrations.js';
 import { z } from 'zod';
 import { fixtureEnv, sentinel, startFixture } from './helpers/model-fixture.js';
 import { successfulGeneration } from './helpers/generation.js';
@@ -93,7 +94,7 @@ test('fixture CLI creates only an isolated database, saves/reopens, and never la
     assert.ok(!`${result.stdout}${result.stderr}`.includes(sentinel));
     assert.ok(!result.stdout.includes('export default function')); assert.ok(!result.stdout.includes('服务类型可选'));
     const sql = new Database(join(directory, report.id, 'project.sqlite'));
-    assert.equal(sql.pragma('user_version', { simple: true }), 3); sql.close();
+    assert.equal(sql.pragma('user_version', { simple: true }), migrations.at(-1)?.version); sql.close();
   } finally { await fixture.close(); }
 });
 
