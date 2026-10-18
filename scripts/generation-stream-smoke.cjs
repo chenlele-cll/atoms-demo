@@ -115,7 +115,7 @@ async function mode(name, port) {
   await ready(`http://127.0.0.1:${port}`, frontend); const context = await browser.newContext(); const page = await context.newPage();
   const pageErrors = []; page.on('pageerror', error => pageErrors.push(error.name));
   try {
-    await page.goto(`http://127.0.0.1:${port}`); await api(page, 'POST', '/api/session', {});
+    await page.goto(`http://127.0.0.1:${port}/diagnostics/connection`); await api(page, 'POST', '/api/session', {});
     const templates = await api(page, 'GET', '/api/templates'); const template = templates.body.items[0];
     const created = await api(page, 'POST', '/api/projects', { title: `${name} stream fixture`, templateId: template.id, templateVersion: template.version, templateDigest: template.digest });
     assert.equal(created.status, 201); const project = created.body; let success;

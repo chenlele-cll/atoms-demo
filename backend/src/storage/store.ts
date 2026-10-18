@@ -264,6 +264,17 @@ export class ProjectStore {
       return page;
     });
   }
+  latestMessages(ownerId: string, projectId: string, limit: number, beforeSequence?: number) {
+    return storageOperation(() => this.db.transaction(() => {
+      this.owned(ownerId, projectId);
+      const latestSequence = parse(z.object({ sequence: z.number().int().nonnegative() }), this.db.prepare('SELECT coalesce(max(sequence),0) AS sequence FROM messages WHERE project_id=?').get(projectId)).sequence;
+      const rows: unknown[] = beforeSequence === undefined
+        ? this.db.prepare(`SELECT ${messageColumns} FROM messages WHERE project_id=? ORDER BY sequence DESC LIMIT ?`).all(projectId, limit + 1)
+        : this.db.prepare(`SELECT ${messageColumns} FROM messages WHERE project_id=? AND sequence<? ORDER BY sequence DESC LIMIT ?`).all(projectId, beforeSequence, limit + 1);
+      const items = rows.slice(0, limit).map(row => parse(messageSchema, row)).reverse();
+      return { items, nextBeforeSequence: rows.length > limit ? items[0]?.sequence ?? null : null, latestSequence };
+    })());
+  }
   private append(projectId: string, inputs: MessageInput[], now: string) {
     const messages = z.array(messageInputSchema).max(50).parse(inputs);
     let sequence = parse(z.object({ sequence: z.number().int() }), this.db.prepare('SELECT coalesce(max(sequence),0) AS sequence FROM messages WHERE project_id=?').get(projectId)).sequence;

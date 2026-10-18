@@ -96,7 +96,7 @@ Node 读取 .nvmrc，pnpm 读取 package.json，依赖使用唯一 lockfile 执�
 
 ## Template baseline
 
-`GEN-001` 的企业官网基线入口为 `/templates/company-landing`，保留首页连接检查，不需要后端或模型配置。它是固定开源模板预览，不是模型成果；来源、许可和改动见 [模板说明](../../templates/company-landing/ADAPTATIONS.md)。
+`GEN-001` 的企业官网基线入口为 `/templates/company-landing`，连接检查迁至 `/diagnostics/connection`，不需要后端或模型配置。它是固定开源模板预览，不是模型成果；来源、许可和改动见 [模板说明](../../templates/company-landing/ADAPTATIONS.md)。
 
 ```sh
 pnpm test:template
@@ -154,7 +154,7 @@ pnpm smoke:projects
 
 端口场景串行执行；smoke 已含 build，另外两项浏览器专项使用该构建，不重复构建。连接 smoke 的后端源码/生产进程改用隔离 cwd 和临时 DATABASE_PATH，正常关闭后才删除临时数据；不接触开发者数据库。项目专项复用 playwright-core 与系统 Chrome，不增加测试框架或产品测试页：
 
-- 在独立前端副本的已有首页，用浏览器 fetch('/api/...') 分别走 dev/preview 代理，检查公开目录不创建 cookie、HttpOnly/Strict/Path cookie、模板创建、空对话及刷新恢复。
+- 在独立前端副本的诊断页，用浏览器 fetch('/api/...') 分别走 dev/preview 代理，检查公开目录不创建 cookie、HttpOnly/Strict/Path cookie、模板创建、空对话及刷新恢复。
 - 独立上下文 A/B 的列表、详情及对话隔离；其他归属与不存在项目为相同 404 错误结构。
 - 后端部署布局含自己的 dist、package、共用契约包及当前平台依赖，不含前端或原模板源；停止后通过内部入口写入明确的测试消息/run/候选，保留原 cookie 与数据库后重启，比较完整快照摘要、项目 ID、消息序号和当前版本不变。临时移走目录 JSON 时，已保存项目仍能由 store 读回；正式 server 仍要求加载可用目录后监听。
 - 测试进程、浏览器和临时数据库均归本次所有，信号中止不启动后续场景；端口冲突不停止占用者。报告在忽略的 test-results/project-persistence/<runId>/，运行目录在清理后删除。
@@ -243,6 +243,14 @@ pnpm smoke:generation-stream
 桌面与 320/375px 检查宿主/frame 真实宽度、长路径、按钮高度、键盘焦点及临时输入重置；检查实际 iframe sandbox/allow/referrerPolicy、其他窗口消息不能采用、父页面读取被跨源拒绝。外部 bundler 只收到代码/依赖，不传平台凭据或对话。报告及必要截图在忽略的 test-results/candidate-review/<id>/，source=fixture；不上传数据库、cookie 或完整代码，只清理所属服务与数据。本地明确测试代码的编译/采用不等于 GEN-010 真实模型或业务验收，也不构成 GEN-009 最终反代/部署通过。
 
 默认 `pnpm verify` 与既有 CI 尚未自动串联候选专项，需显式执行上述命令。保留的混合工作区结果见 [GEN-006 tasks](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md#implementation-evidence)，独立任务分支的实际验证另记在 [隔离验证记录](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md#isolated-review-evidence)，不以历史混合工作区通过代替。
+
+## Project workspace
+
+GEN-007 的 `workspace-messages.test.ts` 验证真实 SQLite 最新/更早页及原增量兼容。前端 `workspace-*.test.ts` 覆盖 JSON/SSE 边界、跨块 UTF-8、帧顺序/关联/终态/上限、单次会话初始化、StrictMode 订阅、取消竞争、丢末帧查询、原 ID 恢复、有界轮询、存储过期/不可用、会话和项目隔离。
+
+先 `pnpm check`、`pnpm build`，再 `pnpm smoke:workspace`；其他专项按上节串行运行。工作台专项从可见表单走真实 SDK 的受控 loopback 上游、工具、SQLite、真实 Sandpack 报价、明确采用及重开，dev/preview 分别执行。覆盖错误/取消/断流/未知响应、只读源码与 API 一致、消息顺序/阅读锚点、跨项目草稿、会话过期、原生链接及 1280/1024/768/375/320px 布局。无生产假模型开关，不以注入 compiled 替代编译。
+
+报告在忽略的 `test-results/workspace/<runId>/report.json`，source=fixture、realModelCalls=0。复用旧报告时必须比较 sourceHashes 并明确变化文件；旧结果不能冒充本次执行。实际结果及剩余限制见 [GEN-007 tasks](../../openspec/changes/gen-007-project-workspace/tasks.md)。现有 verify/CI 保留基线范围，新增专项显式运行；最终真实模型与部署仍独立验收。
 
 ## Lifecycle scenarios
 

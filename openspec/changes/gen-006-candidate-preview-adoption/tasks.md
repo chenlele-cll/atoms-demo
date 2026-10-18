@@ -2,6 +2,8 @@
 
 范围见 [proposal.md](./proposal.md)，实现方案见 [design.md](./design.md)，行为验收见 [candidate-review](./specs/candidate-review/spec.md)。以下任务已按隔离树的实际验证结果完成，具体命令、结果与报告见 [Isolated review evidence](#isolated-review-evidence)。下方混合工作区的原始实施证据单独保留，不替代隔离验证。依赖 GEN-001、003～005 的实际能力；此项用明确测试候选完成真实编译/交互，真实模型与最终部署由 GEN-010/009 验收。
 
+上述完成状态对应下方历史隔离树；合入 `origin/main` 的 GEN-007 后，当前集成树的实际验证另记在 [Integration evidence](#integration-evidence)。
+
 ## 1. 共用契约与构建前提
 
 - [x] 1.1 GEN-006 新增最小 `@atoms/contracts` workspace，提取实际共用的项目/版本/快照/采用/安全错误 schema，前后端显式依赖同一权威定义；保留私有模型与存储实现。验证：包输出 ESM/声明、两应用类型检查通过，同一输入的边界校验一致，浏览器构建无 Node/后端实现依赖；更新 Monorepo 与 Development 的包和契约归属。
@@ -105,3 +107,21 @@ README、Monorepo、Development、Lifecycle、Verification 和两应用指南已
 以上 Implementation evidence 的命令、195/10 等旧测试计数、报告路径、67 文件哈希及 `/tmp/atoms-gen006-*.log` 日志均属于 `/Users/cll/Documents/atoms` 的历史混合工作区。它们与本节 168/11 计数及新报告分开保留，不能用于证明隔离源码相同；原始报告没有复制或改写成隔离结果。上方 REV-001 陈述仅是历史上下文，不表示本次隔离实现包含历史功能。
 
 本次验收 source=fixture，仅证明明确测试候选的实际编译、交互、隔离、采用与持久恢复。真实模型业务端到端与最终部署未运行；历史 GEN-004 真实模型记录仍独立，不据此宣布 GEN-010/009 通过。报告、截图、日志、数据库和凭据保持本地，不纳入任务提交；本次没有归档或发布。
+
+## Integration evidence
+
+2026-10-18，本节记录隔离 worktree 合并 `origin/main`（GEN-007 PR1，`d3cfb7a`）后的集成检查，更新原待执行状态。当前树保留 main 的 GEN-007 应用、工作台、诊断路由与共享会话/消息/分页/SSE 契约，并保留 GEN-006 的候选 API、契约准备及两处候选刷新/采用保护；最后补充 `frontend/src/workspace/VersionPane.tsx` 手动重试按钮的 refreshing 禁用条件。原源码工作区的所有修改保持。下方结果与上方历史混合工作区、独立 GEN-006 证据分开记录。
+
+| 集成检查 | 实际结果与适用范围 |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | 退出 0 |
+| `pnpm check` | 退出 0；契约准备 1 项、后端 169 项、前端 32 项通过，lint/typecheck 通过；在最后按钮条件前执行 |
+| `pnpm smoke` | 退出 0，包含构建；在最后按钮条件前执行 |
+| 前端 build、lint | 最后补充 VersionPane 手动重试 refreshing 条件后重新执行，均退出 0 |
+| `pnpm smoke:candidate` | 21 个场景通过；`test-results/candidate-review/abaea391-0e77-4536-bfa0-1545e1b75d79/report.json` |
+| `pnpm smoke:workspace` 首轮 | 26 个既有场景通过；`test-results/workspace/f3b33e10-9ade-4fc4-9095-0716a5edbcf8/report.json`；在最后按钮条件前执行 |
+| `pnpm smoke:workspace` 最终轮 | 最后按钮条件后，既有 26 个场景全部通过（dev 13、preview 13），报告 `status=passed`；`test-results/workspace/dbf4ac7d-5e20-47a2-9401-12831a009486/report.json`；实际日志 `/var/folders/qz/w0j_pldx16b5frjywnmbqlq00000gn/T/opencode/gen006-workspace-validated.log` |
+
+工作台最终脚本与 `origin/main` 相同。曾临时加入额外故障注入测试，但该测试自身的无界等待挂起，相关尝试取消后已移除；它不在最终代码中，也不计入通过数。另有两次尝试因其他部署进程占用 3001 端口而受阻，未停止外部进程；这些受阻/取消记录不作为产品失败或通过证据。
+
+模板、项目、事件流与 manager 专项未在本次 UI 集成中重跑：相关源码与 main 相同，先前证据单独保留，不新增通过声明。集成后执行 `pnpm openspec validate --all --strict --no-interactive`，23 项通过、0 失败；本地文档链接和差异检查通过。候选与工作台结果使用明确 fixture，不代表真实模型业务或最终部署验收；历史报告、测试计数和旧首页/共享包范围不能替代本节集成结果。

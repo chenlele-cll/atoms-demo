@@ -51,7 +51,7 @@ company-landing 策略只允许已有 App.tsx 与 components/data/lib/generated 
 
 ## Generation execution
 
-公开生成体/路径/状态/事件以 backend/src/contracts/generations.ts 的 Zod schema 为权威，生成体 pick GEN-004 输入规则。状态与每帧只含关联 ID、起止时间、持久状态、安全错误、取消请求标记、候选 ID、实际 changedFiles 和 unverified；usage=null，不推测历史计数。不返回需求/对话/代码/工具正文。输入 strict，状态显式构造并校验；Fastify stream 是预序列化对象，因此 SSE 在编码前独立运行时校验，不依赖 JSON serializer。
+公开生成体/路径/状态/事件以 @atoms/contracts 的 Zod schema 为权威，backend/src/contracts/generations.ts 重导出同一来源，生成内核也复用共享输入规则。状态与每帧只含关联 ID、起止时间、持久状态、安全错误、取消请求标记、候选 ID、实际 changedFiles 和 unverified；usage=null，不推测历史计数。不返回需求/对话/代码/工具正文。输入 strict，状态显式构造并校验；Fastify stream 是预序列化对象，因此 SSE 在编码前独立运行时校验，不依赖 JSON serializer。
 
 prepareGeneration 负责归属、重放、基线/布局/配置预检；acceptPreparedGeneration 在短事务内保存 running/user，generateProject 可执行已受理运行，原 CLI 仍组合相同步骤。GenerationManager 是每个应用的具体活动 Map，持有唯一 Controller、最初连接、执行 Promise、最终化和写入许可。同步准入/受理之间没有 await；失败不占槽，重复在容量/日配额前返回原状态。一次性最终化后释放槽位；取消收尾仍占用。无执行者的 running 返回 503 RUN_STATE_UNCONFIRMED 并阻止该项目新生成；存储不可用不能由内存状态冒充成功。
 
@@ -75,7 +75,7 @@ prepareGeneration 负责归属、重放、基线/布局/配置预检；acceptPre
 
 ## Project persistence
 
-@atoms/contracts 是前后端共用项目/版本/快照/run/采用/安全错误的 Zod 契约来源，类型由 schema 推导；backend/src/contracts/projects.ts 重导出公开契约，保留会话、目录、消息、分页与可信模板 ID 等后端限制，SSE 仍由后端维护。项目路由局部设置 Fastify validatorCompiler / serializerCompiler；请求 strict 拒绝额外字段，输出经显式 DTO 和 schema 投影，不返回 ownerSessionId、token 摘要、SQL 行或原始异常。健康契约保持独立。GEN-006 的实际浏览器消费者已提取所需公开契约，禁止复制规则或导入后端实现。
+@atoms/contracts 是前后端共用会话/目录/项目/消息/版本/快照/采用/run/SSE/安全错误的 Zod 契约来源，类型由 schema 推导；backend/src/contracts/projects.ts 保留可信模板限制并重导出公开契约。项目路由局部设置 Fastify validatorCompiler / serializerCompiler；请求 strict 拒绝额外字段，输出经显式 DTO 和 schema 投影，不返回 ownerSessionId、token 摘要、SQL 行或原始异常。健康契约保持独立，禁止浏览器导入后端实现。
 
 中立 templates/bundle.mjs 的纯文件规则随准备复制到后端部署资产；Zod 快照校验调用相同规则并重算 SHA-256，限制规范化虚拟路径、入口/样式/许可/运行配置、精确依赖版本、64 文件和总 UTF-8 2 MiB。新建项目核对当前可信目录；历史快照按自身身份验证，读取不依赖当前模板。保存候选须匹配基础版本的来源、入口和依赖，不改变 currentVersionId；结构合法不证明编译通过。
 
@@ -96,6 +96,18 @@ storage/store.ts 管理 sessions、projects、versions、messages、generation_r
 SnapshotPreview 供模板与候选页复用，仅接收已校验的快照和项目/版本/摘要/attempt 键，使用固定外部 bundler 与快照依赖，不补默认示例。useSandpackClient 作用域内的实际 done 且 compilatonError=false 才成为 compiled；load/connected 不成功。状态机拒绝旧键事件，编译/运行错误及 60 秒超时锁定该轮，文档重载使旧成功无效；主动重试才新实例。已 compiled 后 runtimeError 禁用采用。卸载清除 timer/监听，晚到的异步 client 被销毁；每次切换最多一个 iframe。
 
 iframe 固定跨源、sandbox="allow-scripts allow-same-origin"、空 allow、no-referrer；不传平台凭据/对话，不由 postMessage 触发采用。编译结果不是服务端信任根，采用接口不接收 verified/compiled 字段。页面把 loadingSnapshot/loadError/compiling/compiled/compileError/runtimeError/timeout 与 idle/submitting/confirmed/conflict/unknown/error 分开。用户点击且收到有效确认才声明采用；丢响应后查询当前事实，旧版本仍当前保持 unknown，其他选择为 conflict，不自动改 expected 重发。刷新与采用共用同步互斥保护，刷新期间禁用首次采用及手动重试，避免迟到的旧读取覆盖确认结果。手动同载荷重试依赖服务端幂等和 CAS；运行错误不回写旧版本。
+
+## Project workspace
+
+GEN-007 的 `/` 创建，`/projects/:projectId` 读取私有工作台，连接检查迁至 `/diagnostics/connection`，未知路由报错。首页会话初始化 single-flight；私有直达先 GET，不自动初始化会话。401 清除私有内存、草稿、消息与待确认信封并停止请求，回首页后由用户明确重新开始。
+
+原消息 `afterSequence` 协议保持 `{items,nextAfterSequence}`；新增 `direction=backward&limit=50&beforeSequence=N`，before 为可选正安全整数、排他 `<N`，与 after 互斥。同事务读取 latestSequence，返回 `{items,nextBeforeSequence,latestSequence}`，items 始终升序。客户端按持久 ID 去重并按序号合并，不伪造历史工具活动。
+
+POST SSE 使用 eventsource-parser 4.1.2，缓冲 8192 字符，业务帧最多 8 KiB/128 帧，总传输 320 KiB（含心跳）；首响应/空闲/总期限分别 10/25/150 秒。fatal UTF-8 解码并校验 accepted 首帧、项目/request/base/run 关联、连续 seq、唯一终态及内部关联。拒绝 id/retry/未知字段、截断、双终态；JSON running/terminal 分支独立校验。EOF/200 不等于完成，不自动重连 POST。
+
+控制器由应用拥有，StrictMode 订阅重放和聊天/预览/源码切换不取消任务，真实离页中止旧 activation。202 取消只表示请求，已提交成功优先。丢帧或未知状态只查原 requestId，每 2 秒、最多 75 次/150 秒；隐藏暂停、离页结束、429 尊重 Retry-After。只有明确手动重试复用原 payload，新尝试才分配新 ID。
+
+sessionStorage 仅保存项目/request/base/prompt/时间信封，最多 20 项/24 小时，先限原串再解析；不可用时仅内存并显示限制。草稿、阅读位置和已加载消息按项目保存在内存，不承诺刷新恢复草稿。新生成始终基于已采用版本；工作台复用 GEN-006 采用状态。源码来自所选完整快照，仅 select/pre/code 文本，只读、不注入 HTML、不执行源码。
 
 ## UI and handoff
 

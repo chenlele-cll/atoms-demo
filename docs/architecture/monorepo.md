@@ -24,7 +24,7 @@
 - `backend/src/app.ts` 构建应用并注册路由，不监听端口；`server.ts` 负责环境加载、监听和进程生命周期。
 - 路由负责 HTTP 边界。生成和存储职责随首次实现形成实际模块，不持续堆入路由，也不预建空的 service、repository 或通用依赖注入层。
 - backend/src/model 维护单供应商客户端、延迟配置、独立探针和安全错误，AI SDK/OpenAI 仅在 backend 声明，Zod 的公开契约使用见下节。探针文件和工具不依赖模板或项目模块，不新增浏览器可用的计费接口；真实调用与替身测试分别记录。
-- backend/src/contracts、storage、projects、templates 分别维护 HTTP 契约、SQLite 存储/迁移、配置/安全错误及后端目录。项目 routes 通过注入调用这些具体模块，不把 SQL 放入 HTTP handler；GEN-006 的浏览器消费者与后端通过 @atoms/contracts 共用必要公开契约，模型/存储实现保留后端。
+- backend/src/contracts、storage、projects、templates 分别维护公开 Zod 契约、SQLite 存储/迁移、配置/安全错误及后端目录。项目 routes 通过注入调用这些具体模块，不把 SQL 放入 HTTP handler；GEN-006 的浏览器消费者与后端通过 @atoms/contracts 共用必要公开契约；GEN-007 实际消费的会话、分页、消息和 SSE 契约也归共享包；模型/存储实现保留后端。
 - backend/src/generation 维护内部生成契约、冻结文件工具、显式有界编排和隔离验收，复用 model 单步传输与 storage 事务；GEN-005 在具体 manager/stream 和 generation 路由中接入公开执行及生命周期，不增加框架 Agent。生成工具只持有快照/策略，模型调用在事务之外，候选不会原地覆盖当前版本。
 
 ## Workspace and toolchain
@@ -39,11 +39,11 @@
 - 同一准备脚本支持 frontend/backend-src/backend-dist 三个独立目标。后端准备目录含 bundle JSON 与同源中立校验模块/类型，不维护第二套文件规则；src 资源被忽略，构建会准备 src 并将对应副本放入 dist，编译产物独立于前端目录。typecheck/test 也先准备 src，使全新安装可独立运行检查。
 - 后端固定 better-sqlite3 13.0.3、@types/better-sqlite3 9.6.0、@fastify/cookie 11.1.3、@fastify/rate-limit 11.2.1，复用现有 Zod 4.6.7。SQLite 13 自带 N-API 平台预构建且没有安装脚本，本次无需新增 pnpm 脚本许可；保留已有 esbuild 许可和 es5-ext 拒绝。目标平台 frozen install 后必须执行真实绑定读写，不能以声明或复制别处 node_modules 代替。
 
-后端显式使用运行依赖 proper-lockfile 4.1.2，类型 @types/proper-lockfile 4.1.4 仅开发使用；根已有同版本工具依赖继续独立声明。后端独立部署安装自身运行依赖，不依赖根 node_modules 偶然可见。所有权模块只处理规范数据文件与 release，Fastify 的 preClose/onClose 协调生成→存储→锁；SSE schema 仍在后端维护，不属于 GEN-006 共享包。参数与本地文件系统前提见 [Lifecycle](../engineering/lifecycle.md#generation-service-lifecycle)。
+后端显式使用运行依赖 proper-lockfile 4.1.2，类型 @types/proper-lockfile 4.1.4 仅开发使用；根已有同版本工具依赖继续独立声明。后端独立部署安装自身运行依赖，不依赖根 node_modules 偶然可见。所有权模块只处理规范数据文件与 release，Fastify 的 preClose/onClose 协调生成→存储→锁；GEN-007 的 SSE schema 已随实际浏览器消费者提入 @atoms/contracts，管理器和存储实现仍只在后端。参数与本地文件系统前提见 [Lifecycle](../engineering/lifecycle.md#generation-service-lifecycle)。
 
 ## Shared contract build
 
-`packages/contracts`（@atoms/contracts）输出 ESM JavaScript 与声明到 dist；前后端通过 workspace:* 显式依赖。包仅含实际共用项目/版本/快照/run/采用/安全错误 schema 与推导类型，会话、目录、消息、分页和 SSE 契约仍在后端。Zod 固定 4.6.7；浏览器与后端同步验证 SHA-256，使用纯 JavaScript @noble/hashes 2.0.1，不引入 Node crypto 到浏览器，也不手写散列算法。纯文件格式/规范 JSON 仍来自 templates/bundle.mjs；包构建复制同源纯模块与类型到自身资产，不维护第二套规则。
+`packages/contracts`（@atoms/contracts）输出 ESM JavaScript 与声明到 dist；前后端通过 workspace:* 显式依赖。包仅含实际共用会话/目录/项目/消息/run/SSE/版本/快照/采用/错误 schema 与推导类型，Zod 固定 4.6.7。浏览器与后端都须同步验证 SHA-256，因此使用纯 JavaScript @noble/hashes 2.0.1，不引入 Node crypto 到浏览器，也不手写散列算法。纯文件格式/规范 JSON 仍来自 templates/bundle.mjs；包构建复制同源纯模块与类型到自身资产，不维护第二套规则。
 
 scripts/prepare-contracts.mjs 是统一准备入口，复用 root proper-lockfile 串行化同仓库的操作；按契约源码、配置、lockfile 和纯模板规则输入的 SHA-256 与必要输出摘要检查，缺失/过期才构建。编译到私有暂存目录并在成功后替换 dist，失败阻止后续命令，普通编译失败保留原产物。60 秒总期限涵盖取锁与构建，信号/超时终止所属编译进程组；锁由所属 release 释放，所有权丢失则不释放未知锁。包 build/typecheck、根 check、两应用独立 dev/build/typecheck/test 和源码 generation:smoke 复用入口，不增加常驻 watcher。
 
@@ -58,3 +58,5 @@ manager 隔离副本复制 packages/contracts 源、build.mjs 和准备脚本，
 ## Enforcement status
 
 现有工具执行严格类型检查、ESLint 和行为测试。[CI 配置](../engineering/verification.md#github-actions) 已接入既有检查，远端执行结果以实际 Actions 记录为准。跨应用源码导入和模块依赖方向目前仍需审查，本文件不代表这些约束已经自动执行。新增自动约束时应同时更新配置和验证记录。
+
+GEN-007 的前端固定依赖 eventsource-parser 4.1.2，负责有界 POST 响应的 SSE 分帧；本地控制器继续负责 HTTP、UTF-8、总字节/帧数、关联/顺序、超时和终态，不手写第二个 SSE 解析器。它是浏览器运行依赖，不加入后端或共享契约包。

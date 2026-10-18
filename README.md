@@ -4,7 +4,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 项目目标是让用户通过自然语言生成和修改网页应用，交互预览结果，并保存项目与代码版本。
 
-当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成、公开生成事件流/查询/取消和候选预览/采用已实现；首页保留连接检查，完整工作台尚未实现，Top 1 尚未完成。
+当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成、公开生成事件流/查询/取消、候选预览/采用及创建/对话/预览/只读源码工作台已实现；本地工作台使用受控 SDK 上游验证，真实模型最终业务与部署验收仍需独立完成。
 
 ## 环境
 
@@ -36,10 +36,11 @@ pnpm dev:frontend
 ```
 
 - 前端：<http://127.0.0.1:5173>。
+- 连接诊断：<http://127.0.0.1:5173/diagnostics/connection>，保留原连接检查页面。
 - 企业官网模板基线：<http://127.0.0.1:5173/templates/company-landing>，也可从首页进入；不需要后端或模型密钥。
 - 后端健康接口：<http://127.0.0.1:3001/api/health>。
 - 前端请求相对路径 `/api/health`，Vite 将 `/api` 原样代理到后端。
-- 页面上的“检查后端连接”按钮验证 HTTP 状态与响应结构；后端不可用时显示失败反馈。
+- 诊断页的“检查后端连接”按钮验证 HTTP 状态与响应结构；后端不可用时显示失败反馈。
 - 两个进程相互独立，后端关闭时前端页面仍可加载。Vite 固定端口，冲突时直接报错。
 
 完成 bootstrap 后，也可通过 [manager.sh](./manager.sh) 一键管理两个开发进程：
@@ -63,6 +64,16 @@ pnpm dev:frontend
 ```
 
 当前三个命令均明确返回“未配置外部基础设施”（JSON 为 `not_configured`），重复执行成功，不安装工具或启动服务。真实服务在需要时通过 `INF-002` 接入 Docker Compose；检测到尚未接入的 Compose 配置时明确失败，见 [基础设施约定](./docs/engineering/lifecycle.md#infrastructure-contract)。
+
+## 创建与项目工作台
+
+首页填写名称与需求、选择模板，再点击“创建并生成”；示例只填入文本，Enter 换行，Ctrl/Cmd+Enter 提交，中文组合输入期间不提交。创建或生成没有自动重试；创建响应未知时保留输入并刷新真实列表。
+
+`/projects/:projectId` 展示持久对话、本次真实活动、原请求查询/取消、当前与候选预览及只读源码。候选保存后先检查预览，再明确“使用这个版本”；新需求始终使用当前已采用版本。内部聊天/预览/代码切换保留连接，离开项目关闭原连接并取消未完成运行。刷新读取已保存项目，待确认请求只查询原 ID。消息默认最新 50 条，可加载更早；内存草稿不承诺刷新恢复，会话失效不能认领旧项目。模型未配置仍保留已创建项目和需求。
+
+候选直达、版本 API、明确采用与隔离预览的详细边界见下方[候选预览与采用](#候选预览与采用)。工作台复用相同的预览与采用状态。
+
+构建后可分别执行 `pnpm smoke:candidate` 和 `pnpm smoke:workspace`。需要 Chrome、空闲 3001/5173/4173 和外部 Sandpack 网络；端口专项串行执行，使用独立数据与受控 fixture，不调用计费模型。覆盖与证据边界见 [Verification](./docs/engineering/verification.md#candidate-review)。
 
 ## 企业官网模板基线
 
@@ -101,7 +112,7 @@ pnpm smoke:template
 
 ## 项目数据 API
 
-按以下顺序，通过同源 `/api` 请求使用；目前没有项目工作台 UI。所有 POST 必须为 JSON，并带 APP_ORIGINS 中的 Origin。脚本调用需显式提供 Origin，并保存/回传 cookie；浏览器 fetch 使用同源默认凭据。
+按以下顺序，通过同源 `/api` 请求使用；项目工作台也使用这些接口。所有 POST 必须为 JSON，并带 APP_ORIGINS 中的 Origin。脚本调用需显式提供 Origin，并保存/回传 cookie；浏览器 fetch 使用同源默认凭据。
 
 | 请求 | 请求内容与响应 |
 | --- | --- |
@@ -110,7 +121,8 @@ pnpm smoke:template
 | POST /api/projects | `{templateId,templateVersion,templateDigest,title}`；201 `{project,currentVersion,latestRun:null}` |
 | GET /api/projects?limit=20&cursor=… | 当前会话的 `{items,nextCursor}`；最多 50 条元数据，不含代码 |
 | GET /api/projects/:projectId | `{project,currentVersion,latestRun}`，当前版本含完整 snapshot |
-| GET /api/projects/:projectId/messages?afterSequence=0&limit=20 | `{items,nextAfterSequence}`，按序号升序，最多 50 条 |
+| GET /api/projects/:projectId/messages?afterSequence=0&limit=20 | `{items,nextAfterSequence}`，原增量协议，按序号升序，最多 50 条 |
+| GET /api/projects/:projectId/messages?direction=backward&limit=50 | `{items,nextBeforeSequence,latestSequence}`；可用互斥的 `beforeSequence=N` 取更早页，items 始终升序 |
 
 新项目原子保存服务端可信模板 v0，消息为空、没有生成记录；模板冲突返回 409，客户端不能注入文件或所有者。匿名 cookie 为 HttpOnly、SameSite=Strict、Path=/api，有效期 30 天，复用不延长；HTTPS 配置启用 Secure。数据库只保存 token 摘要。清理 cookie 或到期后会失去旧项目入口，没有找回或认领接口；数据不会自动删除。有效会话访问他人的项目与不存在项目均为 404，无会话为 401。
 
@@ -131,7 +143,9 @@ pnpm smoke:template
 
 外部 Sandpack/bundler 会接收用于预览的代码，依赖联网与依赖包下载。iframe 不接收平台会话、对话或后端配置；sandbox 仅允许 scripts/same-origin，allow 为空且 no-referrer。切换/重试重置预览内临时输入；刷新及后端重启重新读取持久选择并重新编译，浏览器运行错误不会静默回退已采用版本。
 
-前后端通过 `packages/contracts` 共用项目/版本/快照/run/采用/安全错误契约；会话、消息、分页与 SSE 契约仍在后端。独立 dev/build/typecheck/test 自动准备其 ESM/声明，根 check 也先准备；契约源改变后重新准备或重启应用，不承诺跨包热更新。生产后端部署须含中立包的 package.json、dist 和运行依赖，见 [Monorepo](./docs/architecture/monorepo.md#shared-contract-build)。
+刷新与采用共用同步互斥保护；刷新期间禁用首次采用和手动重试，避免迟到的旧读取覆盖采用确认。
+
+前后端通过 `packages/contracts` 共用会话/目录/项目/消息/分页/版本/快照/run/SSE/采用/安全错误契约。独立 dev/build/typecheck/test 自动准备其 ESM/声明，根 check 也先准备；契约源改变后重新准备或重启应用，不承诺跨包热更新。生产后端部署须含中立包的 package.json、dist 和运行依赖，见 [Monorepo](./docs/architecture/monorepo.md#shared-contract-build)。
 
 先 `pnpm build`，再 `pnpm smoke:candidate`；需要 Chrome、空闲 3001/5173/4173 以及外部 Sandpack 网络。报告位于忽略的 `test-results/candidate-review/<id>/report.json`，以明确 fixture 候选验证真实编译、报价控件、隔离、错误、采用竞争和重启，不消耗真实模型额度。覆盖与限制见 [Verification](./docs/engineering/verification.md#candidate-review)，历史混合工作区证据与隔离验证记录见 [GEN-006 tasks](./openspec/changes/gen-006-candidate-preview-adoption/tasks.md#isolated-review-evidence)。
 
@@ -255,7 +269,7 @@ frontend/              React + Vite 前端应用
   AGENTS.md            前端任务路由与局部边界
   src/
     api/health.ts       HTTP 客户端与响应校验
-    App.tsx            最小启动与连通检查页面
+    App.tsx            创建、项目工作台与直达页面路由
     App.module.css     页面样式
     main.tsx           浏览器入口
     styles.css         全局基础样式
@@ -263,6 +277,8 @@ frontend/              React + Vite 前端应用
     template-baseline/ 企业官网模板基线页及隔离预览
     preview/           共用快照 iframe 与每次尝试的状态机
     candidate-review/  候选读取、编译状态与明确采用
+    workspace/         创建、持久对话、生成控制、预览与只读源码
+    diagnostics/       独立连接诊断页面
   vite.config.ts       开发与预览代理
 backend/               Fastify 后端应用
   AGENTS.md            后端任务路由与局部边界
@@ -277,7 +293,7 @@ backend/               Fastify 后端应用
     storage/           SQLite 迁移、事务和内部写入
     templates/         后端可信模板目录
   test/                接口与配置行为测试
-packages/contracts/    项目/版本/快照/run/采用/错误的共用 schema 与摘要校验
+packages/contracts/    会话/目录/项目/消息/版本/快照/run/SSE/采用/错误共用契约与摘要校验
 docs/
   README.md            文档索引与目录约定
   architecture/
@@ -341,11 +357,11 @@ eslint.config.mjs      前后端共用 lint 配置
 | [playwright](./.agents/skills/playwright/SKILL.md) | 真实浏览器快照、交互、截图和调试 | 复用 `openai/skills` 原版；CLI `0.1.22` 固定为项目开发依赖 |
 | [OpenSpec workflows](./docs/engineering/openspec.md#skill-entry-points) | 规划、实施、修订、同步、验证与归档 | 固定 CLI `1.14.3`，官方 Codex/OpenCode 适配生成同一组七个工作流入口 |
 
-进行平台 UI 开发前，先阅读 [DESIGN.md](./DESIGN.md)，再加载对应 skill；工具无法自动发现时，直接读取仓库内的 `SKILL.md`。该设计 skill 已用于建立设计规范，产品工作台尚未实现。
+进行平台 UI 开发前，先阅读 [DESIGN.md](./DESIGN.md)，再加载对应 skill；工具无法自动发现时，直接读取仓库内的 `SKILL.md`。创建与项目工作台沿用该设计规范。
 
 ## 项目资料
 
-- [核心功能路径与生成质量方案](./docs/product/core-paths.md)：Top 1 模板起步与真实生成、Top 2 对话修改与版本恢复、Top 3 固定版本分享的范围与验收目标；产品能力尚待实现。
+- [核心功能路径与生成质量方案](./docs/product/core-paths.md)：Top 1 模板起步与真实生成、Top 2 对话修改与版本恢复、Top 3 固定版本分享的范围与验收目标；实际完成与验证范围以对应任务证据为准。
 - [Agent 工作入口](./AGENTS.md)：按任务选择文档、Skills 与检查；前后端细则分别见 [前端指南](./frontend/AGENTS.md) 和 [后端指南](./backend/AGENTS.md)。
 - [Git 工作流](./docs/engineering/git-workflow.md)：任务编号、分支命名、提交格式、验证及合并约定。
 - [OpenSpec 指南](./docs/engineering/openspec.md)：项目 CLI、上下文、技能与变更工件。
@@ -353,6 +369,6 @@ eslint.config.mjs      前后端共用 lint 配置
 - [生命周期指南](./docs/engineering/lifecycle.md)：manager 命令、Process Compose 开发编排与基础设施接入边界。
 - [文档索引](./docs/README.md)：产品参考、技术决策及 Monorepo、开发、验证和生命周期规范的职责与阅读时机。
 - [技术栈调研与初始化建议](./docs/architecture/stack-decisions.md)：选型依据及适用边界。
-- [设计入口](./DESIGN.md)：平台采用 Lovable 风格的暖色极简 AI 创作工作台；详细规范位于项目级 [atoms-frontend-design skill](./.agents/skills/atoms-frontend-design/SKILL.md)。规范已确定，产品工作台尚未实现。
+- [设计入口](./DESIGN.md)：平台采用 Lovable 风格的暖色极简 AI 创作工作台；详细规范位于项目级 [atoms-frontend-design skill](./.agents/skills/atoms-frontend-design/SKILL.md)，创建与项目工作台已接入。
 
 原始题目整理稿位于 `docs/product/assignment.md`，仅供本地参考，已由 `.gitignore` 排除，不随仓库发布。密钥、`.env` 和本地工具输出不进入版本控制。

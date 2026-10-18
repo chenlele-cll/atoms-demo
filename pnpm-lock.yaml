@@ -263,6 +263,9 @@ importers:
       '@codesandbox/sandpack-react':
         specifier: 2.20.0
         version: 2.20.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      eventsource-parser:
+        specifier: 4.1.2
+        version: 4.1.2
       react:
         specifier: 19.3.1
         version: 19.3.1
@@ -1424,6 +1427,10 @@ packages:
   eventsource-parser@3.1.1:
     resolution: {integrity: sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ==}
     engines: {node: '>=18.0.0'}
+
+  eventsource-parser@4.1.2:
+    resolution: {integrity: sha512-N9b0EvATDJfZj+Szg3m8WwqseQhei/mtTd6V0rCciGbI/yG24o3yBk0YVyfOZZsLVMZHWs++Zk3Aqd2y2EztnQ==}
+    engines: {node: '>=22.12'}
 
   ext@1.7.0:
     resolution: {integrity: sha512-6hxeJYaL110a9b5TEJSj0gojyHQAmA2ch5Os+ySCiA1QGdS697XWY1pzsrSjqA9LDEEgdB/KypIlR59RcLuHYw==}
@@ -3450,6 +3457,8 @@ snapshots:
       es5-ext: 0.10.64
 
   eventsource-parser@3.1.1: {}
+
+  eventsource-parser@4.1.2: {}
 
   ext@1.7.0:
     dependencies:

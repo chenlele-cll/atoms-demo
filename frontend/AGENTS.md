@@ -17,10 +17,12 @@ An HTTP-client-only change does not require loading the UI design contract unles
 
 ## Source map and local boundaries
 
-- `src/main.tsx` initializes the browser application. `src/App.tsx` keeps the connection-check home, routes `/templates/company-landing` to the isolated template baseline and `/projects/:projectId/candidates/:versionId` to candidate review.
+- `src/main.tsx` initializes the browser application. `src/App.tsx` routes `/` to creation and `/projects/:projectId` to the workspace; template/candidate routes remain direct entries. `src/diagnostics/` preserves connection-check UI at `/diagnostics/connection`.
 - `src/templates/` loads the public template bundle through the neutral `templates/bundle.mjs` contract; `src/template-baseline/` owns host UI and actual Sandpack compile/error/retry states. Do not import template React components into the host tree.
 - `src/api/` contains HTTP clients and response parsing. Reuse the boundary pattern in `src/api/health.ts` for timeouts, HTTP failures, and unknown response data.
-- `src/api/versions.ts` validates project/version/adoption responses with `@atoms/contracts`. `src/preview/` owns the shared snapshot iframe and per-attempt state machine. `src/candidate-review/` keeps adoption confirmation separate from local compilation. `test/` uses Node/tsx for pure state and client boundaries; see [Candidate review](../docs/engineering/development.md#candidate-review).
+- `src/preview/` owns the shared snapshot iframe and per-attempt state machine. `src/candidate-review/` reads shared contracts over HTTP and keeps adoption confirmation separate from local compilation. `test/` uses Node/tsx for pure state and client boundaries.
+- `src/api/versions.ts` validates project/version/adoption responses with `@atoms/contracts`; candidate refresh and adoption share synchronous serialization. See [Candidate review](../docs/engineering/development.md#candidate-review).
+- `src/workspace/controller.ts` owns active requests across React subscription replay and internal views; real route changes abort the old activation. `pending.ts` stores bounded request envelopes only, while drafts/read positions/loaded messages stay in memory per project. `api/generation-stream.ts` consumes bounded POST SSE without automatic POST replay. Workspace adoption reuses `candidate-review/useCandidateReview.ts`.
 - Component styles use CSS Modules; `src/styles.css` contains global foundations. Keep detailed tokens and interaction rules in the design contract. Update that contract when introducing tokens or patterns; keep `DESIGN.md` as navigation.
 - Browser source uses browser APIs and relative `/api` paths for platform requests. It must not import backend source, database code, Node-only APIs, or server secrets.
 - Backend unavailability must leave the frontend usable and show an honest failure state. Loading, success, error, and retry controls must reflect the actual request outcome.
