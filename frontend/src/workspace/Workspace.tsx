@@ -61,7 +61,7 @@ export function Creation({ state, app }: { state: WorkspaceState; app: Workspace
       <button type="button" onClick={() => void app.refreshProjects()}>刷新项目列表</button></section>
   </main>;
 }
-const activityNames = { 'request-started': '模型请求已发出', 'request-finished': '模型请求已结束', 'tool-started': '工具开始', 'tool-finished': '工具完成', validated: '候选结构已校验', saved: '候选已保存', ended: '任务已结束' };
+const activityNames = { 'request-started': '模型请求已发出', 'request-finished': '模型请求已结束', 'tool-started': '工具开始', 'tool-finished': '工具完成', 'agent-started': 'OpenCode 已开始实现', 'agent-finished': 'OpenCode 已完成代码修改', 'agent-tool-finished': 'OpenCode 工具完成', validated: '候选结构已校验', saved: '候选已保存', ended: '任务已结束' };
 function Conversation({ state, app }: { state: WorkspaceState; app: WorkspaceController }) {
   const container = useRef<HTMLDivElement>(null); const stick = useRef(true); const composing = useRef(false);
   const projectId = state.project?.project.id ?? ''; const activation = state.activation;
@@ -91,7 +91,7 @@ function Conversation({ state, app }: { state: WorkspaceState; app: WorkspaceCon
       {task && <section className={styles.task} aria-label="本次任务" data-task-phase={task.phase}>
         <p role="status" aria-live="polite">{task.message}</p>
         {task.events.length > 0 && <details open><summary>本次真实活动 · {task.events.length} 条</summary><ol>
-          {task.events.map(event => <li key={event.seq}>{event.event === 'accepted' ? '需求已受理并保存' : event.event === 'activity' ? `${activityNames[event.activity.type]}${event.activity.tool ? ` · ${event.activity.tool}` : ''} · 第 ${event.activity.step} 步` : '终态已确认'}</li>)}
+          {task.events.map(event => <li key={event.seq}>{event.event === 'accepted' ? '需求已受理并保存' : event.event === 'activity' ? `${activityNames[event.activity.type]}${event.activity.agentTool || event.activity.tool ? ` · ${event.activity.agentTool ?? event.activity.tool}` : ''}${event.activity.step > 0 ? ` · 第 ${event.activity.step} 步` : ''}` : '终态已确认'}</li>)}
         </ol></details>}
         <div className={styles.switch}>
           {busy && <button type="button" onClick={() => void app.cancel()} disabled={task.phase === 'cancelling'}>{task.phase === 'cancelling' ? '正在取消…' : '取消生成'}</button>}

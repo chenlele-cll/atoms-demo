@@ -16,6 +16,26 @@ export function changedPaths(base: Snapshot, candidate: Snapshot) {
 }
 export function candidateSummary(paths: string[]) { return `候选已保存，修改 ${paths.length} 个文件；预览未验证：${paths.join('、')}`; }
 
+export function validateCandidate(base: Snapshot, input: unknown) {
+  const parsed = submitFilesSchema.safeParse(input);
+  if (!parsed.success) throw new GenerationError('FILE_POLICY');
+  let bytes = 0;
+  for (const file of parsed.data.files) {
+    if (!writable(file.path, Object.hasOwn(base.files, file.path)) || !file.content.trim()) throw new GenerationError('FILE_POLICY');
+    bytes += Buffer.byteLength(file.content, 'utf8');
+  }
+  if (bytes > 256 * 1024) throw new GenerationError('FILE_POLICY');
+  const files = { ...base.files };
+  for (const file of parsed.data.files) files[file.path] = file.content;
+  const { digest: previous, ...content } = { ...base, files }; void previous;
+  const candidate = { ...content, digest: createHash('sha256').update(canonicalJSON(content)).digest('hex') };
+  const valid = snapshotSchema.safeParse(candidate);
+  if (!valid.success) throw new GenerationError('FILE_POLICY');
+  const changedFiles = changedPaths(base, valid.data);
+  if (!changedFiles.length) throw new GenerationError('FILE_POLICY');
+  return { snapshot: valid.data, changedFiles, bytes };
+}
+
 export function createFileTools(input: Snapshot) {
   const base = snapshotSchema.parse(input);
   if (base.id !== 'company-landing' || !Object.keys(base.files).some(path => writable(path, true))) throw new GenerationError('UNSUPPORTED_TEMPLATE');
@@ -43,23 +63,13 @@ export function createFileTools(input: Snapshot) {
     submit(input: unknown) {
       const parsed = submitFilesSchema.safeParse(input);
       if (!parsed.success || submitted || read.size === 0) throw new GenerationError('FILE_POLICY');
-      let bytes = 0;
       for (const file of parsed.data.files) {
         const existing = Object.hasOwn(base.files, file.path);
-        if (!writable(file.path, existing) || (existing && !read.has(file.path)) || !file.content.trim()) throw new GenerationError('FILE_POLICY');
-        bytes += Buffer.byteLength(file.content, 'utf8');
+        if (existing && !read.has(file.path)) throw new GenerationError('FILE_POLICY');
       }
-      if (bytes > 256 * 1024) throw new GenerationError('FILE_POLICY');
-      const files = { ...base.files };
-      for (const file of parsed.data.files) files[file.path] = file.content;
-      const { digest: previous, ...content } = { ...base, files }; void previous;
-      const candidate = { ...content, digest: createHash('sha256').update(canonicalJSON(content)).digest('hex') };
-      const valid = snapshotSchema.safeParse(candidate);
-      if (!valid.success) throw new GenerationError('FILE_POLICY');
-      const changedFiles = changedPaths(base, valid.data);
-      if (!changedFiles.length) throw new GenerationError('FILE_POLICY');
+      const candidate = validateCandidate(base, parsed.data);
       submitted = true;
-      return { snapshot: valid.data, changedFiles, bytes };
+      return candidate;
     },
   };
 }

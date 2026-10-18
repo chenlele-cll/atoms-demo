@@ -27,7 +27,7 @@
 
 ## Generation when implemented
 
-当前已有有界生成内核、独立验收入口及 GEN-005 公开生成/事件接口。`client.run` 建立操作截止时间，内部 `session.step` 每次只执行一个模型步骤；工具分派和下一步必须留在同一作用域内，并在分派前检查取消。GEN-002 探针仍独立于项目；实际生成契约见下节。所有生成继续遵守以下边界：
+当前已有有界生成内核、独立验收入口及 GEN-005 公开生成/事件接口。生产默认由 service.ts 调用 opencode.ts 的 OpenCode CLI 1.18.23；显式注入 transport 的夹具保留 AI SDK 自有工具循环，`client.run` / `session.step` 继续用于该路径及独立 GEN-002 探针。实际生成契约见下节。所有生成继续遵守以下边界：
 
 - 对文件路径、依赖范围、输出体积、步骤数和总时长设置限制；模型结果通过 schema 校验后仍需验证实际编译与交互。
 - 生成代码在隔离的预览或执行环境中运行，不能在宿主后端进程中执行，也不能获得后端凭据。
@@ -41,15 +41,23 @@ GEN-004 的 backend/src/generation/contracts.ts 是内部请求、结果和工�
 
 上下文只含固定规则、当前快照身份/依赖元数据、冻结基线血缘的相关历史及当前需求一次。受理短事务从基线自身沿同项目 parent 链到模板，校验合法模板终点和严格递减的父序号；缺失、循环或非法终点在写入及模型调用前以 DATA_CORRUPT 失败。历史仅包含链内 generated 版本关联的同项目 succeeded run 的 user/assistant 消息，且 result/base 与版本及其 parent 匹配；模板基线历史为空，直接恢复的未采用成功版本包含自身历史。其他分支、无关联及失败/取消/中断/运行中的消息只从模型历史排除，持久对话继续保留。
 
-先按血缘筛选，再取最近 10 条，按从近到远保留总正文不超过 UTF-8 16 KiB 的整条消息，再恢复序号顺序；超预算跳过但不从第 11 条补位。省略数为受理前全项目消息总数减实际选入数，本轮 prompt 只在末尾加入一次。代码通过工具读取同一冻结数据库快照，不从 catalog 替换项目数据。每步将工具 schema 与完整消息序列 UTF-8 JSON 计量，累计最多 256 KiB，超限失败而不截断文件。
+先按血缘筛选，再取最近 10 条，按从近到远保留总正文不超过 UTF-8 16 KiB 的整条消息，再恢复序号顺序；超预算跳过但不从第 11 条补位。省略数为受理前全项目消息总数减实际选入数，本轮 prompt 只在末尾加入一次。context.ts 将消息和旧工具 schema 的 UTF-8 JSON 限制为 256 KiB，超限失败而不截断；CLI 路径在构造初始上下文时检查，此值不代表 OpenCode 内部每步完整上下文的计量。代码由同一冻结数据库快照物化到临时项目，不从 catalog 替换项目数据；CLI 的专用规则要求直接读取、编辑文件，消息 JSON 经 stdin 传入，不沿用旧 submit_files 提示词。
 
-三个工具的 schema 派生自同一 Zod 定义，strict=true、所有参数必填、parallel_tool_calls=false，无 SDK execute 或自动多步：list_files 返回冻结基线的排序路径/字节/可写标记；read_files 读取 1–8 个不同文件，正文合计不超过 96 KiB；submit_files 只允许一次终端提交 1–8 个完整文件，正文合计不超过 256 KiB。未知/多调用、额外参数、重复调用 ID 或无有效调用立即失败，不自动修复。读取结果与 SDK 的完整 response.messages/对应工具结果续接，推理续接项只留本轮内存，不进入对话、活动或日志。
+生产默认执行单独安装的 OpenCode CLI 1.18.23，无新增 npm 依赖。ATOMS_OPENCODE_BIN 修剪后为空或未配置时使用 opencode，建议绝对路径；服务 PATH 必须可解析固定版本，启动和健康检查不验证其存在或版本。保留已校验的 OPENAI_API_KEY/OPENAI_BASE_URL/MODEL_ID/MODEL_TIMEOUT_MS/MODEL_MAX_OUTPUT_TOKENS，CLI 使用 openai/<MODEL_ID> 和原输出预算，供应商 maxRetries=0。原模型客户端的 fetch 注入、重定向控制和细分观测仅适用于 SDK 路径，不能据此声明 CLI 网络行为已验证。
 
-company-landing 策略只允许已有 App.tsx 与 components/data/lib/generated 内的 TS/TSX 业务文件，以及已有 src/generated CSS；新文件仅在 /src/generated 下为 ts/tsx/css。根路径与 src 路径的业务规则均明确判断，实际接入使用 GEN-001 的 src 布局。入口引导、配置、许可、资源及预编译 CSS 只读。至少成功读取一个文件，覆盖已有路径必须已读取；拒绝路径绕过、重复、空正文、删除及完全无变化。全量复制文件映射后一次合并，复用快照契约校验 64 文件/2 MiB、身份和依赖，服务端重算 digest/changedFiles。新增样式使用普通 CSS；不做字符串伪编译或宿主执行，结果始终 previewStatus=unverified。
+opencode.ts 为每次运行建立私有 project、HOME、TMP 和 XDG config/data/cache/state 目录，显式传入模型凭据；禁用项目配置、外部 skills/plugins、自动更新、分享、模型目录获取、LSP/formatter/snapshot。固定版本的 managed 配置目录指向私有空目录，macOS 存在可覆盖配置的系统 managed plist 时拒绝执行。--pure 只跳过外部插件，不是安全沙箱。工具默认 deny，仅允许 read/glob/grep/edit/write/apply_patch；shell、网络工具、task、question、skill 与 external_directory 禁止。模型 API 仍需联网。工作目录和这些权限不是 OS sandbox，不能声称操作系统隔离或凭据不可被 CLI 进程访问。
 
-整个操作使用外部 AbortSignal，MODEL_TIMEOUT_MS 默认 0（不设累计截止），显式正值才启用共享期限，最多 6 次实际模型请求，每次沿用输出预算且 maxRetries=0。请求、工具、验证和事务前均检查；成功事务退出前再次检查，取消/超时使写入整体回滚。模型与网络等待不在数据库事务内，外部连接可写。受理原子保存 running/user；完成原子保存候选、事实摘要及 succeeded，保持 currentVersionId 不变；摘要只声明“候选已保存，预览未验证”。运行中基线改变拒绝保存。受理后失败保留输入，取消写 cancelled，超时写 failed/GENERATION_TIMEOUT；终态也写不入时返回 STORAGE_UNAVAILABLE、terminalStatePersisted=false，不冒充已持久化终止。成功已提交后到达的取消不改写结果。
+agent 自身 steps=24；服务端对 JSON 流中不同 step_start 和 step_finish ID 分别限制最多 24 个，超限 INVALID_OUTPUT，不把步骤当作实际供应商请求数。stdout/stderr 合计最多 8 MiB，每条 JSON 行最多 512 KiB，工具结果 callID 去重后最多 512 个；只接受同一 session 和批准的事件/工具。公开活动仅保留前 64 条成功工具结果，给校验、保存和终态预留帧预算。进程 close 确认输出读完、最后助手步骤明确 stop 后才收集文件；中间文本或早先 stop 不表示完成。stop 仍不证明功能满足需求。原始文本、工具输入/输出、stderr 与供应商内容不转发到公开活动或日志。
 
-活动只包含 runId、单调序号、时间、步骤、批准工具名、字节/路径、安全分类和保存标识。完成活动在相应动作后发出，saved 在事务提交后；观察者异常只计入 observerErrors，不影响事实结果。请求次数来自实际传输，用量按已观测单次值累计，任一步未知则合计 null；保留分项，重放未知指标全为 null。原始供应商异常、提示词、代码、工具正文与思维链均不进入结果或日志。进程硬杀可能留下 running，启动恢复按 Lifecycle 的独占所有权规则执行，不自动重试模型。
+旧 AI SDK 自有工具循环仅在显式注入 transport 的测试夹具中保留；独立探针继续使用模型客户端。该循环的三个工具 schema 派生自同一 Zod 定义，strict=true、所有参数必填、parallel_tool_calls=false，无 SDK execute 或自动多步：list_files 返回冻结基线的排序路径/字节/可写标记；read_files 读取 1–8 个不同文件，正文合计不超过 96 KiB；submit_files 只允许一次终端提交 1–8 个完整文件，正文合计不超过 256 KiB。未知/多调用、额外参数、重复调用 ID 或无有效调用立即失败，不自动修复。读取结果与 SDK 的完整 response.messages/对应工具结果续接，每步继续检查 256 KiB 上下文；推理续接项只留本轮内存，不进入对话、活动或日志。
+
+company-landing 策略只允许已有 App.tsx 与 components/data/lib/generated 内的 TS/TSX 业务文件，以及已有 src/generated CSS；新文件仅在 /src/generated 下为 ts/tsx/css。根路径与 src 路径的业务规则均明确判断，实际接入使用 GEN-001 的 src 布局。入口引导、配置、许可、资源及预编译 CSS 只读。CLI 先直接编辑文件，进程组停止后服务端遍历实际目录、比较冻结基线，再调用 policy.ts 的 validateCandidate；生产只提示先读相关文件，不通过 list/read/submit 追踪读取。旧夹具路径仍要求至少成功读取一个文件，覆盖已有路径必须已读取。
+
+原有策略限制不变：修改/新增合计最多 8 个完整文件/UTF-8 256 KiB，拒绝空正文、删除、完全无变化及受保护路径修改；完整快照最多 64 文件/2 MiB，保留身份、入口和固定依赖并由服务端重算 digest/changedFiles。CLI 收集另拒绝非法路径、符号链接、硬链接和非普通文件，目录遍历最多 192 项、深度最多 32；这些限制不扩展可写范围。新增样式使用普通 imported CSS；快照没有构建脚本，新 Tailwind 类不会自动编译。不做字符串伪编译或宿主执行，结果始终 previewStatus=unverified；编译与实际交互在后续预览单独验证。
+
+整个操作使用外部 AbortSignal，MODEL_TIMEOUT_MS 默认 0（不设累计截止），显式正值才启用共享期限；CLI 使用上述 24 步限制，旧 SDK 夹具循环最多 6 次实际模型请求，每次沿用输出预算且 maxRetries=0。CLI 取消/超时终止所属进程组，正常退出也先确认写入进程停止再收集文件；服务端在验证和事务前继续检查，不能声称逐个拦截 CLI 内部模型请求。成功事务退出前再次检查，取消/超时使写入整体回滚。模型与网络等待不在数据库事务内，外部连接可写。受理原子保存 running/user；完成原子保存候选、事实摘要及 succeeded，保持 currentVersionId 不变；摘要只声明“候选已保存，预览未验证”。运行中基线改变拒绝保存。受理后失败保留输入，取消写 cancelled，超时写 failed/GENERATION_TIMEOUT；终态也写不入时返回 STORAGE_UNAVAILABLE、terminalStatePersisted=false，不冒充已持久化终止。成功已提交后到达的取消不改写结果。
+
+活动只包含 runId、单调序号、时间、步骤、批准工具名、字节/路径、安全分类和保存标识。CLI 仅转发安全 agent-started、agent-tool-finished（批准工具名）、agent-finished 元数据，再由服务端发 validated/saved/ended；不转发原始 JSON 流、文本或推理，也不将 CLI step ID 转成请求进度。完成活动在相应动作后发出，saved 在事务提交后；观察者异常只计入 observerErrors，不影响事实结果。CLI 的 requestCount、usage、requests 均为 null，不伪造计数。旧 SDK 路径请求次数来自实际传输，用量按已观测单次值累计，任一步未知则合计 null；保留分项，重放未知指标全为 null。原始供应商异常、提示词、代码、工具正文与思维链均不进入结果或日志。进程硬杀可能留下 running，启动恢复按 Lifecycle 的独占所有权规则执行，不自动重试模型。
 
 ## Generation execution
 
@@ -144,6 +152,8 @@ UI 规范由 [DESIGN.md](../../DESIGN.md) 导航到现有设计 skill；在该�
 按 [Verification](./verification.md) 收集实际结果；版本控制操作遵循 [Git workflow](./git-workflow.md)。
 
 ## Model invocation observations
+
+以下 GEN-010 观测描述适用于保留的 AI SDK 客户端/夹具与探针路径。生产默认 CLI 不经过该 fetch 观测层，不生成对应 dispatch/attempt 或供应商请求计数；CLI 仅有上述安全 agent 活动及 null 指标。既有历史证据不等于 CLI 迁移验收。
 
 GEN-010 的 model/observation.ts 维护服务端私有观测白名单。生产真实 fetch 的调用边界记录 dispatch，原样返回响应时只读取允许的 HTTP status/x-request-id 元数据，SDK 结束时记录可得的 responseModel 与 token usage；不克隆/消费正文，不增加请求、重试或超时预算。每个 attempt 使用独立 UUID，与 generation runId/projectId/requestId 和 1–6 step 关联，三个请求标识不混用。
 

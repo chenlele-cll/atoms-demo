@@ -184,8 +184,9 @@ export const generationBodySchema = z.strictObject({ requestId: idSchema, baseVe
 export const toolNameSchema = z.enum(['list_files', 'read_files', 'submit_files']);
 export const activitySchema = z.strictObject({
   runId: idSchema, sequence: z.number().int().positive(), at: z.iso.datetime(),
-  type: z.enum(['request-started', 'request-finished', 'tool-started', 'tool-finished', 'validated', 'saved', 'ended']),
+  type: z.enum(['request-started', 'request-finished', 'tool-started', 'tool-finished', 'agent-started', 'agent-finished', 'agent-tool-finished', 'validated', 'saved', 'ended']),
   step: z.number().int().nonnegative(), tool: toolNameSchema.optional(), bytes: z.number().int().nonnegative().optional(),
+  agentTool: z.enum(['read', 'glob', 'grep', 'edit', 'write', 'apply_patch']).optional(),
   changedFiles: z.array(virtualPathSchema).optional(), candidateVersionId: idSchema.optional(),
   status: runStatusSchema.optional(), errorCode: runErrorSchema.optional(),
 });

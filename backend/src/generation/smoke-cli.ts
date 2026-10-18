@@ -7,7 +7,8 @@ import type { SmokeCase } from './smoke-cases.js';
 
 const help = `Usage: pnpm generation:smoke [--help] | --live --case quote|filter
 No arguments / --help: no environment loading or model requests.
---live with one public case is required; maximum 6 model requests, no retries.
+--live with one public case is required; uses OpenCode CLI 1.18.23 (24 agent steps).
+Actual CLI provider request/token counts are unknown; no automatic application retry.
 Uses a new isolated project/database, ignoring production DATABASE_PATH.
 Saves sanitized report in test-results/generation-smoke/<id>/report.json.
 Candidate saved does not mean compiled, previewed or adopted.

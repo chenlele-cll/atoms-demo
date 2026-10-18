@@ -22,6 +22,7 @@ export async function runGenerationSmoke(selected: SmokeCase, options: {
   const started = performance.now();
   const report = {
     id: randomUUID(), source: 'not-run' as 'live' | 'fixture' | 'not-run', case: selected,
+    executor: options.transport ? 'ai-sdk-fixture' : 'opencode',
     provider: null as 'openai' | 'openai-compatible' | null, baseURL: null as string | null, model: null as string | null,
     startedAt: new Date().toISOString(), finishedAt: '', durationMs: 0,
     status: 'failed' as 'passed' | 'failed' | 'cancelled', generation: null as GenerationResult | null,
@@ -51,7 +52,8 @@ export async function runGenerationSmoke(selected: SmokeCase, options: {
       ...(options.signal ? { signal: options.signal } : {}), ...(options.transport ? { transport: options.transport } : {}),
       observe: activity => report.activities.push(activity) });
     report.generation = result;
-    report.source = (result.metrics.requestCount ?? 0) > 0 ? options.transport ? 'fixture' : 'live' : 'not-run';
+    report.source = options.transport ? (result.metrics.requestCount ?? 0) > 0 ? 'fixture' : 'not-run'
+      : report.activities.some(activity => activity.type === 'agent-tool-finished') ? 'live' : 'not-run';
     report.saved = result.status === 'succeeded';
     report.unchangedCurrent = store.getProject(session.id, input.projectId).project.currentVersionId === input.baseVersionId;
     if (!report.saved) { report.errorCode = result.errorCode; report.status = result.status === 'cancelled' ? 'cancelled' : 'failed'; }

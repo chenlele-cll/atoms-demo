@@ -10,6 +10,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 - Node.js `22.22.2`，见 `.nvmrc`。
 - pnpm `12.11.2`，见根目录 `package.json`。
+- 默认候选生成另需单独安装 OpenCode CLI `1.18.23`；不新增 npm 依赖，不随发布包分发，也不由 manager bootstrap 安装。后端启动、健康检查与模板预览不依赖该 CLI。
 - 使用 nvm 时先运行 `nvm use`。首次安装可运行 `corepack enable`，由 Corepack 使用项目指定的 pnpm 版本。
 
 选择上述工具链后，在根目录初始化开发环境：
@@ -103,6 +104,7 @@ pnpm smoke:template
 | `backend/.env` | `DATABASE_PATH` | `../data/atoms.sqlite` | 相对 backend 工作目录解析的持久数据文件；禁止内存/空路径及 backend/dist 内路径 |
 | `backend/.env` | `APP_ORIGINS` | `http://127.0.0.1:5173,http://127.0.0.1:4173` | 逗号分隔的精确来源；公网必须 HTTPS，不与开发 HTTP 混用 |
 | `backend/.env` | `OPENAI_API_KEY` | 无；仅模型调用时必填 | 所配置 API 服务的后端凭据 |
+| `backend/.env` | `ATOMS_OPENCODE_BIN` | `opencode` | OpenCode CLI 1.18.23 可执行文件；建议绝对路径，否则由后端服务 PATH 查找 |
 | `backend/.env` | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | 仅允许官方或用户指定的 `https://ai.elegantyc.com/v1` |
 | `backend/.env` | `MODEL_ID` | 无；模板建议 `gpt-6.1-sol` | 显式指定模型；无权限时失败，不自动切换 |
 | `backend/.env` | `MODEL_TIMEOUT_MS` | `0` | 无累计截止；显式正值 1000–2147483647ms 才启用总期限 |
@@ -188,7 +190,9 @@ pnpm model:probe:built --case all --report
 
 ## 有界候选生成
 
-GEN-004 提供 generateProject 内核，GEN-005 将其接入下节公开接口；GEN-007 已接入创建与对话 UI。内核从已保存当前版本读取代码，通过 list_files/read_files/submit_files 修改有限业务文件，最多六次模型请求、默认无任务总期限（MODEL_TIMEOUT_MS=0）、零重试。受理记录与用户输入先保存，合法提交将完整候选、事实摘要和成功状态原子保存，当前版本保持不变。失败保留输入；同一 requestId 重放不再次调用模型。
+GEN-004 提供 generateProject 内核，GEN-005 将其接入下节公开接口；GEN-007 已接入创建与对话 UI。生产默认使用 OpenCode CLI 1.18.23：将已保存基线物化到私有临时目录，由 OpenCode 读取、编辑文件，再由服务端收集并验证候选。agent 配置 steps=24，运行时对观测到的 step_start/step_finish 分别最多允许 24 个不同步骤；这不是供应商请求计数。保留 OPENAI_API_KEY、OPENAI_BASE_URL、MODEL_ID、MODEL_TIMEOUT_MS 和 MODEL_MAX_OUTPUT_TOKENS 配置，默认无任务总期限（MODEL_TIMEOUT_MS=0），供应商 maxRetries=0。受理记录与用户输入先保存，合法候选、事实摘要和成功状态原子保存，当前版本保持不变。失败保留输入；同一 requestId 重放不再次调用模型。
+
+显式注入 transport 的测试夹具继续使用旧 AI SDK 自有 list_files/read_files/submit_files 循环（最多六次请求）；独立模型探针也保留 AI SDK 路径。生产不再通过这三个工具追踪“已读取才允许覆盖”。OpenCode 使用隔离 HOME/XDG 和工具权限，禁止 shell、工具联网与目录外访问；模型 API 连接仍需网络，这些措施不是 OS sandbox。原有最多 8 个修改文件/256 KiB、完整快照最多 64 文件/2 MiB，以及受保护文件和固定依赖限制继续生效。保存前不执行编译，候选仍为 unverified，编译与交互须另行预览验证。CLI 的 requestCount、usage、requests 均为 null，不从步骤或工具事件推算请求或 token；只转发安全 agent-started/agent-tool-finished/agent-finished 元数据及服务端验证/保存事件。详细限制见 [Development](./docs/engineering/development.md#bounded-generation)。
 
 ```sh
 pnpm generation:smoke --help
@@ -199,7 +203,7 @@ pnpm generation:smoke:built --live --case quote
 
 另有公开 filter 样例；每次只执行所选一项，不自动追加第二项或修复。源码命令会先准备后端模板资产；帮助不读取后端环境或请求模型。只有 --live 和指定 --case 同时存在才调用，使用 backend/.env 的允许端点与模型配置。运行器创建自己的随机匿名会话、项目和 SQLite 文件，忽略生产 DATABASE_PATH，不接收现有项目 ID。
 
-报告在忽略的 test-results/generation-smoke/<id>/report.json，同目录保留关闭后的隔离测试数据库用于本地核对，不能上传这些数据库。报告区分 live/fixture/not-run，含实际请求/已知用量、工具元数据、修改路径与候选重开比较，不含代码、提示词或凭据。保存成功仍为 previewStatus=unverified；本轮不证明报价交互、浏览器编译或线上部署。边界见 [Development](./docs/engineering/development.md#bounded-generation)，实测见 [GEN-004 记录](./openspec/changes/gen-004-bounded-agent-generation/tasks.md)。
+报告在忽略的 test-results/generation-smoke/<id>/report.json，同目录保留关闭后的隔离测试数据库用于本地核对，不能上传这些数据库。报告区分 live/fixture/not-run，含可得指标、工具元数据、修改路径与候选重开比较，不含代码、提示词或凭据；CLI 请求/用量指标为 null。保存成功仍为 previewStatus=unverified；本轮不证明报价交互、浏览器编译或线上部署。边界见 [Development](./docs/engineering/development.md#bounded-generation)，历史实测见 [GEN-004 记录](./openspec/changes/gen-004-bounded-agent-generation/tasks.md)，不作为本次 CLI 迁移的真实模型验证。
 
 ## 生成事件与控制 API
 
@@ -275,6 +279,8 @@ pnpm --filter @atoms/backend build
 
 启动生产后端：
 
+部署前另行安装固定 OpenCode CLI 1.18.23，并确认后端服务账号的 PATH 能找到该可执行文件，或在服务环境设置 ATOMS_OPENCODE_BIN 为其绝对路径；交互式终端能找到不代表 systemd 能找到。发布包和部署/bootstrap 不提供该 CLI，健康检查通过不证明生成可用。要求见 [Lifecycle](./docs/engineering/lifecycle.md#opencode-generation-runtime)；本次文档变更不声明真实模型或部署验收通过。
+
 ```sh
 pnpm --filter @atoms/backend start
 ```
@@ -293,7 +299,7 @@ releaseId 创建、复用、配置更新与回滚规则统一维护在 [发布�
 
 ## Top 1 真实模型验收
 
-`pnpm smoke:live --live --release /absolute/package --deployment-report /absolute/deployment-summary.json` 显式运行两个公开需求：工作室报价/案例筛选，以及公开课组合筛选。它只从进程环境取得已有批准供应商的 OPENAI_API_KEY、MODEL_ID、可选 OPENAI_BASE_URL、MODEL_TIMEOUT_MS、MODEL_MAX_OUTPUT_TOKENS，不读取开发 .env 或数据库。每例生成一次、每例最多六次请求，两例计划最多十二次；沿用现有预算，失败即停，不探针、不自动补跑。无参数/--help 只说明，默认 check/verify/CI 无 live。
+`pnpm smoke:live --live --release /absolute/package --deployment-report /absolute/deployment-summary.json` 显式运行两个公开需求：工作室报价/案例筛选，以及公开课组合筛选。它只从进程环境取得已有批准供应商的 OPENAI_API_KEY、MODEL_ID、可选 OPENAI_BASE_URL、MODEL_TIMEOUT_MS、MODEL_MAX_OUTPUT_TOKENS，不读取开发 .env 或数据库。每例生成一次；默认 CLI 路径按每例 24 个观测步骤限制，不能继续用旧 SDK 的每例六次、合计十二次请求预算解释 CLI 执行。CLI 安装与服务可见路径须另行准备；本次未验证该验收入口的 CLI 配置传递或真实模型执行。失败即停，不探针、不自动补跑。无参数/--help 只说明，默认 check/verify/CI 无 live。
 
 先完成工程/产品回归，再为有观测元数据的代码执行 release:build 与匹配 smoke:deployment。使用项目 Node/pnpm、系统 Chrome、Nginx 和独占 3001/8080；Sandpack 编译仍需网络。自动化成功后只显示“视觉复核待完成”；按 [Lifecycle](./docs/engineering/lifecycle.md#live-acceptance-lifecycle) 重开已有项目、实际复核并 `pnpm review:live --run /absolute/run` 后才能宣布最终通过。凭据不进入命令参数/浏览器/产物/报告，输出与请求边界不是金额封顶。
 

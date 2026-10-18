@@ -18,7 +18,7 @@ export const toolContext = Object.entries(toolSchemas).map(([name, schema]) => (
 export function checkContext(messages: ModelMessage[]) {
   if (Buffer.byteLength(JSON.stringify({ messages, tools: toolContext }), 'utf8') > CONTEXT_BYTES) throw new GenerationError('CONTEXT_LIMIT');
 }
-export function buildContext(base: Snapshot, prompt: string, history: Message[], totalHistory: number) {
+export function buildContext(base: Snapshot, prompt: string, history: Message[], totalHistory: number, instructions = rules) {
   let bytes = 0; const selected: Message[] = [];
   for (const message of [...history].sort((a, b) => b.sequence - a.sequence)) {
     const size = Buffer.byteLength(message.content, 'utf8');
@@ -27,7 +27,7 @@ export function buildContext(base: Snapshot, prompt: string, history: Message[],
   selected.sort((a, b) => a.sequence - b.sequence);
   const { files, digest, ...identity } = base;
   const messages: ModelMessage[] = [
-    { role: 'system', content: rules },
+    { role: 'system', content: instructions },
     { role: 'user', content: JSON.stringify({ projectSnapshot: { ...identity, digest, fileCount: Object.keys(files).length }, historyOmitted: totalHistory - selected.length }) },
     ...selected.map(message => ({ role: message.role, content: message.content })),
     { role: 'user', content: prompt },

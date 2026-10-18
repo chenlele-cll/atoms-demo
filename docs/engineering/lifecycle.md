@@ -22,9 +22,19 @@ GEN-003 正式后端先验证 DATABASE_PATH / APP_ORIGINS，加载相对 server 
 
 buildApp 无参数仍不打开磁盘数据库；项目测试显式传入 store/catalog，应用 preClose 终止所属生成，onClose 负责按 store→所有权顺序释放。后端 dev/typecheck/test 准备 src/template-assets，build 同时准备自身 dist 资源；运行 start 需要完整 backend/dist、平台依赖及可写持久目录。项目读写不调用模型。
 
-模型探针通过 workspace 使用 backend 工作目录及同样的原生环境加载规则，帮助不读取 `.env`。模型配置仅在显式探针或未来生成请求边界解析，manager、健康检查、默认自动化入口不触发模型。一次样例的全部请求共用截止时间；SIGINT/SIGTERM 中止底层请求、停止后续样例、输出脱敏最终报告并退出 130/143。构建入口为 `backend/dist/model/probe.js`；配置、请求上限与报告含义见 [README](../../README.md#模型能力探针) 和 [Model access](./verification.md#model-access)。
+模型探针通过 workspace 使用 backend 工作目录及同样的原生环境加载规则，帮助不读取 `.env`。模型配置仅在显式探针或生成请求边界解析，manager、健康检查、默认自动化入口不触发模型。探针保留 AI SDK 路径，不依赖 OpenCode；一次样例的全部请求共用截止时间；SIGINT/SIGTERM 中止底层请求、停止后续样例、输出脱敏最终报告并退出 130/143。构建入口为 `backend/dist/model/probe.js`；配置、请求上限与报告含义见 [README](../../README.md#模型能力探针) 和 [Model access](./verification.md#model-access)。
 
 当前已有 manager 的七个开发命令、infra 空配置入口和 Process Compose 配置。本地编排不接管生产服务器。
+
+## OpenCode generation runtime
+
+生产默认生成使用单独安装的 OpenCode CLI 1.18.23，不新增 npm 依赖，不随发布包提供，也不由 manager/deploy bootstrap 安装。ATOMS_OPENCODE_BIN 默认 opencode，建议配置绝对路径；否则后端服务账号的 PATH 必须找到固定版本，不能依赖交互式终端的 PATH。systemd 的 ProtectHome=true 会阻止访问个人目录中的 CLI，部署时应将可执行文件安装在服务可访问的位置（如 /usr/local/bin/opencode）。现有 deploy 的模型环境补丁白名单尚不支持传入 ATOMS_OPENCODE_BIN；使用该入口时先准备默认 PATH 可访问的 opencode。服务不在启动/健康检查时执行 CLI 或检查版本，缺失可执行文件在显式生成时失败；健康不证明生成可用。本次没有运行真实模型或部署验收，既有 SDK fixture/probe 与部署历史证据保持原范围。
+
+沿用 OPENAI_API_KEY、OPENAI_BASE_URL、MODEL_ID、MODEL_TIMEOUT_MS（默认 0，无累计截止）和 MODEL_MAX_OUTPUT_TOKENS。每次执行创建私有临时项目及独立 HOME/TMP/XDG config/data/cache/state，物化冻结基线；OpenCode 直接读取并编辑文件，服务端随后收集差异、验证策略与快照并保存候选。显式 transport 测试注入保留旧 AI SDK list/read/submit 循环和读取跟踪，生产不再以该跟踪约束覆盖。
+
+agent steps=24，服务端对观测到的 step_start/step_finish 分别限制最多 24 个不同 ID；不能换算成供应商请求数。CLI requestCount/usage/requests 均为 null。只输出安全 agent-started/agent-tool-finished/agent-finished 元数据及服务端校验/保存活动，不透传原始 CLI 内容。保留最多 8 个修改文件/256 KiB、完整快照 64 文件/2 MiB 和受保护文件/固定依赖规则；保存仍为 unverified，编译与交互须由后续预览验证。
+
+工具权限仅允许 read/glob/grep/edit/write/apply_patch，拒绝 shell、网络工具与目录外访问；模型 API 连接仍需网络且 CLI 进程持有显式模型凭据。隔离 HOME/XDG、工作目录、权限与 --pure 均不构成 OS sandbox。CLI 以独立进程组运行，取消/超时及正常退出均先发 SIGTERM，必要时 SIGKILL 并确认停止，再读取项目或删除临时根；无法确认停止时保留私有根，避免与活动写入竞争。后端硬杀不保证 finally 清理，不能声明 OS 沙箱或无残留保证。细则见 [Bounded generation](./development.md#bounded-generation)。
 
 ## Generation service lifecycle
 
@@ -281,7 +291,7 @@ GEN-009 提供 `pnpm release:build [--json]` 和 `pnpm smoke:deployment --releas
 
 GEN-010 的 `pnpm smoke:live --live --release /absolute/package --deployment-report /absolute/deployment-summary.json` 显式消费同一已通过 GEN-009 的包，默认帮助/默认 check/verify/CI 不发起 live。原包只读；模型配置仅从调用进程环境取得，不读取开发 .env/DB 或任何登录缓存。已有私有配置可由执行者在外部监督器或受控终端加载后注入，禁止把密钥作为 CLI 参数、浏览器文本、发布文件或报告内容。
 
-本次布局为 test-results/live-generation/<runId>/{releases,shared,private,export}。只在共享部署互斥锁下使用 3001/8080，未知监听不接管；真实 Node dist/server.js 和前台独立 prefix Nginx 由 GEN-009 的身份与有界清理辅助管理，没有 Vite/tsx/fixture 注入。每例从原模板新建项目，studio/schedule 各提交一次，最多各 6 次供应商请求、合计 12 次；MODEL_TIMEOUT_MS 默认/本地为 0（无累计期限），保留 MODEL_MAX_OUTPUT_TOKENS 和步骤预算，不自动补跑。
+本次布局为 test-results/live-generation/<runId>/{releases,shared,private,export}。只在共享部署互斥锁下使用 3001/8080，未知监听不接管；真实 Node dist/server.js 和前台独立 prefix Nginx 由 GEN-009 的身份与有界清理辅助管理，没有 Vite/tsx/fixture 注入。每例从原模板新建项目，studio/schedule 各提交一次；旧 SDK 每例 6 次、合计 12 次请求限制不适用于默认 CLI，后者按每例 24 个观测步骤限制且请求指标未知。须另行准备固定 CLI 及服务可见路径，本次未验证 live 入口的 CLI 配置传递或执行。MODEL_TIMEOUT_MS 默认/本地为 0（无累计期限），保留 MODEL_MAX_OUTPUT_TOKENS 和步骤预算，不自动补跑。
 
 自动化成功后保留原包、本次 shared/atoms.sqlite、private/author-storage.json 和截图；停止所有所属服务。视觉复核使用 `node scripts/live-review-server.mjs --run /absolute/run`，仅重开相同生产包与 DB，不传模型配置；按仓库 Playwright skill 加载私有作者状态并浏览已保存项目，禁止重新生成。关闭复核浏览器后，对本次 review-server 发送 SIGTERM，核对 private/review-server-cleanup.json；不停止系统 Nginx 或未知进程。
 
