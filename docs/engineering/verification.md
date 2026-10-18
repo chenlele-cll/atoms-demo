@@ -163,6 +163,31 @@ pnpm smoke:projects
 
 这些验证证明持久化和 HTTP/浏览器传输，不证明真实模型生成、候选编译/采用、完整工作台或线上部署。默认 verify/CI 仍不自动加入新项目专项，后续 GEN-008 再整合。实际完成与证据见 [GEN-003 tasks](../../openspec/changes/gen-003-project-persistence-api/tasks.md)。
 
+## Bounded generation
+
+GEN-004 使用现有 Node 测试器覆盖实际 SDK 与真实临时 SQLite 链路。普通 check 使用显式 fixture 传输与假配置，不读取开发者 .env、调用外部模型或触碰生产 DATABASE_PATH。测试范围：
+
+- 真实 GEN-001 bundle 的允许路径、保护文件、重复/绕过路径、未读覆盖、无变化、普通 CSS、96 KiB 读取/256 KiB 提交/最终 64 文件与 2 MiB；保留未改内容且旧快照不变。
+- Zod strict 工具通过实际 Responses HTTP 请求执行 list/read/submit，检查 parallel=false、strict=true、完整读取正文及 SDK 支持的加密推理续接项进入后续请求。未知、多调用、重复 ID、额外字段、普通说明、拒绝和截断均失败，不修复或再试。
+- 最多六次请求、累计上下文上限、实际延迟连接取消/超时、晚到结果不保存/不追加事件、提交事务内截止时间检查回滚；提交后取消及观察者异常不改写成功。
+- 会话/归属/配置/基线预检，运行中与完成的请求重放、需求/基线复用冲突、跨连接相同请求不二次调用；模型等待期间另一真实连接可以写入，证明没有长写事务。
+- 受理和候选/摘要事务故障回滚、基线变化、终态写入也失败时明确未确认；关闭重开一致、currentVersionId 不变。活动/错误/日志不含提示词、正文、思维链、原始供应商体或凭据。
+- 源码/临时构建 CLI 子进程：帮助/非法参数零网络、缺配置 not-run 非零、fixture 来源、隔离数据库（保护生产路径哨兵）、保存/重开及 SIGINT=130/SIGTERM=143 实际连接终止、SQLite 关闭与有限退出。
+
+```sh
+pnpm check
+pnpm smoke
+pnpm smoke:projects
+pnpm generation:smoke --help
+pnpm generation:smoke:built --help
+```
+
+smoke 已含 build，项目恢复及端口用例串行运行。GEN-004 不改变应用启动/安装、模板准备或预览 UI；这些源码未变时复用 GEN-003 的 frozen/manager/模板专项证据，不为了新增内部方法重复全量生命周期验证。新增生成路径不接入默认 smoke/verify/CI 的真实调用。
+
+真实验收只显式运行一次构建后的 `pnpm --filter @atoms/backend generation:smoke:built --live --case quote`。当前冻结版本使用固定官方端点；下述历史兼容服务验收还依赖独立待提交的 GEN-002 端点配置改动。运行器使用后端模型配置、一个公开固定需求和全新隔离项目，最多六次请求，报告实际服务、请求/用量、读取/提交活动、完整候选保存及数据库重开；不自动执行 filter、修复或重新计费。报告与关闭的本地测试数据库在忽略的 test-results/generation-smoke/<id>/，数据库不上传。预检失败为 not-run，本地注入为 fixture，有供应商请求才为 live；用量缺失与重放未知为 null。
+
+本次真实 quote 已保存候选并确认旧当前版本不变，仍为 unverified；未执行候选编译、报价交互、第二需求或线上部署，不把工具参数合法或 SQLite 保存当作完整 Top 1。实际命令、退出结果、模型请求和证据见 [GEN-004 tasks](../../openspec/changes/gen-004-bounded-agent-generation/tasks.md)。
+
 ## Lifecycle scenarios
 
 `OPS-001` 的原生配置验收使用真实进程，检查双服务与单服务启动、HTTP readiness、健康响应及前端 API 代理、所属进程故障恢复、就绪持续失败、外部端口冲突和停止后的进程清理。核对状态时同时检查是否运行、就绪、退出码与重试次数，不把 `process list` 命令成功当作项目健康；注意 [原生状态及就绪限制](./lifecycle.md#behavior-and-limits)，退出码可能属于前一轮进程。原生记录见 [OPS-001](../../openspec/changes/ops-001-process-compose/tasks.md)。

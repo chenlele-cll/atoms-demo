@@ -23,6 +23,7 @@
 - 路由负责 HTTP 边界。生成和存储职责随首次实现形成实际模块，不持续堆入路由，也不预建空的 service、repository 或通用依赖注入层。
 - backend/src/model 维护单供应商客户端、延迟配置、独立探针和安全错误，AI SDK/OpenAI/Zod 仅在 backend 声明。探针文件和工具不依赖模板或项目模块，不新增浏览器可用的计费接口；真实调用与替身测试分别记录。
 - backend/src/contracts、storage、projects、templates 分别维护公开 Zod 契约、SQLite 存储/迁移、配置/安全错误及后端目录。项目 routes 通过注入调用这些具体模块，不把 SQL 放入 HTTP handler；浏览器目前尚未消费这些契约，不新增共享 workspace 包。
+- backend/src/generation 维护内部生成契约、冻结文件工具、显式有界编排和隔离验收，复用 model 单步传输与 storage 事务；不增加依赖、公开路由、框架 Agent 或默认启动副作用。生成工具只持有快照/策略，模型调用在事务之外，候选不会原地覆盖当前版本。
 
 ## Workspace and toolchain
 

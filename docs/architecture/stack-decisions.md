@@ -1,6 +1,6 @@
 # 技术栈调研与初始化建议
 
-状态：前端 React + Vite、后端 Fastify + Node.js + TypeScript 分别启动，已有健康检查、固定模板预览、模型能力探针和 SQLite 匿名项目 API。模型真实能力尚待 API 验收，项目生成与候选采用尚未实现。用户已有服务器，要求保持简单、只引入必要技术。本文记录本项目的技术决策与适用边界。
+状态：前端 React + Vite、后端 Fastify + Node.js + TypeScript 分别启动，已有健康检查、固定模板预览、模型能力探针和 SQLite 匿名项目 API。官方模型真实能力尚待 API 验收；内部有界候选生成已实现，公开生成和候选预览/采用尚未实现。用户已有服务器，要求保持简单、只引入必要技术。本文记录本项目的技术决策与适用边界。
 
 ## 1. 选型目标
 
@@ -26,6 +26,8 @@
 | 行为验证 | Node 内置测试器 + Fastify injection；浏览器实测 | 当前接口与配置无需额外测试框架；前端复杂逻辑出现时按需添加 Vitest，需要持续浏览器回归时再加入 Playwright 工程配置 |
 
 AI SDK 用于减少流式协议、工具调用和结构化输出的手写工作，不要求部署到 Vercel，也不要求使用其模型网关。只接一个实际可用的供应商，不预先编写多模型适配层。
+
+GEN-004 的生成内核采用显式的最多六次单步工具请求，权限、上下文、事务、取消与幂等由业务代码控制，不引入新的 Agent 框架。真实报价样例只证明模型读取/提交及候选保存恢复，保持 previewStatus=unverified；规则与证据见 [生成契约](../engineering/development.md#bounded-generation) 和 [GEN-004](../../openspec/changes/gen-004-bounded-agent-generation/tasks.md)。
 
 GEN-002 在 backend 精确固定 `ai@7.0.143`、`@ai-sdk/openai@4.0.96` 和 `zod@4.6.7`，兼容 Node 22；前端不引入模型依赖。显式使用 `provider.responses()`、`generateText`、`Output.object`、Zod schema 和单步工具调用。客户端控制零自动重试、每次输出预算、完整样例截止时间和取消；工具分派前检查完整调用批次，再显式提交工具结果，避免 SDK 自动多步扩大请求次数。
 

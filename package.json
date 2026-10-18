@@ -25,6 +25,8 @@
     "smoke:template": "node scripts/template-smoke.cjs && node --test scripts/template-smoke-control.test.mjs",
     "model:probe": "pnpm --filter @atoms/backend model:probe",
     "model:probe:built": "pnpm --filter @atoms/backend model:probe:built",
+    "generation:smoke": "pnpm --filter @atoms/backend generation:smoke",
+    "generation:smoke:built": "pnpm --filter @atoms/backend generation:smoke:built",
     "smoke:projects": "node scripts/project-smoke.cjs && node --test scripts/project-smoke-control.test.mjs"
   },
   "devDependencies": {

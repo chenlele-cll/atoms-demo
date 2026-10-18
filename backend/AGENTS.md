@@ -22,11 +22,12 @@ For changes to a public HTTP contract, also read the [frontend guide](../fronten
 - `src/server.ts` loads environment configuration, listens, and handles process shutdown. Keep listening and process-signal effects out of application construction and tests that only need injection.
 - `src/config.ts` parses configuration at the boundary. Pass validated values to application behavior instead of scattering unparsed environment reads through handlers.
 - `src/model/config.ts` validates model settings lazily at explicit invocation; `client.ts` owns bounded single-step Responses calls, deadlines, cancellation and safe failures. `probe-cases.ts` contains public in-memory examples; runner/CLI report capability evidence without an HTTP endpoint. See [model verification](../docs/engineering/verification.md#model-access).
+- `src/generation/` owns strict internal generation contracts, frozen-snapshot tools, explicit bounded orchestration and isolated smoke. It consumes the model/store modules without adding HTTP routes. Candidate save is unverified and does not adopt a version; see [generation boundaries](../docs/engineering/development.md#bounded-generation).
 - `src/routes/` owns HTTP routing and contracts. Keep generated-file work, model execution, and database access in concrete modules when those features are first implemented.
 - `src/contracts/projects.ts` owns Zod project/session/snapshot/DTO contracts. `src/storage/` owns file migrations and synchronous short transactions; `src/templates/` loads the backend's prepared catalog. Project route tests explicitly inject a store/catalog; bare buildApp does not open a database. The application owns and closes an injected store.
 - `test/` contains Node test-runner behavior tests using Fastify injection. Preserve the production build's exclusion of test sources and the existing NodeNext `.js` import convention.
 - Use the backend's structured logger and the logging contract. Untrusted input and provider output require runtime validation; compiler types are insufficient.
-- Generated code must execute outside the host backend process and receive no backend credentials. AI SDK/OpenAI/Zod and SQLite/cookie/rate-limit libraries are backend dependencies. Project persistence is implemented; actual model generation and candidate adoption remain future work. Never turn internal fixture records into claimed model activity.
+- Generated code must execute outside the host backend process and receive no backend credentials. Project persistence and internal bounded generation are implemented. Public generation controls, candidate preview/adoption and workspace UI remain future work. Never turn fixture records into claimed model activity or candidate saves into preview success.
 
 ## Available commands
 
@@ -37,6 +38,8 @@ pnpm --filter @atoms/backend test
 pnpm --filter @atoms/backend build
 pnpm model:probe --help
 pnpm model:probe:built --help
+pnpm generation:smoke --help
+pnpm generation:smoke:built --help
 ```
 
 After building, `pnpm --filter @atoms/backend start` runs the production entry. Configuration loading depends on the application working directory; use the workspace commands rather than bypassing that setup.

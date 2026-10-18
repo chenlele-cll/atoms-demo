@@ -27,13 +27,27 @@
 
 ## Generation when implemented
 
-当前模型模块提供有限调用与能力样例与 runner，尚无项目生成实现。`client.run` 建立操作截止时间，内部 `session.step` 每次只执行一个模型步骤；工具分派和下一步必须留在同一作用域内，并在分派前检查取消。探针中的 `/App.tsx` 仅做结构/路径/字节检查，`inspect_fixture` 只使用公开内存数据；二者不读写项目、不执行代码。后续接入项目生成时继续遵守以下边界：
+当前已有内部有界生成内核与独立验收入口，公开生成/事件接口尚待 GEN-005。`client.run` 建立操作截止时间，内部 `session.step` 每次只执行一个模型步骤；工具分派和下一步必须留在同一作用域内，并在分派前检查取消。GEN-002 探针仍独立于项目；实际生成契约见下节。所有生成继续遵守以下边界：
 
 - 对文件路径、依赖范围、输出体积、步骤数和总时长设置限制；模型结果通过 schema 校验后仍需验证实际编译与交互。
 - 生成代码在隔离的预览或执行环境中运行，不能在宿主后端进程中执行，也不能获得后端凭据。
 - 任务阶段、工具活动和完成状态必须对应实际发生的工作，不能模拟模型执行或将未验证代码标记为可用。
 - 明确定义失败、超时、取消和断线时的任务行为，失败时保留上一个可用快照。
 - 初期请求内任务不承诺关闭浏览器后继续执行；需要可靠后台续跑时再实现相应机制。
+
+## Bounded generation
+
+GEN-004 的 backend/src/generation/contracts.ts 是内部请求、结果和工具的 Zod 来源。generateProject 只接受会话/项目/基线/请求 UUID 与修剪后的需求（1–4000 字符、UTF-8 最多 16 KiB），不接收代码、模型配置或工具列表。先检查持久会话到期及项目归属，再查询相同 requestId；仅新请求检查当前基线、支持布局和模型配置。匹配重放返回原 run/候选，不能再次调用或追加输入；需求或基线不同为 REQUEST_CONFLICT，失败重试需要新 requestId。项目级并发准入与公开取消由 GEN-005 接入。
+
+上下文只含固定规则、当前快照身份/依赖元数据、同项目最近完整历史及当前需求一次。历史选最近 10 条，按从近到远保留总正文不超过 16 KiB 的整条消息，再恢复序号顺序，记录省略数；代码通过工具按需读取，不从 catalog 替换项目数据。每步将工具 schema 与完整消息序列 UTF-8 JSON 计量，累计最多 256 KiB，超限失败而不截断文件。
+
+三个工具的 schema 派生自同一 Zod 定义，strict=true、所有参数必填、parallel_tool_calls=false，无 SDK execute 或自动多步：list_files 返回冻结基线的排序路径/字节/可写标记；read_files 读取 1–8 个不同文件，正文合计不超过 96 KiB；submit_files 只允许一次终端提交 1–8 个完整文件，正文合计不超过 256 KiB。未知/多调用、额外参数、重复调用 ID 或无有效调用立即失败，不自动修复。读取结果与 SDK 的完整 response.messages/对应工具结果续接，推理续接项只留本轮内存，不进入对话、活动或日志。
+
+company-landing 策略只允许已有 App.tsx 与 components/data/lib/generated 内的 TS/TSX 业务文件，以及已有 src/generated CSS；新文件仅在 /src/generated 下为 ts/tsx/css。根路径与 src 路径的业务规则均明确判断，实际接入使用 GEN-001 的 src 布局。入口引导、配置、许可、资源及预编译 CSS 只读。至少成功读取一个文件，覆盖已有路径必须已读取；拒绝路径绕过、重复、空正文、删除及完全无变化。全量复制文件映射后一次合并，复用快照契约校验 64 文件/2 MiB、身份和依赖，服务端重算 digest/changedFiles。新增样式使用普通 CSS；不做字符串伪编译或宿主执行，结果始终 previewStatus=unverified。
+
+整个操作共享 MODEL_TIMEOUT_MS（默认 60000ms）和外部 AbortSignal，最多 6 次实际模型请求，每次沿用输出预算且 maxRetries=0。请求、工具、验证和事务前均检查；成功事务退出前再次检查，取消/超时使写入整体回滚。模型与网络等待不在数据库事务内，外部连接可写。受理原子保存 running/user；完成原子保存候选、事实摘要及 succeeded，保持 currentVersionId 不变；摘要只声明“候选已保存，预览未验证”。运行中基线改变拒绝保存。受理后失败保留输入，取消写 cancelled，超时写 failed/GENERATION_TIMEOUT；终态也写不入时返回 STORAGE_UNAVAILABLE、terminalStatePersisted=false，不冒充已持久化终止。成功已提交后到达的取消不改写结果。
+
+活动只包含 runId、单调序号、时间、步骤、批准工具名、字节/路径、安全分类和保存标识。完成活动在相应动作后发出，saved 在事务提交后；观察者异常只计入 observerErrors，不影响事实结果。请求次数来自实际传输，用量按已观测单次值累计，任一步未知则合计 null；保留分项，重放未知指标全为 null。原始供应商异常、提示词、代码、工具正文与思维链均不进入结果或日志。进程硬杀可能留下 running，启动恢复由 GEN-005 负责，不自动重试模型。
 
 ## Persistence when implemented
 

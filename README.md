@@ -4,7 +4,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 项目目标是让用户通过自然语言生成和修改网页应用，交互预览结果，并保存项目与代码版本。
 
-当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。真实项目生成、候选采用和完整工作台尚未实现，Top 1 尚未完成。
+当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。内部有界候选生成已实现；公开生成接口、候选预览/采用和完整工作台尚未实现，Top 1 尚未完成。
 
 ## 环境
 
@@ -130,6 +130,21 @@ pnpm model:probe:built --case all --report
 无参数或 `--help` 仅显示帮助，不读取环境文件、不发请求。只有显式 `--case text|files|tools|all` 才调用；文本/文件各最多 1 次、工具最多 2 次、all 最多 4 次，没有自动重试。使用 Responses API 并设置 `store: false`；每项样例共用一个截止时间，Ctrl+C / SIGTERM 中止活动请求并分别退出 130/143。认证、权限、额度、服务、网络、超时或取消会停止剩余样例。
 
 文件样例只检查 `/App.tsx` 的结构、非空内容及 16 KiB 字节上限，不写入、不执行、不证明编译通过；工具只读取公开内存数据，最终回答须确认本次实际工具结果。默认输出脱敏 JSON，可选报告保存到忽略的 `test-results/model-probe/<runId>.json`。`source` 区分 live/fixture/not-run，用量缺失为 null；缺配置、任一必需项失败或未执行均非零退出。默认 check/smoke/verify、健康检查及 CI 均不调用真实模型。覆盖和验收边界见 [Model access](./docs/engineering/verification.md#model-access)。
+
+## 有界候选生成
+
+GEN-004 提供内部 generateProject 内核，目前没有公开生成路由或生成 UI。它从已保存当前版本读取代码，通过 list_files/read_files/submit_files 修改有限业务文件，最多六次模型请求、共享默认 60 秒期限、零重试。受理记录与用户输入先保存，合法提交将完整候选、事实摘要和成功状态原子保存，当前版本保持不变。失败保留输入；同一 requestId 重放不再次调用模型。
+
+```sh
+pnpm generation:smoke --help
+pnpm generation:smoke:built --help
+# 完成 pnpm build 后，显式执行一项真实样例：
+pnpm generation:smoke:built --live --case quote
+```
+
+另有公开 filter 样例；每次只执行所选一项，不自动追加第二项或修复。源码命令会先准备后端模板资产；帮助不读取后端环境或请求模型。只有 --live 和指定 --case 同时存在才调用，使用 backend/.env 的模型配置及固定官方端点；兼容端点支持仍在独立待提交的 GEN-002 改动中。运行器创建自己的随机匿名会话、项目和 SQLite 文件，忽略生产 DATABASE_PATH，不接收现有项目 ID。
+
+报告在忽略的 test-results/generation-smoke/<id>/report.json，同目录保留关闭后的隔离测试数据库用于本地核对，不能上传这些数据库。报告区分 live/fixture/not-run，含实际请求/已知用量、工具元数据、修改路径与候选重开比较，不含代码、提示词或凭据。保存成功仍为 previewStatus=unverified；本轮不证明报价交互、浏览器编译或线上部署。边界见 [Development](./docs/engineering/development.md#bounded-generation)，实测见 [GEN-004 记录](./openspec/changes/gen-004-bounded-agent-generation/tasks.md)。
 
 ## 验证
 

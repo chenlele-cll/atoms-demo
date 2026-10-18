@@ -10,7 +10,9 @@
     "typecheck": "node ../scripts/prepare-company-template.mjs --target backend-src && tsc --noEmit",
     "test": "node ../scripts/prepare-company-template.mjs --target backend-src && tsx --test test/*.test.ts",
     "model:probe": "tsx src/model/probe.ts",
-    "model:probe:built": "node dist/model/probe.js"
+    "model:probe:built": "node dist/model/probe.js",
+    "generation:smoke": "node ../scripts/prepare-company-template.mjs --target backend-src && tsx src/generation/smoke.ts",
+    "generation:smoke:built": "node dist/generation/smoke.js"
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.96",
@@ -19,11 +21,13 @@
     "ai": "7.0.143",
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.7",
+    "proper-lockfile": "4.1.2",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "^22.0.0",
+    "@types/proper-lockfile": "4.1.4",
     "tsx": "4.23.15"
   }
 }
