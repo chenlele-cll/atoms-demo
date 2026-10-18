@@ -217,6 +217,9 @@ importers:
       '@ai-sdk/openai':
         specifier: 4.0.96
         version: 4.0.96(zod@4.6.7)
+      '@atoms/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
       '@fastify/cookie':
         specifier: 11.1.3
         version: 11.1.3
@@ -254,9 +257,15 @@ importers:
 
   frontend:
     dependencies:
+      '@atoms/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
       '@codesandbox/sandpack-react':
         specifier: 2.20.0
         version: 2.20.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      eventsource-parser:
+        specifier: 4.1.2
+        version: 4.1.2
       react:
         specifier: 19.3.1
         version: 19.3.1
@@ -276,9 +285,21 @@ importers:
       '@vitejs/plugin-react':
         specifier: 6.1.2
         version: 6.1.2(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.15)(yaml@2.9.1))
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
       vite:
         specifier: 8.3.4
         version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@1.21.7)(tsx@4.23.15)(yaml@2.9.1)
+
+  packages/contracts:
+    dependencies:
+      '@noble/hashes':
+        specifier: 2.0.1
+        version: 2.0.1
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
 packages:
 
@@ -854,6 +875,10 @@ packages:
   '@marijn/find-cluster-break@1.0.4':
     resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
 
+  '@noble/hashes@2.0.1':
+    resolution: {integrity: sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==}
+    engines: {node: '>= 20.19.0'}
+
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
     engines: {node: '>= 8'}
@@ -1402,6 +1427,10 @@ packages:
   eventsource-parser@3.1.1:
     resolution: {integrity: sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ==}
     engines: {node: '>=18.0.0'}
+
+  eventsource-parser@4.1.2:
+    resolution: {integrity: sha512-N9b0EvATDJfZj+Szg3m8WwqseQhei/mtTd6V0rCciGbI/yG24o3yBk0YVyfOZZsLVMZHWs++Zk3Aqd2y2EztnQ==}
+    engines: {node: '>=22.12'}
 
   ext@1.7.0:
     resolution: {integrity: sha512-6hxeJYaL110a9b5TEJSj0gojyHQAmA2ch5Os+ySCiA1QGdS697XWY1pzsrSjqA9LDEEgdB/KypIlR59RcLuHYw==}
@@ -2884,6 +2913,8 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.4': {}
 
+  '@noble/hashes@2.0.1': {}
+
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
       '@nodelib/fs.stat': 2.0.5
@@ -3426,6 +3457,8 @@ snapshots:
       es5-ext: 0.10.64
 
   eventsource-parser@3.1.1: {}
+
+  eventsource-parser@4.1.2: {}
 
   ext@1.7.0:
     dependencies:

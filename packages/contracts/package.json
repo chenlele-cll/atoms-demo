@@ -1,0 +1,23 @@
+{
+  "name": "@atoms/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/prepare-contracts.mjs",
+    "typecheck": "node ../../scripts/prepare-contracts.mjs"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.0.1",
+    "zod": "4.6.7"
+  }
+}

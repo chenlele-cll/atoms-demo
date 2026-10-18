@@ -132,7 +132,7 @@ async function doctor() {
   } catch { /* Report through the check below. */ }
   add('pnpm', pnpmOk, `required ${details.pkg.packageManager}`, 'Install/select the pinned pnpm version.');
   let dependenciesOk = true;
-  for (const scope of ['', 'frontend', 'backend']) {
+  for (const scope of ['', 'frontend', 'backend', 'packages/contracts']) {
     const pkg = JSON.parse(await readFile(path.join(root, scope, 'package.json'), 'utf8'));
     const missing = [];
     for (const [name, version] of Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })) {
@@ -150,9 +150,9 @@ async function doctor() {
     try {
       const result = await run('pnpm', ['-r', 'list', '--depth=-1', '--json']);
       const members = JSON.parse(result.stdout);
-      workspace = result.code === 0 && Array.isArray(members) && ['frontend', 'backend'].every((scope) => members.some((item) => object(item) && item.path === path.join(root, scope)));
+      workspace = result.code === 0 && Array.isArray(members) && ['frontend', 'backend', 'packages/contracts'].every((scope) => members.some((item) => object(item) && item.path === path.join(root, scope)));
     } catch { /* Diagnostic below. */ }
-    add('workspace', workspace, 'frontend and backend must be pnpm workspace members.', 'Check pnpm-workspace.yaml.');
+    add('workspace', workspace, 'Applications and public contracts must be pnpm workspace members.', 'Check pnpm-workspace.yaml.');
   }
   let pcOk = false;
   try { await prepare(); pcOk = await toolValid(details); } catch { /* Diagnostic below. */ }

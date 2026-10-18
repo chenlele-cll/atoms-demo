@@ -1,4 +1,7 @@
 node_modules/
+/packages/contracts/src/template-assets/
+/packages/contracts/.build-*/
+/packages/contracts/.previous-*/
 dist/
 coverage/
 *.tsbuildinfo

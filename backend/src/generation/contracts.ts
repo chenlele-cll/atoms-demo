@@ -1,21 +1,22 @@
 import { z } from 'zod';
 import { idSchema, runErrorSchema, runStatusSchema } from '../contracts/projects.js';
-import { validateVirtualPath } from '../template-assets/bundle.mjs';
+import { virtualPathSchema, promptSchema, toolNameSchema } from '@atoms/contracts';
+export { activitySchema, toolNameSchema } from '@atoms/contracts';
+export type { GenerationActivity } from '@atoms/contracts';
+export { virtualPathSchema } from '@atoms/contracts';
 
 export const generationInputSchema = z.strictObject({
   sessionId: idSchema, projectId: idSchema, baseVersionId: idSchema, requestId: idSchema,
-  prompt: z.string().trim().min(1).max(4000).refine(value => Buffer.byteLength(value, 'utf8') <= 16 * 1024),
+  prompt: promptSchema,
 });
 export type GenerationInput = z.infer<typeof generationInputSchema>;
-export const virtualPathSchema = z.string().max(240).refine(value => { try { validateVirtualPath(value); return true; } catch { return false; } });
 export const listFilesSchema = z.strictObject({});
 export const readFilesSchema = z.strictObject({ paths: z.array(virtualPathSchema).min(1).max(8).refine(paths => new Set(paths).size === paths.length) });
 export const submitFilesSchema = z.strictObject({
   files: z.array(z.strictObject({ path: virtualPathSchema, content: z.string().min(1) })).min(1).max(8)
     .refine(files => new Set(files.map(file => file.path)).size === files.length),
 });
-export const toolNames = ['list_files', 'read_files', 'submit_files'] as const;
-export const toolNameSchema = z.enum(toolNames);
+export const toolNames = toolNameSchema.options;
 export type ToolName = z.infer<typeof toolNameSchema>;
 export const toolSchemas = { list_files: listFilesSchema, read_files: readFilesSchema, submit_files: submitFilesSchema };
 export const generationTools = {
@@ -34,11 +35,3 @@ export const generationResultSchema = z.strictObject({
   replayed: z.boolean(), metrics: metricsSchema, observerErrors: z.number().int().nonnegative(),
 });
 export type GenerationResult = z.infer<typeof generationResultSchema>;
-export const activitySchema = z.strictObject({
-  runId: idSchema, sequence: z.number().int().positive(), at: z.iso.datetime(),
-  type: z.enum(['request-started', 'request-finished', 'tool-started', 'tool-finished', 'validated', 'saved', 'ended']),
-  step: z.number().int().nonnegative(), tool: toolNameSchema.optional(), bytes: z.number().int().nonnegative().optional(),
-  changedFiles: z.array(virtualPathSchema).optional(), candidateVersionId: idSchema.optional(),
-  status: runStatusSchema.optional(), errorCode: runErrorSchema.optional(),
-});
-export type GenerationActivity = z.infer<typeof activitySchema>;

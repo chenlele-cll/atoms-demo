@@ -4,21 +4,24 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node ../scripts/prepare-company-template.mjs && vite",
-    "build": "node ../scripts/prepare-company-template.mjs && tsc --noEmit && vite build",
+    "dev": "node ../scripts/prepare-contracts.mjs && node ../scripts/prepare-company-template.mjs && vite",
+    "build": "node ../scripts/prepare-contracts.mjs && node ../scripts/prepare-company-template.mjs && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "node ../scripts/prepare-contracts.mjs && tsc --noEmit"
   },
   "dependencies": {
+    "@atoms/contracts": "workspace:*",
+    "@codesandbox/sandpack-react": "2.20.0",
+    "eventsource-parser": "4.1.2",
     "react": "19.3.1",
-    "react-dom": "19.3.1",
-    "@codesandbox/sandpack-react": "2.20.0"
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "6.1.2",
+    "tsx": "4.23.15",
     "vite": "8.3.4"
   }
 }
