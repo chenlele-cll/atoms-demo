@@ -140,7 +140,7 @@ pnpm smoke:template
 | GET /api/projects/:projectId/versions/:versionId | 完整不可变 version、successfulRun 或 null、changedFiles、currentVersionId、adoptionAvailability；有归属、no-store、每 IP 每分钟 60 次 |
 | POST /api/projects/:projectId/versions/:versionId/adopt | 严格 `{expectedCurrentVersionId}`，上限 1 KiB；返回 `{projectId,currentVersionId,updatedAt,alreadyCurrent}`；每 IP 每分钟 10 次 |
 
-采用须关联本项目成功生成运行，parent 与 expected 相同，当前仍为 expected，且没有活动或未确认生成。过期为 409 CURRENT_VERSION_CONFLICT；不是合法候选为 409 CANDIDATE_NOT_ADOPTABLE；活动为 409 PROJECT_BUSY，孤立 running 为 503 RUN_STATE_UNCONFIRMED。同一合法目标已是当前时返回 alreadyCurrent=true，不重复写入；不提供历史恢复。采用只切换当前引用，不修改快照或调用模型。
+采用须关联本项目成功生成运行，parent 与 expected 相同，当前仍为 expected，且没有活动或未确认生成。过期为 409 CURRENT_VERSION_CONFLICT；不是合法候选为 409 CANDIDATE_NOT_ADOPTABLE；活动为 409 PROJECT_BUSY，孤立 running 为 503 RUN_STATE_UNCONFIRMED。同一合法目标已是当前时返回 alreadyCurrent=true，不重复写入；历史恢复使用下述独立 restore 接口。采用只切换当前引用，不修改快照或调用模型。
 
 按钮仅在本轮候选真实编译完成、无已知错误且服务端条件可用时启用。编译反馈是本地观察，不是可信编译证明或业务验收；后端不接受 verified 标记。网络断开/响应不合法时显示待确认并查询当前项目，查询失败可再次查询；仍是原版本不能证明原请求不会提交，可由所有者明确重试同一载荷。出现其他当前版本时保留冲突，不自动更换 expected 或回写旧版本。
 
@@ -153,6 +153,20 @@ pnpm smoke:template
 先 `pnpm build`，再 `pnpm smoke:candidate`；需要 Chrome、空闲 3001/5173/4173 以及外部 Sandpack 网络。报告位于忽略的 `test-results/candidate-review/<id>/report.json`，以明确 fixture 候选验证真实编译、报价控件、隔离、错误、采用竞争和重启，不消耗真实模型额度。覆盖与限制见 [Verification](./docs/engineering/verification.md#candidate-review)，历史混合工作区证据与隔离验证记录见 [GEN-006 tasks](./openspec/changes/gen-006-candidate-preview-adoption/tasks.md#isolated-review-evidence)。
 
 历史查询由 REV-001 提供：beforeSequence 为排他非负安全整数，0 返回空页，末页 nextBeforeSequence=null；分页间新增版本需刷新首页可见。每项展示版本/父关联/时间、当前标记、对应运行与需求摘录、标明 stored/fallback 的简短摘要和实际修改路径，文本最多 240 个 Unicode 码点。每页当前标记反映该次读取，不代表版本曾被采用或已通过预览。每 IP 每分钟 60 次，响应最多 1 MiB，损坏/超限明确失败；查询不改数据、不调用模型。历史 UI、确认恢复与恢复后续改仍由后续 REV 任务对接；契约与验证分别见 [Version history](./docs/engineering/development.md#version-history) 和 [历史验证](./docs/engineering/verification.md#version-history)。
+
+## 历史版本恢复
+
+REV-002 提供 `POST /api/projects/:projectId/versions/:versionId/restore`，使用原作者会话、精确 Origin 和 JSON，查询参数必须为空，请求体最多 1 KiB：
+
+```json
+{"expectedCurrentVersionId":"当前版本的 UUID"}
+```
+
+成功返回 `{projectId,currentVersionId,updatedAt,alreadyCurrent}`。目标可为本项目已存模板或有效成功生成版本，包括从未采用的候选；不要求目标 parent 等于 expected。真实切换须当前仍等于 expected，且项目没有活动或未确认生成；只修改当前引用和更新时间，保留全部版本、对话、运行与文件，不调用模型、不执行代码。目标已是当前时合法重试不写数据、不更新时间，但仍验证会话、归属和目标完整性。
+
+每 IP 每分钟 10 次，429 带 Retry-After，所有响应 no-store。冲突为 409 CURRENT_VERSION_CONFLICT，缺少成功结果关联为 409 VERSION_NOT_RESTORABLE，活动为 409 PROJECT_BUSY，孤立 running 为 503 RUN_STATE_UNCONFIRMED，停服/所有权失效拒绝实际切换；损坏目标为安全 500。响应丢失后用项目 GET 查询当前事实，不能直接当作回滚或自动换 expected 重试。
+
+本轮实现后端恢复接口；先预览再确认的历史 UI、恢复后上下文筛选与完整真实模型验收由 REV-003～005 接入。恢复代码和布局不代表恢复预览内业务临时输入。契约见 [Version restoration](./docs/engineering/development.md#version-restoration)，测试及实际结果见 [恢复验证](./docs/engineering/verification.md#version-restoration)。
 
 ## 模型能力探针
 

@@ -10,7 +10,7 @@ import { ProjectError, storageOperation } from '../projects/errors.js';
 import { migrate } from './migrations.js';
 import { canonicalJSON, companyTemplateIdentity, parseTemplateBundle } from '../template-assets/bundle.mjs';
 import type { GenerationInput } from '../generation/contracts.js';
-import { versionReviewSchema, adoptResponseSchema, versionHistorySchema } from '@atoms/contracts';
+import { versionReviewSchema, adoptResponseSchema, versionHistorySchema, restoreResponseSchema } from '@atoms/contracts';
 
 export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 export function tokenDigest(token: string) { return createHash('sha256').update(token).digest('hex'); }
@@ -122,6 +122,35 @@ export class ProjectStore {
         .run(versionId, updatedAt, projectId, ownerId, expected);
       if (result.changes !== 1) throw new ProjectError('CURRENT_VERSION_CONFLICT');
       return parse(adoptResponseSchema, { projectId, currentVersionId: versionId, updatedAt, alreadyCurrent: false });
+    }).immediate());
+  }
+
+  restoreVersion(ownerId: string, projectId: string, versionId: string, expected: string,
+    activity: () => 'busy' | 'unconfirmed' | null, now: () => number = Date.now) {
+    return storageOperation(() => this.db.transaction(() => {
+      if (!z.array(idSchema).length(4).safeParse([ownerId, projectId, versionId, expected]).success) throw new ProjectError('INVALID_INPUT');
+      const time = now();
+      const session: unknown = this.db.prepare('SELECT id FROM sessions WHERE id=? AND expires_at>?').get(ownerId, time);
+      if (!session) throw new ProjectError('SESSION_REQUIRED');
+      this.owned(ownerId, projectId);
+      const project = this.project(projectId); const target = this.candidate(projectId, versionId);
+      if (this.db.prepare('SELECT 1 FROM generation_runs WHERE result_version_id=? AND project_id<>? LIMIT 1').get(versionId, projectId)) {
+        throw new ProjectError('DATA_CORRUPT');
+      }
+      if (target.version.kind === 'generated' && !target.eligible) throw new ProjectError('VERSION_NOT_RESTORABLE');
+      if (project.currentVersionId === versionId) return parse(restoreResponseSchema, {
+        projectId, currentVersionId: versionId, updatedAt: project.updatedAt, alreadyCurrent: true });
+      if (project.currentVersionId !== expected) throw new ProjectError('CURRENT_VERSION_CONFLICT');
+      if (typeof activity !== 'function') throw new ProjectError('GENERATION_UNAVAILABLE');
+      const active = activity();
+      if (active === 'busy') throw new ProjectError('PROJECT_BUSY');
+      if (active === 'unconfirmed' || this.hasRunning(projectId)) throw new ProjectError('RUN_STATE_UNCONFIRMED');
+      if (active !== null) throw new ProjectError('GENERATION_UNAVAILABLE');
+      const updatedAt = new Date(Math.max(time, Date.parse(project.updatedAt) + 1)).toISOString();
+      const result = this.db.prepare('UPDATE projects SET current_version_id=?,updated_at=? WHERE id=? AND owner_session_id=? AND current_version_id=?')
+        .run(versionId, updatedAt, projectId, ownerId, expected);
+      if (result.changes !== 1) throw new ProjectError('CURRENT_VERSION_CONFLICT');
+      return parse(restoreResponseSchema, { projectId, currentVersionId: versionId, updatedAt, alreadyCurrent: false });
     }).immediate());
   }
 

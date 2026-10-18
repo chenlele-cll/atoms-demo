@@ -154,6 +154,9 @@ export class GenerationManager {
     this.streams.clear();
   }
   get activeCount() { return this.active.size; }
+  assertWritable() {
+    if (this.stopping) throw new ProjectError('GENERATION_UNAVAILABLE');
+  }
   projectActivity(projectId: string): 'busy' | 'unconfirmed' | null {
     if ([...this.active.values()].some(item => item.accepted.request.projectId === projectId)) return 'busy';
     return this.store.hasRunning(projectId) ? 'unconfirmed' : null;

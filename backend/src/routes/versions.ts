@@ -1,12 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import type { z } from 'zod';
-import { adoptRequestSchema, adoptResponseSchema, errorSchema, versionParamsSchema, versionReviewSchema } from '@atoms/contracts';
+import { adoptRequestSchema, adoptResponseSchema, errorSchema, versionParamsSchema, versionReviewSchema,
+  restoreRequestSchema, restoreResponseSchema } from '@atoms/contracts';
 import { sessionRequestSchema } from '../contracts/projects.js';
 import type { ProjectStore } from '../storage/store.js';
-import type { GenerationManager } from '../generation/manager.js';
+import { GenerationManager } from '../generation/manager.js';
+import { ProjectError } from '../projects/errors.js';
 
 export function versionRoutes(app: FastifyInstance, store: ProjectStore, manager: GenerationManager,
   owner: (cookies: Record<string, string | undefined>) => string, now?: () => number) {
+  if (!(manager instanceof GenerationManager)) throw new ProjectError('GENERATION_UNAVAILABLE');
   const errors = { '4xx': errorSchema, '5xx': errorSchema };
   app.get<{ Params: z.infer<typeof versionParamsSchema> }>('/projects/:projectId/versions/:versionId', {
     config: { rateLimit: { max: 60, timeWindow: 60_000 } },
@@ -17,4 +20,9 @@ export function versionRoutes(app: FastifyInstance, store: ProjectStore, manager
     schema: { params: versionParamsSchema, querystring: sessionRequestSchema, body: adoptRequestSchema, response: { 200: adoptResponseSchema, ...errors } },
   }, request => store.adoptVersion(owner(request.cookies), request.params.projectId, request.params.versionId, request.body.expectedCurrentVersionId,
     () => manager.projectActivity(request.params.projectId), now));
+  app.post<{ Params: z.infer<typeof versionParamsSchema>; Body: z.infer<typeof restoreRequestSchema> }>('/projects/:projectId/versions/:versionId/restore', {
+    bodyLimit: 1024, config: { rateLimit: { max: 10, timeWindow: 60_000 } },
+    schema: { params: versionParamsSchema, querystring: sessionRequestSchema, body: restoreRequestSchema, response: { 200: restoreResponseSchema, ...errors } },
+  }, request => store.restoreVersion(owner(request.cookies), request.params.projectId, request.params.versionId, request.body.expectedCurrentVersionId,
+    () => { manager.assertWritable(); return manager.projectActivity(request.params.projectId); }, now));
 }

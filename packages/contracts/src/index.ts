@@ -97,6 +97,9 @@ export const adoptRequestSchema = z.strictObject({ expectedCurrentVersionId: idS
 export const adoptResponseSchema = z.object({ projectId: idSchema, currentVersionId: idSchema, updatedAt: timeSchema, alreadyCurrent: z.boolean() });
 export type VersionReview = z.infer<typeof versionReviewSchema>;
 export type Adoption = z.infer<typeof adoptResponseSchema>;
+export const restoreRequestSchema = adoptRequestSchema;
+export const restoreResponseSchema = adoptResponseSchema;
+export type Restoration = z.infer<typeof restoreResponseSchema>;
 
 export const VERSION_HISTORY_MAX_BYTES = 1024 * 1024;
 const historyIntegerQuery = z.string().regex(/^(0|[1-9]\d*)$/).transform(Number).pipe(z.number().int().min(0).max(Number.MAX_SAFE_INTEGER));

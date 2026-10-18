@@ -183,6 +183,16 @@ REV-001 的 `backend/test/version-history.test.ts` 使用现有 Node 测试器�
 
 本变更相关整体检查为 `pnpm check` → `pnpm smoke`（已含 build）→ `pnpm smoke:projects`，占端口套件串行。历史页面、restore 与恢复后新生成尚待 REV-002～004 实际接通，不能由现有 fixture 或结构校验代替；实际命令、退出结果和剩余任务见 [REV-001 tasks](../../openspec/changes/rev-001-version-history/tasks.md)。
 
+## Version restoration
+
+REV-002 的 `backend/test/version-restoration.test.ts` 与 `version-restoration-network.test.ts` 随 `pnpm check` 执行，使用现有 Node 测试器、临时真实 SQLite、Fastify injection 与随机端口真实 HTTP。正常恢复测试的模型请求计数为零；与生成竞争的测试使用实际 SDK 和 loopback 受控上游，明确为 fixture，不读取真实 `.env` 或调用外部模型。
+
+覆盖模板/祖先/未采用分支、strict 请求与全部错误状态、会话到期与跨归属 404、10/min/IP、显式检查依赖、全部 running 与取消收尾 Map、CAS/幂等先后顺序、单调更新时间、事务回滚、目标/父快照/同项目及跨项目结果关联损坏。SQL 全表前后比较证明实际恢复只改项目引用/更新时间，旧快照、消息与运行完整保留；模型传输计数和源码哨兵证明不调用或执行代码。
+
+真实网络测试还覆盖 adopt/restore 竞争、SSE accepted 后恢复 busy、恢复先提交后旧基线生成拒绝、所有权撤销、请求已进入后触发真实 app.preClose 的写入拒绝、提交后销毁响应连接、查询不可用、POST 请求体延迟最后一个字节时先读旧值、目标切走后旧 CAS 拒绝，以及关闭所属监听应用/数据库并再次 listen 后保留原 cookie/current/完整快照。仅清理本次资源，不占固定开发端口，不以 injection 冒充这些网络证据。
+
+本变更整体检查按 `pnpm check` → `pnpm build` → `pnpm smoke:projects` → `pnpm smoke:generation-stream` 串行执行，后两项消费该构建。实际命令/退出结果、源码身份和剩余边界见 [REV-002 tasks](../../openspec/changes/rev-002-version-restoration/tasks.md)。本任务不验证恢复 UI、恢复后模型上下文、真实模型业务质量或线上部署，也不修改其他 REV 的完成状态。
+
 ## Bounded generation
 
 GEN-004 使用现有 Node 测试器覆盖实际 SDK 与真实临时 SQLite 链路。普通 check 使用显式 fixture 传输与假配置，不读取开发者 .env、调用外部模型或触碰生产 DATABASE_PATH。测试范围：

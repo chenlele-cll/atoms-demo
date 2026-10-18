@@ -7,6 +7,7 @@ const definitions = {
   BASE_VERSION_CHANGED: [409, 'Project base version has changed.'],
   CURRENT_VERSION_CONFLICT: [409, 'Current version changed. Reload the project state.'],
   CANDIDATE_NOT_ADOPTABLE: [409, 'Version is not a successful candidate for this base.'],
+  VERSION_NOT_RESTORABLE: [409, 'Version has no valid successful generation result.'],
   ACCEPT_REQUIRED: [406, 'Accept text/event-stream is required.'],
   PROJECT_BUSY: [409, 'Project already has an active generation.'],
   SESSION_BUSY: [429, 'Session already has an active generation.'],

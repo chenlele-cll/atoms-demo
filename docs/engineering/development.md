@@ -113,6 +113,18 @@ sessionStorage 仅存项目/request/base/prompt/时间信封，最多 20 项、2
 
 源码来自所选版本完整快照，只读 select/pre/code 文本，不用 HTML 注入，不执行源码，不实现编辑/保存。切换版本同步文件映射；长源码仅在 pre 内横向滚动。iframe 只接收代码和依赖，平台会话、提示词与后端凭据不得传入。输入与响应式规则由 owning design skill 维护。
 
+## Version restoration
+
+REV-002 在 `@atoms/contracts` 导出 `restoreRequestSchema`、`restoreResponseSchema` 和 `Restoration`；请求/响应结构与采用相同，直接复用权威定义，两个操作的业务资格独立。`POST /api/projects/:projectId/versions/:versionId/restore` 使用 UUID 路径、strict `{expectedCurrentVersionId}`、严格空 query 和 1 KiB 上限，返回 `{projectId,currentVersionId,updatedAt,alreadyCurrent}`；复用 Origin/JSON/会话/归属/no-store/安全错误，每 IP 10/min、429 带 Retry-After。
+
+`ProjectStore.restoreVersion` 在同步 immediate 短事务内重新验证会话有效性、owner、已存目标及父快照的完整结构、身份与 digest，并复用 candidate 的唯一 succeeded 结果关联检查；同时拒绝已有跨项目矛盾结果关联。generated 无成功结果关联为 409 VERSION_NOT_RESTORABLE，损坏/矛盾为安全 500 DATA_CORRUPT；模板可恢复，不依赖当前 catalog 或曾采用标记。目标已当前的合法重试先于 CAS/活动检查返回原 updatedAt；目标损坏或会话过期仍拒绝。
+
+真正切换按 current=expected 检查，不能使用 adopt 的 parent=expected 约束。显式 activity 回调同步调用本应用真实 `GenerationManager.assertWritable/projectActivity`：stopping（含所有权撤销）拒绝写入，活动 Map 含取消收尾返回 PROJECT_BUSY，无执行者 running 返回 RUN_STATE_UNCONFIRMED，事务内仍检查全部 running；缺失/非法检查器不当作 idle，缺真实 manager 不注册版本路由。所有检查与条件更新之间没有 await，不调用模型或执行快照代码。
+
+按 owner/current 条件更新恰好一行，只改 currentVersionId/updatedAt；更新时间取 max(当前时钟, 旧更新时间+1ms)，合法无写入重试不更新时间。失败整事务回滚，快照/序号/父关联/消息/run 不变，不新增恢复副本。不同目标共享 expected 至多一个成功，相同目标可幂等；目标随后被切走时旧请求重新受 CAS 约束。当前 ID CAS 不记录 ABA 历史，也不承诺操作日志。
+
+响应未知时 GET 项目仅证明查询时 current；读到旧值不能证明在途 POST 不会提交，读到其他目标也不能重建历史。后续消费者保留 unknown、明确查询或同合法载荷手动重试，不自动换 expected。REV-003 负责 UI 门槛，REV-004 负责恢复后续改，REV-005 负责完整真实验收；服务端不接收 compiled/verified 证明。
+
 ## Version history
 
 REV-001 的公开历史契约在 `packages/contracts/src/index.ts`（`@atoms/contracts`）维护，后端项目契约直接重导出同一来源。`GET /api/projects/:projectId/versions?limit=20&beforeSequence=N` 只读，limit 为 1..50，beforeSequence 为可选非负安全整数、排他 `<N`；0 返回空页，重复/额外/非规范整数字段拒绝。按项目内 sequence 倒序，返回 `{projectId,currentVersionId,items,nextBeforeSequence}`；有更多时游标为本页末项序号，否则 null。每页 current/isCurrent 来自同一读取事务，跨页可以改变，客户端应统一校准徽标，不以最大序号推断当前版本。
