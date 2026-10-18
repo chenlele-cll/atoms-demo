@@ -1,97 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { SandpackProvider, useSandpackClient } from '@codesandbox/sandpack-react';
+import { useEffect, useState } from 'react';
+import { SnapshotPreview } from '../preview/SnapshotPreview';
+import { snapshotSchema } from '@atoms/contracts';
 import type { TemplateBundle } from '../../../templates/bundle.mjs';
 import { companyTemplate, loadCompanyTemplate } from '../templates/companyLanding';
 import styles from './TemplateBaseline.module.css';
-
-const BUNDLER_URL = 'https://2-19-8-sandpack.codesandbox.io/';
-const PREVIEW_TIMEOUT_MS = 60000;
-type PreviewState = { status: 'compiling' | 'ready' | 'error'; message: string };
-
-function TemplateFrame() {
-  const { iframe, listen, sandpack, getClient } = useSandpackClient();
-  const runSandpack = sandpack.runSandpack;
-  const [state, setState] = useState<PreviewState>({ status: 'compiling', message: '正在编译模板，首次加载需要下载预览依赖…' });
-  const failed = useRef(false);
-  const deadline = useRef<number | null>(null);
-  const ready = useRef(false);
-  const started = useRef(false);
-  const mounted = useRef(false);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => { mounted.current = false; };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    // React StrictMode replays mount effects. Start after that replay so the
-    // pinned client's asynchronous registration creates only one live client.
-    queueMicrotask(() => {
-      if (!active || started.current) return;
-      started.current = true;
-      runSandpack().then(() => {
-        // Client module loading can finish after a retry unmounted this attempt.
-        // Its provider cleanup ran before creation, so dispose that late client.
-        if (!mounted.current) getClient()?.destroy();
-      }).catch(() => {
-        if (!mounted.current) return;
-        failed.current = true;
-        setState({ status: 'error', message: '预览客户端初始化失败，请重新加载。' });
-      });
-    });
-    return () => { active = false; };
-  }, [runSandpack, getClient]);
-
-  useEffect(() => {
-    deadline.current ??= Date.now() + PREVIEW_TIMEOUT_MS;
-    let active = true;
-    const fail = (message: string) => {
-      if (!active || failed.current) return;
-      failed.current = true;
-      setState({ status: 'error', message });
-    };
-    const timer = window.setTimeout(() => {
-      if (!ready.current) fail('预览服务在 60 秒内未完成编译。请检查网络后重新加载。');
-    }, Math.max(0, deadline.current - Date.now()));
-    const unsubscribe = listen((message) => {
-      if (!active || failed.current) return;
-      if ((message.type === 'action' && message.action === 'show-error') ||
-          (message.type === 'action' && message.action === 'notification' && message.notificationType === 'error') ||
-          (message.type === 'done' && message.compilatonError === true)) {
-        fail('模板预览编译或运行失败。请重新加载；持续失败时检查模板文件与依赖网络。');
-      } else if (message.type === 'done' && message.compilatonError === false) {
-        ready.current = true;
-        window.clearTimeout(timer);
-        setState({ status: 'ready', message: '预览可运行 · 可在下方操作模板' });
-      }
-    });
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-      unsubscribe();
-    };
-  }, [listen]);
-
-  return (
-    <>
-      <p className={state.status === 'error' ? styles.error : styles.status} role="status" data-preview-state={state.status}>
-        {state.message}
-      </p>
-      <iframe
-        src={BUNDLER_URL}
-        ref={iframe}
-        title="企业官网模板隔离预览"
-        sandbox="allow-scripts allow-same-origin"
-        allow=""
-        referrerPolicy="no-referrer"
-        className={styles.frame}
-        aria-busy={state.status === 'compiling'}
-        hidden={state.status === 'error'}
-      />
-    </>
-  );
-}
 
 function TemplateAttempt() {
   const [bundle, setBundle] = useState<TemplateBundle | null>(null);
@@ -110,17 +22,10 @@ function TemplateAttempt() {
 
   if (error) return <p className={styles.error} role="alert" data-preview-state="error">{error}</p>;
   if (!bundle) return <p className={styles.status} role="status" data-preview-state="loading">正在加载并校验模板资源…</p>;
-  const files = Object.fromEntries(Object.entries(bundle.files).map(([filename, code]) => [filename, { code }]));
   return (
     <>
-      <SandpackProvider
-        files={files}
-        customSetup={{ entry: bundle.entry, environment: 'create-react-app', dependencies: bundle.dependencies }}
-        options={{ bundlerURL: BUNDLER_URL, initMode: 'immediate', autorun: false, autoReload: false }}
-        className={styles.preview}
-      >
-        <TemplateFrame />
-      </SandpackProvider>
+      <SnapshotPreview snapshot={snapshotSchema.parse(bundle)} projectId="template" versionId="company-landing-v1" attempt={0}
+        title="企业官网模板隔离预览" baseline />
       <p className={styles.digest}>{Object.keys(bundle.files).length} 个文件 · SHA-256 <code>{bundle.digest}</code></p>
     </>
   );
