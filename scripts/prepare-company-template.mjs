@@ -12,6 +12,8 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const require = createRequire(import.meta.url);
 export const templateSource = path.join(root, 'templates/company-landing');
 export const templateOutput = path.join(root, 'frontend/public/template-assets/company-landing.bundle.json');
+export const templateSources = JSON.parse(await readFile(path.join(root, 'templates/catalog.json'), 'utf8'))
+  .map(id => path.join(root, 'templates', id));
 export const backendTemplateDirectory = (target) => {
   if (!['backend-src', 'backend-dist'].includes(target)) throw new Error('模板准备目标无效。');
   return path.join(root, 'backend', target === 'backend-src' ? 'src' : 'dist', 'template-assets');
@@ -94,7 +96,8 @@ export async function prepareCompanyTemplate({ sourceDirectory = templateSource,
   ]).process(styleInputs.sort((a, b) => a.name.localeCompare(b.name, 'en')).map(({ code }) => code).join('\n'), { from: undefined });
   files['/src/styles.css'] = css.css;
   files['/LICENSE'] = (await readSource('LICENSE')).toString('utf8');
-  files['/public/index.html'] = '<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Company landing · template demonstration</title></head><body><div id="root"></div></body></html>\n';
+  const title = manifest.id === 'company-landing' ? 'Company landing · template demonstration' : manifest.id;
+  files['/public/index.html'] = `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head><body><div id="root"></div></body></html>\n`;
   files['/package.json'] = JSON.stringify({ name: manifest.id, version: '1.0.0', private: true, main: manifest.entry, dependencies: manifest.dependencies }, null, 2) + '\n';
   validateImports(files, manifest.dependencies);
   const content = {
@@ -116,34 +119,45 @@ export async function prepareCompanyTemplate({ sourceDirectory = templateSource,
   return bundle;
 }
 
-export async function prepareBackendTemplate({ outputDirectory = backendTemplateDirectory('backend-src'), sourceDirectory = templateSource } = {}) {
+export async function prepareTemplates({ outputDirectory = path.dirname(templateOutput), sourceDirectories = templateSources } = {}) {
+  const bundles = [];
+  for (const sourceDirectory of sourceDirectories) {
+    const manifest = JSON.parse(await readFile(path.join(sourceDirectory, 'manifest.json'), 'utf8'));
+    if (!/^[a-z0-9-]+$/.test(manifest.id) || bundles.some(bundle => bundle.id === manifest.id)) throw new Error('模板目录标识无效或重复。');
+    bundles.push(await prepareCompanyTemplate({ sourceDirectory, outputFile: path.join(outputDirectory, `${manifest.id}.bundle.json`) }));
+  }
+  if (!bundles.length) throw new Error('模板目录不能为空。');
+  return bundles;
+}
+
+export async function prepareBackendTemplate({ outputDirectory = backendTemplateDirectory('backend-src'), sourceDirectory, sourceDirectories = sourceDirectory ? [sourceDirectory] : templateSources } = {}) {
   const stage = `${outputDirectory}.${randomUUID()}.tmp`;
   const previous = `${outputDirectory}.${randomUUID()}.previous`;
   let moved = false;
   try {
-    const bundle = await prepareCompanyTemplate({ sourceDirectory, outputFile: path.join(stage, 'company-landing.bundle.json') });
-    const identity = Object.fromEntries(Object.entries(bundle).filter(([key]) => !['files', 'digest'].includes(key)));
+    const bundles = await prepareTemplates({ sourceDirectories, outputDirectory: stage });
+    const identities = bundles.map(bundle => Object.fromEntries(Object.entries(bundle).filter(([key]) => !['files', 'digest'].includes(key))));
     const runtime = await readFile(path.join(root, 'templates/bundle.mjs'), 'utf8');
     const types = await readFile(path.join(root, 'templates/bundle.d.mts'), 'utf8');
-    await writeFile(path.join(stage, 'bundle.mjs'), `${runtime}\nexport const companyTemplateIdentity = ${canonicalJSON(identity)};\n`);
-    await writeFile(path.join(stage, 'bundle.d.mts'), `${types}\nexport const companyTemplateIdentity: TemplateIdentity;\n`);
+    await writeFile(path.join(stage, 'bundle.mjs'), `${runtime}\nexport const templateIdentities = ${canonicalJSON(identities)};\nexport const companyTemplateIdentity = templateIdentities.find(template => template.id === 'company-landing');\n`);
+    await writeFile(path.join(stage, 'bundle.d.mts'), `${types}\nexport const templateIdentities: TemplateIdentity[];\nexport const companyTemplateIdentity: TemplateIdentity;\n`);
     try { await rename(outputDirectory, previous); moved = true; }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
     try { await rename(stage, outputDirectory); }
     catch (error) { if (moved) await rename(previous, outputDirectory); throw error; }
     await rm(previous, { recursive: true, force: true });
-    return bundle;
+    return bundles[0];
   } finally { await rm(stage, { recursive: true, force: true }); }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const args = process.argv.slice(2);
   const target = args.length === 0 ? 'frontend' : args.length === 2 && args[0] === '--target' ? args[1] : null;
-  const prepare = target === 'frontend' ? () => prepareCompanyTemplate() : ['backend-src', 'backend-dist'].includes(target)
+  const prepare = target === 'frontend' ? () => prepareTemplates() : ['backend-src', 'backend-dist'].includes(target)
     ? () => prepareBackendTemplate({ outputDirectory: backendTemplateDirectory(target) })
     : () => Promise.reject(new Error('Usage: prepare-company-template.mjs [--target frontend|backend-src|backend-dist]'));
-  prepare().then((bundle) => {
-    console.log(`Prepared ${bundle.id} v${bundle.version}: ${Object.keys(bundle.files).length} files, SHA-256 ${bundle.digest}`);
+  prepare().then((result) => {
+    for (const bundle of Array.isArray(result) ? result : [result]) console.log(`Prepared ${bundle.id} v${bundle.version}: ${Object.keys(bundle.files).length} files, SHA-256 ${bundle.digest}`);
   }).catch((error) => {
     console.error(error instanceof Error ? error.message : '模板准备失败。');
     process.exitCode = 1;

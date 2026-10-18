@@ -47,7 +47,7 @@ test('initial project is atomic, empty and restores every file independently of 
   assert.deepEqual(f.store.listMessages(a.id, first.project.id, 0, 20), { items: [], nextAfterSequence: null });
   assert.equal(f.store.listProjects(b.id, 20).items.length, 0);
   assert.throws(() => f.store.getProject(b.id, first.project.id), error => error instanceof ProjectError && error.code === 'NOT_FOUND');
-  const different = createCatalog(changedSnapshot(f.bundle));
+  const different = createCatalog([changedSnapshot(f.bundle)]);
   assert.notEqual(different.list().items[0]?.digest, f.bundle.digest);
   f.store.close(); const reopened = openStore(f.filename); t.after(() => reopened.close());
   assert.deepEqual(reopened.getProject(a.id, first.project.id), first);

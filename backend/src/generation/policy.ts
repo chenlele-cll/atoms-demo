@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Snapshot } from '../contracts/projects.js';
 import { snapshotSchema } from '../contracts/projects.js';
-import { canonicalJSON } from '../template-assets/bundle.mjs';
+import { canonicalJSON, templateIdentities } from '../template-assets/bundle.mjs';
 import { listFilesSchema, readFilesSchema, submitFilesSchema } from './contracts.js';
 import { GenerationError } from './errors.js';
 
@@ -38,7 +38,7 @@ export function validateCandidate(base: Snapshot, input: unknown) {
 
 export function createFileTools(input: Snapshot) {
   const base = snapshotSchema.parse(input);
-  if (base.id !== 'company-landing' || !Object.keys(base.files).some(path => writable(path, true))) throw new GenerationError('UNSUPPORTED_TEMPLATE');
+  if (!templateIdentities.some(template => template.id === base.id) || !Object.keys(base.files).some(path => writable(path, true))) throw new GenerationError('UNSUPPORTED_TEMPLATE');
   const read = new Set<string>(); let submitted = false;
   return {
     list(input: unknown) {

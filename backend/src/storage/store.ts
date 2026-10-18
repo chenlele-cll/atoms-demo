@@ -8,7 +8,7 @@ import { decodeCursor, encodeCursor, idSchema, messageInputSchema, messageSchema
 import type { MessageInput, Run, Snapshot, Version } from '../contracts/projects.js';
 import { ProjectError, storageOperation } from '../projects/errors.js';
 import { migrate } from './migrations.js';
-import { canonicalJSON, companyTemplateIdentity, parseTemplateBundle } from '../template-assets/bundle.mjs';
+import { canonicalJSON, templateIdentities, parseTemplateBundle } from '../template-assets/bundle.mjs';
 import type { GenerationInput } from '../generation/contracts.js';
 import { versionReviewSchema, adoptResponseSchema, versionHistorySchema, restoreResponseSchema } from '@atoms/contracts';
 
@@ -275,7 +275,9 @@ export class ProjectStore {
 
   createProject(ownerId: string, title: string, input: Snapshot, quota = 20) {
     const snapshot = snapshotSchema.parse(input);
-    parseTemplateBundle(snapshot, companyTemplateIdentity);
+    const identity = templateIdentities.find(template => template.id === snapshot.id);
+    if (!identity) throw new ProjectError('TEMPLATE_CONFLICT');
+    parseTemplateBundle(snapshot, identity);
     const safeTitle = titleSchema.parse(title);
     return storageOperation(() => this.db.transaction(() => {
       const count = parse(z.object({ count: z.number() }), this.db.prepare('SELECT count(*) AS count FROM projects WHERE owner_session_id=?').get(ownerId)).count;

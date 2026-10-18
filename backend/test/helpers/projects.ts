@@ -15,7 +15,7 @@ export async function projectFixture(t: TestContext) {
   const store = openStore(filename);
   t.after(async () => { store.close(); await rm(directory, { recursive: true, force: true }); });
   const bundle = snapshotSchema.parse(JSON.parse(await readFile(new URL('../../src/template-assets/company-landing.bundle.json', import.meta.url), 'utf8')) as unknown);
-  return { directory, filename, store, bundle, catalog: createCatalog(bundle) };
+  return { directory, filename, store, bundle, catalog: createCatalog([bundle]) };
 }
 export function changedSnapshot(original: Snapshot): Snapshot {
   const { digest: previous, ...body } = structuredClone(original);

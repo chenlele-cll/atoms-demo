@@ -40,7 +40,7 @@ async function fixture(t: TestContext, gated = false) {
   let store = openStore(filename);
   const bundle = snapshotSchema.parse(JSON.parse(await readFile(
     new URL('../src/template-assets/company-landing.bundle.json', import.meta.url), 'utf8')) as unknown);
-  const catalog = createCatalog(bundle);
+  const catalog = createCatalog([bundle]);
   const session = store.createSession();
   const detail = store.createProject(session.id, 'Explicit restoration network fixture', bundle);
   const projectId = detail.project.id;

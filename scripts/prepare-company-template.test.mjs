@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'n
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { prepareBackendTemplate, prepareCompanyTemplate, templateSource } from './prepare-company-template.mjs';
+import { prepareBackendTemplate, prepareCompanyTemplate, prepareTemplates, templateSource, templateSources } from './prepare-company-template.mjs';
 import { contentDigest, verifyTemplateBundle } from '../templates/bundle.mjs';
 
 const root = fileURLToPath(new URL('../test-results/template-preparation/', import.meta.url));
@@ -59,6 +59,31 @@ test('fixed source prepares deterministic, self-contained files and compiled CSS
     assert.doesNotMatch(code, /https:\/\/(?:i\.pravatar\.cc|github\.com\/shadcn\.png)|vite-ui-theme|Subscribed!/);
     if (name.endsWith('.asset.ts')) assert.match(code, /^export default "data:image\/(?:png|svg\+xml);base64,/);
   }
+});
+
+test('complete catalog prepares matching assets and rejects a partial backend update', async t => {
+  const f = await fixture(t);
+  const sources = [];
+  for (const source of templateSources) {
+    const target = path.join(f.directory, path.basename(source));
+    await cp(source, target, { recursive: true });
+    sources.push(target);
+  }
+  const frontend = await prepareTemplates({ sourceDirectories: sources, outputDirectory: path.join(f.directory, 'frontend') });
+  assert.deepEqual(frontend.map(bundle => bundle.id), ['company-landing', 'brand-store', 'personal-portfolio']);
+  const outputDirectory = path.join(f.directory, 'backend');
+  await prepareBackendTemplate({ sourceDirectories: sources, outputDirectory });
+  for (const bundle of frontend) {
+    const backend = JSON.parse(await readFile(path.join(outputDirectory, `${bundle.id}.bundle.json`), 'utf8'));
+    assert.deepEqual(backend, bundle);
+    const again = await prepareCompanyTemplate({ sourceDirectory: sources.find(source => source.endsWith(bundle.id)), outputFile: path.join(f.directory, 'again.json') });
+    assert.equal(again.digest, bundle.digest);
+  }
+  const previous = await Promise.all((await readdir(outputDirectory)).sort().map(async name => [name, await readFile(path.join(outputDirectory, name), 'utf8')]));
+  await rm(path.join(sources[2], 'LICENSE'));
+  await assert.rejects(prepareBackendTemplate({ sourceDirectories: sources, outputDirectory }));
+  assert.deepEqual(await Promise.all((await readdir(outputDirectory)).sort().map(async name => [name, await readFile(path.join(outputDirectory, name), 'utf8')])), previous);
+  assert.ok(!(await readdir(f.directory)).some(name => name.endsWith('.tmp') || name.endsWith('.previous')));
 });
 
 test('missing source, license or entry fails without replacing a previous complete output', async (t) => {

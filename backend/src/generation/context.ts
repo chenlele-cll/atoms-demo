@@ -4,7 +4,7 @@ import type { Message, Snapshot } from '../contracts/projects.js';
 import { CONTEXT_BYTES, generationTools, toolSchemas } from './contracts.js';
 import { GenerationError } from './errors.js';
 
-const rules = `You modify one saved company website using only list_files, read_files and submit_files.
+const rules = `You modify one saved website using only list_files, read_files and submit_files.
 Read complete existing files before changing them. Keep the existing layout and working features.
 Only the declared writable paths may change. Add files only under /src/generated/. Keep entry, dependencies, assets, license and precompiled CSS unchanged.
 Use ordinary CSS imported by a component for new styling; do not rely on generating new Tailwind utility classes.
