@@ -1,6 +1,8 @@
 # Tasks
 
-范围见 [proposal.md](./proposal.md)，实现方案见 [design.md](./design.md)，行为验收见 [candidate-review](./specs/candidate-review/spec.md)。实施和验证状态以复选框及下方实际证据为准；规划结构不代表运行验证。复用 GEN-001、003～005 的实际能力，保留其他 change 的修改；本项用明确测试候选完成真实编译/交互，真实模型与最终部署由 GEN-010/009 验收。
+范围见 [proposal.md](./proposal.md)，实现方案见 [design.md](./design.md)，行为验收见 [candidate-review](./specs/candidate-review/spec.md)。以下任务已按隔离树的实际验证结果完成，具体命令、结果与报告见 [Isolated review evidence](#isolated-review-evidence)。下方混合工作区的原始实施证据单独保留，不替代隔离验证。依赖 GEN-001、003～005 的实际能力；此项用明确测试候选完成真实编译/交互，真实模型与最终部署由 GEN-010/009 验收。
+
+上述完成状态对应下方历史隔离树；合入 `origin/main` 的 GEN-007 后，当前集成树的实际验证另记在 [Integration evidence](#integration-evidence)。
 
 ## 1. 共用契约与构建前提
 
@@ -20,8 +22,8 @@
 ## 4. HTTP 客户端与候选检查页
 
 - [x] 4.1 GEN-006 实现版本/项目读取及采用客户端，使用共用 schema、相对 API、10 秒截止、响应体/快照上限、摘要校验和取消。验证：前端 Node 测试覆盖 HTTP/JSON/schema/摘要失败、响应超限、取消及错误纯文本处理，不断言未知数据类型或读取 cookie 凭据；同步 Development 的边界处理规则。
-- [x] 4.2 GEN-006 新增候选检查页与直接 URL、版本/来源/修改路径、当前/候选切换、重试与明确采用，首页/模板页继续工作。建立 `scripts/candidate-smoke.cjs`、计划命令 `pnpm smoke:candidate` 及明确测试候选，首先覆盖真实报价控件、采用前无写入、编译错误禁用和采用成功。验证：运行浏览器操作控件及主按钮，状态只来自本实例与服务端确认；使用设计 token、语义控件、基本键盘和 live region，更新 README 与 Verification 的实际入口。
-- [x] 4.3 GEN-006 完成采用 submitting/confirmed/conflict/unknown/error、丢响应后查询确认、同载荷手动重试和当前信息刷新，不能自动改 expected 或回写旧版本。验证：前端逻辑和浏览器回归覆盖服务端已提交但响应丢失、确认查询失败、当前仍旧/已被其他版本替换、重复点击、预览随后出错及刷新重新编译；保持候选和当前事实一致，README 记录待确认处理。
+- [x] 4.2 GEN-006 新增候选检查页与直接 URL、版本/来源/修改路径、当前/候选切换、重试与明确采用，首页/模板页继续工作。建立 `scripts/candidate-smoke.cjs`、命令 `pnpm smoke:candidate` 及明确测试候选，首先覆盖真实报价控件、采用前无写入、编译错误禁用和采用成功。验证：运行浏览器操作控件及主按钮，状态只来自本实例与服务端确认；使用设计 token、语义控件、基本键盘和 live region，更新 README 与 Verification 的实际入口。
+- [x] 4.3 GEN-006 完成采用 submitting/confirmed/conflict/unknown/error、丢响应后查询确认、同载荷手动重试和当前信息刷新，不能自动改 expected 或回写旧版本。验证：前端逻辑和浏览器回归覆盖服务端已提交但响应丢失、确认查询失败、当前仍旧/已被其他版本替换、重复点击、刷新与采用互斥、预览随后出错及刷新重新编译；保持候选和当前事实一致，README 记录待确认处理。
 
 ## 5. 跨模块浏览器与持久化回归
 
@@ -33,6 +35,8 @@
 - [x] 6.1 GEN-006 串行运行 frozen install、`pnpm check`（含前后端测试）、`pnpm test:manager`、`pnpm smoke`（含 build）、GEN-001 模板回归、新增 `pnpm smoke:candidate` 及受影响项目/事件流回归；相同源码已有有效结果时复用。验证：记录命令、退出码、实际差异与真实编译/交互/采用/重开观察，执行 `pnpm openspec validate gen-006-candidate-preview-adoption --strict --no-interactive`、链接检查和 `git diff --check`；明确测试候选、真实模型、业务验收和最终部署的不同状态。
 
 ## Implementation evidence
+
+以下原始记录来自 `/Users/cll/Documents/atoms` 的混合工作区，保留其当时陈述和结果；隔离适用性见末尾说明。
 
 2026-10-18，本轮实际实现共用契约、版本读取/条件采用、共用快照预览与候选检查页。`packages/contracts` 是公开项目/版本/快照/采用/错误 schema 的单一来源，输出 ESM/声明并使用浏览器可用 SHA-256；私有会话分页、模型、SQL 与运行管理仍在后端。准备入口检查输入与必要输出摘要、串行构建、失败阻止应用启动；manager 与构建副本包含共用包，未复制真实环境/数据库/node_modules。
 
@@ -65,3 +69,59 @@
 README、Monorepo、Development、Lifecycle、Verification 和两应用指南已更新。本 change 严格校验、168 个本地文档目标/3 个新增锚点检查及 git diff --check 均通过；最终进程和 3001/5173/4173 端口已释放，仅清理本次所属数据。其他 change 的并行修改保持，本轮没有提交、推送、归档或发布。
 
 边界：source=fixture，以上真实编译/交互针对明确测试候选，预览是本轮本地观察。GEN-004 的既有真实模型记录独立保留；本轮没有重发真实模型请求，也没有宣布服务端可信编译、其他业务需求或最终部署通过。完整聊天工作台仍由 GEN-007 接入，真实业务/模型端到端与最终环境分别继续在 GEN-010/009 验收。
+
+## Isolated review evidence
+
+2026-10-18，隔离验证在 `/var/folders/qz/w0j_pldx16b5frjywnmbqlq00000gn/T/opencode/gen006-review` 实际运行，分支 `feat/gen-006-candidate-preview-adoption`，基线 `257321f`。提交按共享契约与构建准备、版本读取/条件采用 API、共享预览、候选检查页面四组组织。以下结果覆盖独立 GEN-006 代码树，包括候选 UI 与刷新竞争修复，不依赖原工作区其他任务的未提交实现。
+
+共用包限于 project/version/snapshot/run/adopt/errors，session/message/SSE 保持后端归属；首页仍为连接检查。没有引入 GEN-007 工作台/诊断路由、REV-001 历史、GEN-008 验证调度或模型配置变更，没有新增迁移。隔离 HEAD 已有部署文档保留，原 main 工作区与隔离 worktree 的其他工作均保持。
+
+| 隔离树实际命令 | 结果 |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | 退出 0；Node 22.22.2、pnpm 12.11.2 |
+| `pnpm check` | 退出 0；契约准备测试 1 项、后端 168 项、前端 11 项通过，lint/typecheck 通过 |
+| `pnpm smoke` | 退出 0；包含完整构建，连接检查首页在 dev/preview 的响应式与错误恢复通过 |
+| `pnpm --filter @atoms/frontend build`、`pnpm --filter @atoms/frontend test`、`pnpm lint` | 刷新/采用竞争修复后重新执行，均退出 0；前端 11 项通过 |
+| `pnpm smoke:candidate` | 最终 21 个 dev/preview 场景通过；报告 status=passed、cleanup=passed，真实模型调用 0、fixtureModelRequests=2 |
+| `pnpm test:manager` | 13 项通过、0 失败，约 150 秒 |
+| `pnpm smoke:template` | 13 个浏览器场景及 4 项控制测试通过、0 失败 |
+| `pnpm smoke:projects` | 6 个浏览器场景及 4 项控制测试通过 |
+| `pnpm smoke:generation-stream` | 8 个浏览器场景通过 |
+| `pnpm openspec validate gen-006-candidate-preview-adoption --strict --no-interactive` | 退出 0；文档与任务记录收尾后严格校验通过 |
+| `git diff --check` | 通过；文档收尾后另核对本次差异与本地链接 |
+
+所有占端口套件串行执行。最终候选 smoke 包含刷新/采用竞争回归：刷新与 submit 入口同步取得 `operation.current` 锁，`canSubmit` 要求 `!refreshing`，手动重试按钮在 refreshing 时禁用。延迟返回旧状态的刷新 GET 期间没有采用 POST；刷新完成后重复点击仅发送一次 POST。修复后重新构建前端、运行全部 11 项前端测试与 lint，再运行最终 21 项候选场景。dev 的 320px/1280px 截图已由执行代理复查。
+
+下列报告路径均相对于本节隔离 worktree 根目录，是本次实际结果；测试源码也以同一根目录为准：
+
+| 套件与测试源码 | 本次隔离报告 |
+| --- | --- |
+| [candidate-smoke.cjs](../../../scripts/candidate-smoke.cjs) | `test-results/candidate-review/e5ffe832-fd04-49ed-bb90-3d2971e5f836/report.json` |
+| [manager.test.mjs](../../../scripts/manager.test.mjs) | `test-results/manager/f1575599-530d-4b97-bec9-9183ca0b9f5a/report.json` |
+| [template-smoke.cjs](../../../scripts/template-smoke.cjs)、[控制测试](../../../scripts/template-smoke-control.test.mjs) | `test-results/template-baseline/b948ef5f-943a-46f0-9359-deb5a9be9902/report.json` |
+| [project-smoke.cjs](../../../scripts/project-smoke.cjs)、[控制测试](../../../scripts/project-smoke-control.test.mjs) | `test-results/project-persistence/e3714570-13e1-41a0-9a96-4aa587f656d2/report.json` |
+| [generation-stream-smoke.cjs](../../../scripts/generation-stream-smoke.cjs) | `test-results/generation-stream/9bcae38b-a1ef-4335-a92d-37931d657c3b/report.json` |
+
+契约准备测试为 [prepare-contracts.test.mjs](../../../scripts/prepare-contracts.test.mjs)，后端候选边界为 [candidate-review.test.ts](../../../backend/test/candidate-review.test.ts)，前端测试位于 `frontend/test/`；根 `pnpm check` 串联对应入口。
+
+以上 Implementation evidence 的命令、195/10 等旧测试计数、报告路径、67 文件哈希及 `/tmp/atoms-gen006-*.log` 日志均属于 `/Users/cll/Documents/atoms` 的历史混合工作区。它们与本节 168/11 计数及新报告分开保留，不能用于证明隔离源码相同；原始报告没有复制或改写成隔离结果。上方 REV-001 陈述仅是历史上下文，不表示本次隔离实现包含历史功能。
+
+本次验收 source=fixture，仅证明明确测试候选的实际编译、交互、隔离、采用与持久恢复。真实模型业务端到端与最终部署未运行；历史 GEN-004 真实模型记录仍独立，不据此宣布 GEN-010/009 通过。报告、截图、日志、数据库和凭据保持本地，不纳入任务提交；本次没有归档或发布。
+
+## Integration evidence
+
+2026-10-18，本节记录隔离 worktree 合并 `origin/main`（GEN-007 PR1，`d3cfb7a`）后的集成检查，更新原待执行状态。当前树保留 main 的 GEN-007 应用、工作台、诊断路由与共享会话/消息/分页/SSE 契约，并保留 GEN-006 的候选 API、契约准备及两处候选刷新/采用保护；最后补充 `frontend/src/workspace/VersionPane.tsx` 手动重试按钮的 refreshing 禁用条件。原源码工作区的所有修改保持。下方结果与上方历史混合工作区、独立 GEN-006 证据分开记录。
+
+| 集成检查 | 实际结果与适用范围 |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | 退出 0 |
+| `pnpm check` | 退出 0；契约准备 1 项、后端 169 项、前端 32 项通过，lint/typecheck 通过；在最后按钮条件前执行 |
+| `pnpm smoke` | 退出 0，包含构建；在最后按钮条件前执行 |
+| 前端 build、lint | 最后补充 VersionPane 手动重试 refreshing 条件后重新执行，均退出 0 |
+| `pnpm smoke:candidate` | 21 个场景通过；`test-results/candidate-review/abaea391-0e77-4536-bfa0-1545e1b75d79/report.json` |
+| `pnpm smoke:workspace` 首轮 | 26 个既有场景通过；`test-results/workspace/f3b33e10-9ade-4fc4-9095-0716a5edbcf8/report.json`；在最后按钮条件前执行 |
+| `pnpm smoke:workspace` 最终轮 | 最后按钮条件后，既有 26 个场景全部通过（dev 13、preview 13），报告 `status=passed`；`test-results/workspace/dbf4ac7d-5e20-47a2-9401-12831a009486/report.json`；实际日志 `/var/folders/qz/w0j_pldx16b5frjywnmbqlq00000gn/T/opencode/gen006-workspace-validated.log` |
+
+工作台最终脚本与 `origin/main` 相同。曾临时加入额外故障注入测试，但该测试自身的无界等待挂起，相关尝试取消后已移除；它不在最终代码中，也不计入通过数。另有两次尝试因其他部署进程占用 3001 端口而受阻，未停止外部进程；这些受阻/取消记录不作为产品失败或通过证据。
+
+模板、项目、事件流与 manager 专项未在本次 UI 集成中重跑：相关源码与 main 相同，先前证据单独保留，不新增通过声明。集成后执行 `pnpm openspec validate --all --strict --no-interactive`，23 项通过、0 失败；本地文档链接和差异检查通过。候选与工作台结果使用明确 fixture，不代表真实模型业务或最终部署验收；历史报告、测试计数和旧首页/共享包范围不能替代本节集成结果。

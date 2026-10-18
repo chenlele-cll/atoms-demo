@@ -87,11 +87,15 @@ storage/store.ts 管理 sessions、projects、versions、messages、generation_r
 
 ## Candidate review
 
-GEN-006 的版本 GET 检查会话、归属、项目关联，读取自身不可变快照、成功运行或 null、相对父版本实际修改路径及采用可用性，不从当前模板补代码。采用 POST 仅接受 expectedCurrentVersionId，最多 1 KiB；短事务重查有效会话、成功 generated 关联、parent/expected/当前引用及内存活动与数据库 running，以 owner/current CAS 更新一行。已当前的合法目标幂等，不修改快照、运行或消息，不调用模型、不实现历史恢复。GET/POST 每 IP 每分钟 60/10 次。
+公开版本与采用以 @atoms/contracts 为唯一 schema。快照结构复用同源纯文件规则，UTF-8 总正文最多 2 MiB/64 文件，规范 JSON 的 SHA-256 在两个运行时同步验证；历史读取不从当前模板补文件。版本 GET 先检查会话/归属/项目关联，返回不可变版本、成功运行或 null、实际相对父版本修改路径及当时采用可用性。两份快照路径并集最多 128 条，不能以单快照的 64 文件限制截断修改列表。源码仅在归属成功的读取响应中返回，不进入错误或普通日志。
 
-版本客户端采用相对 /api、same-origin、10 秒期限、16 MiB 成功/64 KiB 错误上限，unknown 经共享 schema/摘要与请求关联校验。SnapshotPreview 由模板与候选共用，以项目/版本/摘要/attempt 拒绝旧事件。真实 Sandpack done 且 compilatonError=false 才为 compiled；运行错误、重载、超时撤销成功，主动重试新建实例。iframe 为固定跨源、sandbox="allow-scripts allow-same-origin"、空 allow、no-referrer，只接收代码和依赖。
+采用 POST 严格只接受 expectedCurrentVersionId，1 KiB；成功候选必须为本项目 generated 版本并关联 succeeded.resultVersionId，parent 必须等于 expected。短事务再次检查会话到期、归属、完整候选和引用；目标已当前则幂等且不修改更新时间，否则比较当前 expected，检查 GEN-005 活动 Map 和数据库 running，再以 owner/current 条件 CAS 更新一行。无 await 或模型调用；失败回滚，不更改快照/运行/消息，不实现历史恢复。GET 每 IP 60/min、POST 10/min，Origin/JSON/no-store 沿用项目边界。冲突与拒绝的状态码见 [README API](../../README.md#候选预览与采用)。
 
-采用与编译状态独立；用户点击且收到有效确认才声明采用。丢响应后查询当前事实；原版本仍当前保持 unknown，其他选择为 conflict，不自动更改 expected 重发。服务端不接受 compiled/verified 字段，本地编译不是业务验收。
+前端 api/versions.ts 使用相对 /api、same-origin、10 秒请求与读取期限，unknown 进入共用 schema，并核对响应与请求的项目/版本关联。完整响应上限 16 MiB，容纳快照 JSON 转义；错误体 64 KiB、展示消息最多 500 字符，均为纯文本。UTF-8/JSON/schema/摘要、HTTP、网络、取消、超时和超限分别处理；不读取 cookie 值，不将原始网络异常展示或上传。
+
+SnapshotPreview 供模板与候选页复用，仅接收已校验的快照和项目/版本/摘要/attempt 键，使用固定外部 bundler 与快照依赖，不补默认示例。useSandpackClient 作用域内的实际 done 且 compilatonError=false 才成为 compiled；load/connected 不成功。状态机拒绝旧键事件，编译/运行错误及 60 秒超时锁定该轮，文档重载使旧成功无效；主动重试才新实例。已 compiled 后 runtimeError 禁用采用。卸载清除 timer/监听，晚到的异步 client 被销毁；每次切换最多一个 iframe。
+
+iframe 固定跨源、sandbox="allow-scripts allow-same-origin"、空 allow、no-referrer；不传平台凭据/对话，不由 postMessage 触发采用。编译结果不是服务端信任根，采用接口不接收 verified/compiled 字段。页面把 loadingSnapshot/loadError/compiling/compiled/compileError/runtimeError/timeout 与 idle/submitting/confirmed/conflict/unknown/error 分开。用户点击且收到有效确认才声明采用；丢响应后查询当前事实，旧版本仍当前保持 unknown，其他选择为 conflict，不自动改 expected 重发。刷新与采用共用同步互斥保护，刷新期间禁用首次采用及手动重试，避免迟到的旧读取覆盖确认结果。手动同载荷重试依赖服务端幂等和 CAS；运行错误不回写旧版本。
 
 ## Project workspace
 

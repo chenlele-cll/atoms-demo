@@ -23,12 +23,21 @@ const report = { runId, suite: 'candidate-review', source: 'fixture', status: 'r
 let browser; let interrupted; let logs = ''; let backend; let upstream; let upstreamOrigin; let tools; let bundle;
 
 function signalGroup(child, signal) {
-  if (!child?.pid) return;
+  if (!children.has(child) || !child.pid) return;
   try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
 }
 function groupAlive(child) {
-  if (!child?.pid) return false;
+  if (!children.has(child) || !child.pid) return false;
   try { process.kill(-child.pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+}
+async function closeBrowser() {
+  if (!browser) return;
+  let timer;
+  try {
+    await Promise.race([browser.close(), new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Browser cleanup timed out')), 3000);
+    })]);
+  } finally { clearTimeout(timer); }
 }
 async function stop(child) {
   if (!child) return;
@@ -305,12 +314,20 @@ async function mode(name, port) {
       const duplicate = await seed(`${name} duplicate activation`, 'normal', item.owner); await page.goto(candidateUrl(origin, duplicate)); await waitPreview(page);
       let release; const gate = new Promise(resolve => { release = resolve; }); let sent = 0;
       await page.route(`**${versionUrl(duplicate)}/adopt`, async route => { sent++; await gate; await route.continue(); });
+      let releaseRefresh; const refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
+      let captured; const refreshCaptured = new Promise(resolve => { captured = resolve; });
+      await page.route(`**${projectUrl(duplicate)}`, async route => { const response = await route.fetch(); captured(); await refreshGate; await route.fulfill({ response }); });
       try {
+        await page.getByRole('button', { name: '刷新版本状态', exact: true }).click(); await refreshCaptured;
+        assert.equal(await page.getByRole('button', { name: '使用这个版本', exact: true }).isDisabled(), true);
+        await page.getByRole('button', { name: '使用这个版本', exact: true }).evaluate(element => element.click()); assert.equal(sent, 0);
+        releaseRefresh(); await page.getByRole('button', { name: '刷新版本状态', exact: true }).waitFor();
+        await page.unroute(`**${projectUrl(duplicate)}`);
         await page.getByRole('button', { name: '使用这个版本', exact: true }).evaluate(element => { element.click(); element.click(); });
         await page.locator('[data-adoption-state="submitting"]').waitFor(); assert.equal(await page.getByRole('button', { name: '使用这个版本', exact: true }).isDisabled(), true);
         await assertCurrent(page, duplicate, duplicate.detail.currentVersion.id, duplicate.detail.currentVersion.snapshot); release();
         await page.locator('[data-adoption-state="confirmed"]').waitFor(); assert.equal(sent, 1);
-      } finally { release(); await page.unroute(`**${versionUrl(duplicate)}/adopt`); }
+      } finally { releaseRefresh(); release(); await page.unroute(`**${projectUrl(duplicate)}`); await page.unroute(`**${versionUrl(duplicate)}/adopt`); }
     });
     await scenario(`${name}: lost response followed by another legitimate selection reports conflict, never rewrites`, async () => {
       const changed = await seed(`${name} later selection`, 'normal', item.owner); await page.goto(candidateUrl(origin, changed)); await waitPreview(page); let successor;
@@ -381,11 +398,14 @@ async function main() {
 }
 main().catch(error => { report.status = interrupted ? 'cancelled' : 'failed'; report.error = error.message; console.error(`Candidate smoke ${report.status}: ${error.message}`); process.exitCode = interrupted === 'SIGINT' ? 130 : interrupted ? 143 : 1; })
   .finally(async () => {
-    await browser?.close().catch(() => {});
-    const results = await Promise.allSettled([...children].map(stop));
+    const results = await Promise.allSettled([closeBrowser(), ...[...children].map(stop)]);
     upstream?.closeAllConnections(); if (upstream?.listening) await new Promise(resolve => upstream.close(resolve));
     if (results.some(result => result.status === 'rejected')) { report.cleanup = 'failed'; process.exitCode = 1; }
     else { report.cleanup = 'passed'; await rm(runtime, { recursive: true, force: true }); }
+    if (interrupted) {
+      report.status = 'cancelled';
+      process.exitCode = interrupted === 'SIGINT' ? 130 : 143;
+    }
     void logs; await mkdir(output, { recursive: true }); await writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
     console.log(`Candidate review report: ${path.relative(root, path.join(output, 'report.json'))}`);
   });

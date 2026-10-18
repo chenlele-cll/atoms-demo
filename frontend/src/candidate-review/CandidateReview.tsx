@@ -36,7 +36,7 @@ function Review({ initialProject, initialReview }: { initialProject: ProjectDeta
     </div>
     <section className={styles.confirmation} aria-label="采用结果"><p role="status" aria-live="polite" data-adoption-state={adoption.status}>{adoption.message}</p>
       {adoption.status === 'unknown' && <div className={styles.actions}><button type="button" disabled={refreshing} onClick={() => void refresh(true)}>查询采用结果</button>
-        <button type="button" disabled={!compiled || !eligible} onClick={() => void submit(true)}>重试同一采用请求</button></div>}
+        <button type="button" disabled={refreshing || !compiled || !eligible} onClick={() => void submit(true)}>重试同一采用请求</button></div>}
       {refreshError && <p role="alert" className={styles.error}>{refreshError}</p>}
       <p className={styles.muted}>浏览器编译是本次本地观察，不代表业务已验收。预览由外部 Sandpack 服务接收代码并运行；切换或重试会重置预览内的临时输入。采用只保存代码与当前选择。</p>
     </section>

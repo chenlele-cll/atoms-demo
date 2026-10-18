@@ -40,7 +40,7 @@ export function VersionPane({ project, review, mode, onProject, onSelection, onU
       <p role="status" aria-live="polite" data-adoption-state={adoption.status}>{adoption.message}</p>
       {adoption.status === 'unknown' && <div className={styles.switch}>
         <button type="button" disabled={refreshing} onClick={() => void control.refresh(true)}>查询采用结果</button>
-        <button type="button" disabled={!compiled || !eligible} onClick={() => void control.submit(true)}>重试同一采用请求</button>
+        <button type="button" disabled={refreshing || !compiled || !eligible} onClick={() => void control.submit(true)}>重试同一采用请求</button>
       </div>}
       <button type="button" disabled={refreshing || adoption.status === 'submitting'} onClick={() => void control.refresh()}>刷新版本状态</button>
       {control.refreshError && <p className={styles.error} role="alert">{control.refreshError}</p>}

@@ -24,10 +24,12 @@ export function useCandidateReview(initialProject: ProjectDetail, initialReview:
   const key = previewKey(projectId, selected.id, selected.snapshot.digest, attempt);
   const compiled = preview?.key === key && preview.status === 'compiled';
   const eligible = review.adoptionAvailability === 'eligible' && project.project.currentVersionId === expected;
-  const canSubmit = view === 'candidate' && compiled && eligible && !['submitting', 'unknown', 'confirmed', 'conflict'].includes(adoption.status);
+  const canSubmit = view === 'candidate' && compiled && eligible && !refreshing && !['submitting', 'unknown', 'confirmed', 'conflict'].includes(adoption.status);
   const message = (error: unknown) => error instanceof VersionApiError ? error.message : '请求未能完成，请重试。';
   async function refresh(confirm = false) {
+    if (operation.current) return;
     const signal = lifecycle.current?.signal; if (!signal || signal.aborted) return;
+    operation.current = true;
     setRefreshing(true); setRefreshError('');
     try {
       const [current, candidate] = await Promise.all([getProject(projectId, { signal }), getVersion(projectId, target, { signal })]);
@@ -37,7 +39,7 @@ export function useCandidateReview(initialProject: ProjectDetail, initialReview:
         setAdoption(confirmation(current.project.currentVersionId, target, expected ?? ''));
       }
     } catch (error) { if (!denied(error) && !signal.aborted) setRefreshError(message(error)); }
-    finally { if (!signal.aborted) setRefreshing(false); }
+    finally { operation.current = false; if (!signal.aborted) setRefreshing(false); }
   }
   async function submit(manualRetry = false) {
     if (operation.current || !expected || (!canSubmit && !(manualRetry && adoption.status === 'unknown' && compiled && eligible))) return;

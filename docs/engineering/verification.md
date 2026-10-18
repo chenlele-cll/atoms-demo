@@ -33,7 +33,7 @@ pnpm verify
 | 顺序 | 现有入口 | 验收范围 | 证据与限制 |
 | --- | --- | --- | --- |
 | 1 | `./manager.sh doctor` | 固定工具链、依赖、原生配置、实例、端口及环境文件元信息 | 输出逐项诊断；Chrome 在 doctor 中是可选项，但后续 smoke 必需 |
-| 2 | `pnpm check` | lint、两应用类型、后端接口/配置边界 | Node test 输出；不验证浏览器或进程归属 |
+| 2 | `pnpm check` | 契约准备、lint、两应用类型、契约准备与前后端测试 | Node test 输出；不验证浏览器或进程归属 |
 | 3 | `pnpm test:infra` | 无配置接口、重复/并发调用、文件保护与未接入配置拒绝 | `test-results/infra/`；没有真实容器或数据卷 |
 | 4 | `pnpm test:manager` | 隔离安装、诊断、日志、幂等/并发起停、失败回滚、归属和清理 | `test-results/manager/`；真实前后端及固定 Process Compose，需要网络与缓存 |
 | 5 | `pnpm smoke` | 两应用生产构建、真实浏览器、独立启动/API 代理、窄屏与错误恢复、本地生产入口 | `test-results/smoke/`；已含 build，不额外重复构建，不验证线上部署 |
@@ -79,7 +79,7 @@ Node 读取 .nvmrc，pnpm 读取 package.json，依赖使用唯一 lockfile 执�
 
 ## Existing coverage
 
-`pnpm check` 依次运行 ESLint、前后端类型检查和后端测试。既有 [app.test.ts](../../backend/test/app.test.ts) 与 [config.test.ts](../../backend/test/config.test.ts) 覆盖健康接口、API 404、监听配置；GEN-002 增加模型配置、协议、生命周期及 CLI 测试，见下节。
+`pnpm check` 先准备共享契约，再运行 ESLint、workspace 类型检查、契约准备测试、后端测试和前端纯逻辑测试。既有 [app.test.ts](../../backend/test/app.test.ts) 与 [config.test.ts](../../backend/test/config.test.ts) 覆盖健康接口、API 404、监听配置；GEN-002 增加模型配置、协议、生命周期及 CLI 测试，见下节。
 
 `pnpm build` 分别构建前后端；后端构建配置排除测试文件。
 
@@ -156,7 +156,7 @@ pnpm smoke:projects
 
 - 在独立前端副本的诊断页，用浏览器 fetch('/api/...') 分别走 dev/preview 代理，检查公开目录不创建 cookie、HttpOnly/Strict/Path cookie、模板创建、空对话及刷新恢复。
 - 独立上下文 A/B 的列表、详情及对话隔离；其他归属与不存在项目为相同 404 错误结构。
-- 后端部署布局仅含自己的 dist、package 和当前平台依赖，不含前端或原模板源；停止后通过内部入口写入明确的测试消息/run/候选，保留原 cookie 与数据库后重启，比较完整快照摘要、项目 ID、消息序号和当前版本不变。临时移走目录 JSON 时，已保存项目仍能由 store 读回；正式 server 仍要求加载可用目录后监听。
+- 后端部署布局含自己的 dist、package、共用契约包及当前平台依赖，不含前端或原模板源；停止后通过内部入口写入明确的测试消息/run/候选，保留原 cookie 与数据库后重启，比较完整快照摘要、项目 ID、消息序号和当前版本不变。临时移走目录 JSON 时，已保存项目仍能由 store 读回；正式 server 仍要求加载可用目录后监听。
 - 测试进程、浏览器和临时数据库均归本次所有，信号中止不启动后续场景；端口冲突不停止占用者。报告在忽略的 test-results/project-persistence/<runId>/，运行目录在清理后删除。
 
 同一 smoke:projects 命令随后运行 project-smoke-control.test.mjs，以真实外部 HTTP 占用者和活动浏览器分别验证端口保护、SIGINT=130、SIGTERM=143、十秒内退出、最终取消报告、临时目录删除和端口释放。只清理本次 runner 所属进程，不接管其他测试或用户服务。
@@ -221,11 +221,28 @@ DEP-004 的[验收矩阵](../../openspec/changes/dep-004-deployment-acceptance/d
 
 ## Candidate review
 
-GEN-006 使用现有 Node 测试器；根 check 包含契约准备和两端测试，无新增 DOM 框架。`prepare-contracts.test.mjs` 在 offline frozen 独立副本验证无 dist 构建、并发准备、缓存/输出缺失/输入变化及准备失败阻止 dev。后端真实 SQLite/injection 覆盖归属、完整快照、成功关联、同父竞争 CAS、幂等、活动/孤立 running、回滚与重开；前端覆盖预览键/旧事件/错误锁定/超时、采用确认/未知/冲突及 HTTP/schema/摘要/关联/正文/取消/截止。
+GEN-006 使用现有 Node 测试器，根 test/check 串联契约准备测试、后端测试和前端固定 tsx 测试；前端无 DOM 测试框架。[prepare-contracts.test.mjs](../../scripts/prepare-contracts.test.mjs) 在独立副本 offline frozen install 后验证无 dist 的独立后端/前端构建、并发准备/typecheck、缓存复用、缺失输出、源码变化及准备失败阻止 dev；不复制真实环境、数据库或 node_modules。manager 副本也复制共用包源/准备脚本并实际启动独立应用，doctor 检查新增 workspace。
 
-先 `pnpm build`，再按顺序运行 `pnpm smoke:template`、`pnpm smoke:candidate`、`pnpm smoke:projects`、`pnpm smoke:generation-stream`。需要项目 Node/pnpm、Chrome/npx、空闲 3001/5173/4173 与外部 Sandpack/bundler 网络。各专项使用相同构建、独立数据，只清理所属进程。候选专项预置明确 fixture succeeded/候选，验证真实报价、编译/运行错误、bundler 阻断/重试、采用竞争、丢响应查询、重启和 iframe 隔离；桌面与 320/375px 真实宽度、焦点、临时输入也分别断言。
+后端 [candidate-review.test.ts](../../backend/test/candidate-review.test.ts) 的真实 SQLite/injection 覆盖有归属完整版本、模板/候选、跨项目同形 404、错误输入、成功关联、同父竞争 CAS、目标幂等、活动/孤立 running、故障回滚和重开。前端纯逻辑覆盖键/旧事件/错误锁定/超时/重载、采用确认/未知/冲突，以及 HTTP body/UTF-8/JSON/schema/摘要/关联/超限/取消和截止；这些不能代替实际编译。
 
-报告在忽略的 `test-results/candidate-review/<runId>/`，source=fixture；不调用计费模型、不上传数据库/cookie/完整代码。实际任务证据见 [GEN-006 tasks](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md)，不能替代最终模型业务或部署验收。
+```sh
+pnpm install --frozen-lockfile
+pnpm check
+pnpm test:manager
+pnpm smoke
+pnpm smoke:template
+pnpm smoke:candidate
+pnpm smoke:projects
+pnpm smoke:generation-stream
+```
+
+聚焦诊断可运行 `pnpm test:contracts`、`pnpm --filter @atoms/backend test` 和 `pnpm --filter @atoms/frontend test`；两应用入口自动准备契约，后端还准备模板资产。使用项目 Node/pnpm、本机 Chrome/npx、固定工具和缓存；端口 3001/5173/4173 空闲，所有端口场景串行。smoke 已含 build，后续专项消费同源产物。模板与候选正向预览需可访问外部 Sandpack/bundler 和依赖下载，外部服务失败时正向场景保持失败，不能伪造 done 或静态截图代替。
+
+[candidate-smoke.cjs](../../scripts/candidate-smoke.cjs) 在真实 API/SQLite 与完整构建副本上预置明确 fixture succeeded/候选，不增加生产假模型开关。dev/preview 分别操作新增报价控件、原导航/FAQ、主题及隔离检查，比较计算数值、主操作和完整快照/引用；覆盖真实语法/运行错误、坏响应/离线/摘要、受阻 bundler 与重试、A/B 和双标签竞争、提交后丢响应、未知查询/同载荷手动重试、其他新选择、活动/未确认生成和写故障。延迟刷新期间断言采用禁用且零写入，释放后再验证重复激活只提交一次。采用后重启/刷新重读持久引用并重新编译，随后运行错误不自动回退。
+
+桌面与 320/375px 检查宿主/frame 真实宽度、长路径、按钮高度、键盘焦点及临时输入重置；检查实际 iframe sandbox/allow/referrerPolicy、其他窗口消息不能采用、父页面读取被跨源拒绝。外部 bundler 只收到代码/依赖，不传平台凭据或对话。报告及必要截图在忽略的 test-results/candidate-review/<id>/，source=fixture；不上传数据库、cookie 或完整代码，只清理所属服务与数据。本地明确测试代码的编译/采用不等于 GEN-010 真实模型或业务验收，也不构成 GEN-009 最终反代/部署通过。
+
+默认 `pnpm verify` 与既有 CI 尚未自动串联候选专项，需显式执行上述命令。保留的混合工作区结果见 [GEN-006 tasks](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md#implementation-evidence)，独立任务分支的实际验证另记在 [隔离验证记录](../../openspec/changes/gen-006-candidate-preview-adoption/tasks.md#isolated-review-evidence)，不以历史混合工作区通过代替。
 
 ## Project workspace
 
@@ -239,7 +256,7 @@ GEN-007 的 `workspace-messages.test.ts` 验证真实 SQLite 最新/更早页及
 
 `OPS-001` 的原生配置验收使用真实进程，检查双服务与单服务启动、HTTP readiness、健康响应及前端 API 代理、所属进程故障恢复、就绪持续失败、外部端口冲突和停止后的进程清理。核对状态时同时检查是否运行、就绪、退出码与重试次数，不把 `process list` 命令成功当作项目健康；注意 [原生状态及就绪限制](./lifecycle.md#behavior-and-limits)，退出码可能属于前一轮进程。原生记录见 [OPS-001](../../openspec/changes/ops-001-process-compose/tasks.md)。
 
-`pnpm test:manager` 执行 [manager.test.mjs](../../scripts/manager.test.mjs)，在含空格和深路径的隔离副本中使用真实前后端及固定工具，验证重复/并发调用、重启、原生故障恢复后的状态、外部端口保护、就绪超时、中断回滚、调用者硬杀后的锁恢复、supervisor 退出、陈旧 PID、跨副本隔离、未知 socket 和强制停止。它需要 3001/5173 空闲、项目 Node/pnpm、固定 Process Compose 和本机 pnpm 依赖缓存；隔离副本以 offline frozen install 安装，不复制环境文件。产物在忽略的 `test-results/manager/`，需等待 stale 锁和停止截止时间；不会在工作副本自动安装缺失工具，首次安装场景仅操作隔离副本。`pnpm check` 仍只含 lint、类型与后端单元测试，生命周期变更额外执行本命令；完整验收已由上述 `pnpm verify` 串联。
+`pnpm test:manager` 执行 [manager.test.mjs](../../scripts/manager.test.mjs)，在含空格和深路径的隔离副本中使用真实前后端及固定工具，验证重复/并发调用、重启、原生故障恢复后的状态、外部端口保护、就绪超时、中断回滚、调用者硬杀后的锁恢复、supervisor 退出、陈旧 PID、跨副本隔离、未知 socket 和强制停止。它需要 3001/5173 空闲、项目 Node/pnpm、固定 Process Compose 和本机 pnpm 依赖缓存；隔离副本以 offline frozen install 安装，不复制环境文件。产物在忽略的 `test-results/manager/`，需等待 stale 锁和停止截止时间；不会在工作副本自动安装缺失工具，首次安装场景仅操作隔离副本。`pnpm check` 包含 lint、类型、契约准备和两应用单元测试，生命周期变更额外执行本命令；完整验收已由上述 `pnpm verify` 串联。
 
 该回归还包含 OPS-003：无 node_modules/工具的副本使用真实官方网络下载安装，验证重复 bootstrap、环境文件及 lockfile 保护；受控下载替身验证校验失败和中断清理。doctor 覆盖缺失/错误版本、配置、端口和健康实例，不输出环境值；logs 覆盖服务/行数限制、在线读取、跟随取消及停止后读取。首次安装场景需要 GitHub 网络；其他副本安装复用 pnpm 缓存。测试不访问开发者的真实环境文件，fixture 内只创建测试值。
 

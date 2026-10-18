@@ -45,7 +45,7 @@
 
 `packages/contracts`（@atoms/contracts）输出 ESM JavaScript 与声明到 dist；前后端通过 workspace:* 显式依赖。包仅含实际共用会话/目录/项目/消息/run/SSE/版本/快照/采用/错误 schema 与推导类型，Zod 固定 4.6.7。浏览器与后端都须同步验证 SHA-256，因此使用纯 JavaScript @noble/hashes 2.0.1，不引入 Node crypto 到浏览器，也不手写散列算法。纯文件格式/规范 JSON 仍来自 templates/bundle.mjs；包构建复制同源纯模块与类型到自身资产，不维护第二套规则。
 
-scripts/prepare-contracts.mjs 是统一准备入口，复用 root proper-lockfile 串行化同仓库的操作；按契约源码、配置、lockfile 和纯模板规则输入的 SHA-256 与必要输出摘要检查，缺失/过期才构建。编译到私有暂存目录并在成功后替换 dist，失败阻止后续命令，普通编译失败保留原产物。60 秒总期限涵盖取锁与构建，信号/超时终止所属编译进程组；锁仅由返回的 release 释放。包 build/typecheck、根 check、两应用独立 dev/build/typecheck/test 和源码 generation:smoke 复用入口，不增加常驻 watcher。
+scripts/prepare-contracts.mjs 是统一准备入口，复用 root proper-lockfile 串行化同仓库的操作；按契约源码、配置、lockfile 和纯模板规则输入的 SHA-256 与必要输出摘要检查，缺失/过期才构建。编译到私有暂存目录并在成功后替换 dist，失败阻止后续命令，普通编译失败保留原产物。60 秒总期限涵盖取锁与构建，信号/超时终止所属编译进程组；锁由所属 release 释放，所有权丢失则不释放未知锁。包 build/typecheck、根 check、两应用独立 dev/build/typecheck/test 和源码 generation:smoke 复用入口，不增加常驻 watcher。
 
 manager 隔离副本复制 packages/contracts 源、build.mjs 和准备脚本，经独立 frozen install 构建，排除环境、数据库、node_modules 与 dist；doctor 同时诊断该 workspace 及声明依赖。后端生产布局须包含中立包 package.json/dist/同平台运行依赖，不依赖前端或根模板源码。浏览器专项的 prepare-backend-runtime.mjs 复制应用及共用包输出，只链接本机已安装的外部依赖；这用于同平台测试，不作为跨平台复制 node_modules 的部署办法。
 
