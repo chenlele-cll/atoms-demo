@@ -90,7 +90,7 @@ fix(api): preserve the last snapshot when generation is cancelled (GEN-001)
 ```text
 docs(design): add Lovable workspace skill and DESIGN.md navigation (DOC-001)
 
-- .opencode/skills/atoms-frontend-design/: define workspace tokens,
+- .agents/skills/atoms-frontend-design/: define workspace tokens,
   layout, interaction states, and retain the initial-screen reference.
 - DESIGN.md: link to the detailed skill as the design entry point.
 - AGENTS.md and README.md: document when to read the skill and its purpose.

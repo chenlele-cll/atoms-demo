@@ -11,7 +11,7 @@
 | `engineering/` | [verification.md](./engineering/verification.md) | 检查选择、pnpm verify 本地验收、GitHub Actions 配置与覆盖矩阵；验证任务时阅读，检查与覆盖变化时更新 |
 | `engineering/` | [lifecycle.md](./engineering/lifecycle.md) | manager 初始化/诊断/起停/日志、空基础设施入口与原生 Process Compose；调整命令、进程或基础设施时阅读并更新 |
 | `engineering/` | [git-workflow.md](./engineering/git-workflow.md) | 任务编号、分支、提交、推送与合并约定；开展版本控制操作时阅读，流程变化时更新 |
-| `engineering/` | [skills.md](./engineering/skills.md) | 上游技能来源、固定版本与触发范围；使用或更新项目技能时阅读 |
+| `engineering/` | [skills.md](./engineering/skills.md) | 共享技能目录、宿主发现边界、固定上游来源与触发范围；使用或更新项目技能时阅读 |
 | `engineering/` | [openspec.md](./engineering/openspec.md) | OpenSpec CLI、上下文、工件和技能入口；创建、推进或更新变更时阅读，接入方式变化时更新 |
 | `product/` | `assignment.md`（仅本地） | 原始题目参考材料；存在时可供本地查阅，由 `.gitignore` 排除，不能复制到公开文档 |
 

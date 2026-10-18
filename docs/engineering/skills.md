@@ -1,8 +1,12 @@
 # Repository skills
 
-Git 与浏览器技能复用上游实现，直接保存在 `.agents/skills/`。该目录可由 Codex 和 OpenCode 读取；工具未自动显示或存在同名全局技能时，按 `AGENTS.md` 中的仓库路径读取 `SKILL.md`。现有设计 skill 继续保存在 `.opencode/skills/atoms-frontend-design/`。
+所有仓库技能统一存放在 `.agents/skills/<name>/SKILL.md`。设计、Git、浏览器与 OpenSpec 使用同一目录；脚本、references、assets 和许可证跟随各技能，不维护按 coding agent 分开的正文副本。
 
-OpenSpec 的七个工作流由固定版本的官方 CLI 为 Codex 和 OpenCode 分别生成入口，位于 `.agents/skills/openspec-*` 与 `.opencode/skills/openspec-*`。配置、同名技能处理、刷新方式及 MIT 来源见 [OpenSpec 指南](./openspec.md)，不修改生成内容。
+Codex 与 OpenCode 原生支持该共享目录。新增其他宿主时，先核对它的发现机制；需要时使用其支持的路径配置或必要链接适配，仍只维护这份源文件。统一目录不代表所有未知工具都具有相同的命令、权限或自动选用行为。
+
+OpenSpec 的七个工作流保留官方兼容共享版本，Codex 与 OpenCode 读取相同文件；不手改生成正文。官方共享目标、刷新方式与 MIT 来源见 [OpenSpec 指南](./openspec.md)。设计规范位于 [atoms-frontend-design](../../.agents/skills/atoms-frontend-design/SKILL.md)，通过 [DESIGN.md](../../DESIGN.md) 导航。
+
+本机 OpenCode 1.18.23 存在同名个人全局技能的覆盖问题，增加重复发现路径也不能保证优先级。个人目录不随仓库任务改写；项目执行以 `AGENTS.md` 指定的仓库文件为准。迁移与实际发现范围见 [SKL-002](../../openspec/changes/skl-002-unified-skills/tasks.md)，旧 change 保留当时的双目录历史记录。
 
 ## Installed upstream skills
 

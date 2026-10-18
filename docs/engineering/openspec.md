@@ -13,8 +13,8 @@
 | [openspec/config.yaml](../../openspec/config.yaml) | schema、语言、简短项目上下文、文档入口及工件规则 |
 | `openspec/changes/` | 当前变更及后续归档的 proposal、design、tasks 等工件 |
 | `openspec/specs/` | 发生真实产品契约变更时维护的长期能力规格 |
-| `.agents/skills/openspec-*` | 官方 Codex 集成生成的七个技能，不手改生成文件 |
-| `.opencode/skills/openspec-*` | 官方 OpenCode 项目入口，对应同一组工作流，可按路径读取固定版本 |
+| `.agents/skills/openspec-*` | 官方生成的七个共享技能，所有宿主读取同一份，不手改正文 |
+| `.agents/skills/.openspec-target` | 官方共享目录的生成归属，当前为 codex；兼容提示包含 Codex 与其他宿主调用形式 |
 
 官方 CLI 设置原本属于机器范围。项目命令通过 `XDG_CONFIG_HOME` 将其限定到仓库 `.config/`，不改变个人默认设置。项目上下文只保留必要事实和引用，已有工程规范继续各自维护。
 
@@ -32,7 +32,7 @@
 
 Codex 使用 `$openspec-propose` 等技能名或技能选择器；OpenCode 提供 `/openspec-propose` 等技能入口。当前没有另装 `/opsx:*` slash command 文件，不能假定各工具具有相同命令拼写。
 
-本机 OpenCode `1.18.23` 的同名技能发现结果会受全局版本影响，项目目录也不能保证每次被优先选择。执行工作流前，按 `AGENTS.md` 直接读取对应仓库路径中的 `SKILL.md`，核对 `metadata.generatedBy: "1.14.3"`，再使用项目 CLI。自动模型选择与全局同名冲突的运行时修复未在本任务中验证；不修改个人全局技能。
+本机 OpenCode `1.18.23` 的同名技能发现结果会受全局版本影响，项目目录也不能保证每次被优先选择。执行工作流前，按 `AGENTS.md` 读取共享目录中的 `SKILL.md`，核对 `metadata.generatedBy: "1.14.3"`，再使用项目 CLI。`SKL-002` 统一了仓库源文件，个人同名全局技能的清理不在该迁移范围内。
 
 ## Change handling
 
@@ -59,11 +59,11 @@ pnpm openspec validate --all --strict --no-interactive
 版本由 package.json 与 lockfile 固定，生成技能的 `metadata.generatedBy` 记录 CLI 版本；相关 MIT 许可证保存在 [UPSTREAM-LICENSE](../../openspec/UPSTREAM-LICENSE)。
 
 ```sh
-pnpm openspec init --tools codex,opencode --profile custom --language zh-CN --no-animation
+pnpm openspec init --tools codex,agents --profile custom --language zh-CN --no-animation
 pnpm openspec update
 ```
 
-首次初始化和后续刷新都使用项目入口。升级时明确调整固定版本，检查生成差异、来源、上下文与发现路径，不在启动时自动更新。技能清单及其他技能来源见 [skills.md](./skills.md)。
+首次初始化和后续刷新都使用项目入口。codex 与 agents 是官方共享目标，只写一个 `.agents/skills/` 目录，保留 Codex 兼容的双调用提示。不要再为 OpenCode 选择专属目标生成第二份技能；OpenCode 原生读取共享目录。升级时明确调整固定版本，检查生成差异、来源、上下文与发现路径，不在启动时自动更新。此前双目录方案由 [SKL-002](../../openspec/changes/skl-002-unified-skills/tasks.md) 替代；历史工件保留当时记录。技能清单及其他技能来源见 [skills.md](./skills.md)。
 
 ## Official references
 
@@ -71,3 +71,4 @@ pnpm openspec update
 - [Profiles](https://openspec.dev/docs/profiles)
 - [CLI settings](https://openspec.dev/docs/configuration/config-json)
 - [Project context and rules](https://openspec.dev/docs/project-config)
+- [Shared skills targets](https://openspec.dev/docs/supported-tools)

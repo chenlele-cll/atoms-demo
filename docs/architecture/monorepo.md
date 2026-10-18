@@ -11,7 +11,7 @@
 | 根目录 | workspace 命令、唯一 lockfile、公共开发工具配置与 Agent 入口 |
 | `scripts/` | 仓库级运行和验证脚本；包含端口预检、manager/setup、行为测试、官方安装器副本与浏览器冒烟脚本 |
 | `docs/` | 产品参考、技术决策和工程规范，按英文子目录组织 |
-| `.agents/skills/`、`.opencode/skills/` | 仓库内技能与必要资源；来源和职责见 [skills.md](../engineering/skills.md) |
+| `.agents/skills/` | 所有仓库技能及资源的唯一目录；宿主通过原生发现或路径适配读取，来源和职责见 [skills.md](../engineering/skills.md) |
 
 ## Dependency boundaries
 

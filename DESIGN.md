@@ -4,8 +4,8 @@ Atoms uses a Lovable-inspired warm, minimal AI creation workspace: cream surface
 
 ## Design Navigation
 
-- [Atoms frontend design skill](.opencode/skills/atoms-frontend-design/SKILL.md): the authoritative product UI contract, including tokens, workspace layouts, components, interaction states, responsive behavior, and verification.
-- [Initial connection-check screen](.opencode/skills/atoms-frontend-design/references/initial-screen.md): the existing skeleton screen contract, retained until that screen is replaced or intentionally restyled.
+- [Atoms frontend design skill](.agents/skills/atoms-frontend-design/SKILL.md): the authoritative product UI contract, including tokens, workspace layouts, components, interaction states, responsive behavior, and verification.
+- [Initial connection-check screen](.agents/skills/atoms-frontend-design/references/initial-screen.md): the existing skeleton screen contract, retained until that screen is replaced or intentionally restyled.
 
 ## Usage
 

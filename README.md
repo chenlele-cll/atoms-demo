@@ -194,9 +194,8 @@ process-compose.yaml  原生本地开发进程与就绪、退出、日志配置
 .process-compose-version        固定 Process Compose 工具版本
 AGENTS.md              开发与交付约定
 DESIGN.md              平台设计入口，链接到详细设计 skill 与现有启动页约定
-.opencode/skills/atoms-frontend-design/   已确认的 Lovable 风格及工作台设计规范
-.opencode/skills/openspec-*/     官方生成的 OpenCode 工作流入口
-.agents/skills/        固定上游 Git、Playwright 技能与官方生成的 OpenSpec 技能
+.agents/skills/atoms-frontend-design/   已确认的 Lovable 风格及工作台设计规范
+.agents/skills/        所有仓库技能的唯一目录：设计、Git、Playwright、OpenSpec
 .playwright/           浏览器 CLI 的项目配置
 .config/openspec/      项目范围的官方 OpenSpec CLI 设置
 .github/workflows/ci.yml         日常质量检查与手动完整生命周期验收
@@ -214,11 +213,11 @@ eslint.config.mjs      前后端共用 lint 配置
 
 ## 项目 Skills
 
-Skills 的完整文件保存在本仓库中：复用上游的 Git、Playwright 技能位于 `.agents/skills/`，现有设计 skill 位于 `.opencode/skills/`。这些文件作为项目交付内容纳入版本控制，使用规范不依赖开发者机器上的全局 skill 安装。上游版本、许可证及使用边界见 [Skills 说明](./docs/engineering/skills.md)。
+所有仓库 Skills 统一保存在 `.agents/skills/<name>/SKILL.md`，配套脚本、引用和资源跟随技能目录。Codex 和 OpenCode 读取同一份文件，不再维护按工具复制的技能目录。其他宿主需要适配时只配置发现路径，内容仍在共享目录。上游版本、许可证、调用差异及个人同名技能的处理边界见 [Skills 说明](./docs/engineering/skills.md)。
 
 | Skill | 用途 | 来源与适配 |
 | --- | --- | --- |
-| [atoms-frontend-design](./.opencode/skills/atoms-frontend-design/SKILL.md) | 前端设计、实现与评审，约束平台配色、组件、工作台布局、交互状态、响应式与可访问性 | 基于 awesome-design-md 和 open-design 中的 Lovable 设计分析，按 Atoms 场景编写；来源链接与适配说明见 skill 正文 |
+| [atoms-frontend-design](./.agents/skills/atoms-frontend-design/SKILL.md) | 前端设计、实现与评审，约束平台配色、组件、工作台布局、交互状态、响应式与可访问性 | 基于 awesome-design-md 和 open-design 中的 Lovable 设计分析，按 Atoms 场景编写；来源链接与适配说明见 skill 正文 |
 | [git-commit](./.agents/skills/git-commit/SKILL.md) | 用户请求提交时分析差异、按范围暂存并生成 Conventional Commit | 复用 `github/awesome-copilot` 原版，固定上游提交 |
 | [yeet](./.agents/skills/yeet/SKILL.md) | 用户明确请求暂存、提交、推送并创建 PR 时使用 | 复用 `openai/skills` 原版；执行前遵循仓库 Git 工作流 |
 | [playwright](./.agents/skills/playwright/SKILL.md) | 真实浏览器快照、交互、截图和调试 | 复用 `openai/skills` 原版；CLI `0.1.22` 固定为项目开发依赖 |
@@ -236,6 +235,6 @@ Skills 的完整文件保存在本仓库中：复用上游的 Git、Playwright �
 - [生命周期指南](./docs/engineering/lifecycle.md)：manager 命令、Process Compose 开发编排与基础设施接入边界。
 - [文档索引](./docs/README.md)：产品参考、技术决策及 Monorepo、开发、验证和生命周期规范的职责与阅读时机。
 - [技术栈调研与初始化建议](./docs/architecture/stack-decisions.md)：选型依据及适用边界。
-- [设计入口](./DESIGN.md)：平台采用 Lovable 风格的暖色极简 AI 创作工作台；详细规范位于项目级 [atoms-frontend-design skill](./.opencode/skills/atoms-frontend-design/SKILL.md)。规范已确定，产品工作台尚未实现。
+- [设计入口](./DESIGN.md)：平台采用 Lovable 风格的暖色极简 AI 创作工作台；详细规范位于项目级 [atoms-frontend-design skill](./.agents/skills/atoms-frontend-design/SKILL.md)。规范已确定，产品工作台尚未实现。
 
 原始题目整理稿位于 `docs/product/assignment.md`，仅供本地参考，已由 `.gitignore` 排除，不随仓库发布。密钥、`.env` 和本地工具输出不进入版本控制。
