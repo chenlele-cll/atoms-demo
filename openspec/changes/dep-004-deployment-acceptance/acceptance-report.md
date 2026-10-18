@@ -1,6 +1,6 @@
 # Deployment Acceptance Report
 
-任务：`DEP-004`。**11/11 完成，部署矩阵与清理通过**。真实 Ubuntu/systemd/Nginx、公网可信 IP HTTPS、A/B 更新、幂等/故障恢复及本地模型配置同步均有实际证据；生成和流式检查使用明确的测试上游，未调用计费模型。任务状态见 [tasks.md](./tasks.md)。
+任务：`DEP-004`。**原 11 项完成，但用户实测暴露配置兼容性遗漏，新增 2.5 正在修复，当前 11/12**。真实 Ubuntu/systemd/Nginx、公网可信 IP HTTPS、A/B 更新、幂等/故障恢复及本地模型配置同步均有实际证据；生成和流式检查使用明确的测试上游，未调用计费模型。任务状态见 [tasks.md](./tasks.md)。
 
 ## Authentication and target
 
@@ -64,3 +64,9 @@ B：`03b458e2-33aa-4315-a4d5-707b0eb4e914`，releaseDigest `8a9d721b4cff0cb4c481
 历史 sshpass 失败和隔离回归证据在 test-results/dep-004/sshpass-7fed8d80-3399-4b33-9f76-4a9019be2654/；更早连接证据在 target-cc1bdac7-ea6d-434e-aa45-ceb8176aeb45/。历史“无构建/无 apply”结论已被当前实际构建与发布替代，不再代表现状。
 
 没有工作区 Git 写操作、计费模型调用、提交、推送或归档。并行产品改动保留，代码更新测试只在冻结源副本进行；故障不注入其他站点/用户服务，不恢复旧备份覆盖当前库，不降级原库 schema，不删除锁文件解锁。
+
+## Model configuration follow-up
+
+用户实际创建项目后出现 HTTP 503 MODEL_CONFIGURATION。只读复核确认 key 已在生产进程中，但 A 的 readModelConfig 拒绝同步的 MODEL_TIMEOUT_MS=0；原矩阵只验证配置字节和进程环境，未验证发布版本的解析兼容性。不得将旧 11/11 结论扩展为真实生成可用。
+
+修复在隔离 A 源副本复用工作区已经实现的零超时配置、模型客户端及生成协调逻辑，其他并行产品改动保留；用 GEN-009 生成新 UUID 包。部署门禁增加真实发布包解析检查，在停服和 no-op 前拒绝不兼容配置，保留当前状态/数据。验证结果待实际执行后补充，不触发计费模型。

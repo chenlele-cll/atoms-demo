@@ -54,6 +54,8 @@ chmod 600 deploy.env.local.yml
 
 目标 backend.env 保留未知键和既有模型设置；受管 HOST/PORT/DATABASE_PATH/NODE_ENV/APP_ORIGINS 由部署设置。支持普通单行值、单引号字面值和生成的 JSON 双引号值；拒绝复杂续行、重复键、含糊转义，不执行 shell source。更换 DATABASE_PATH 必须先专门迁移，本入口拒绝把旧库换成空库。
 
+提供非空模型 key 时，apply 会在停服、切换和 no-op 前，调用所选发布包的 `readModelConfig` 校验合并后的设置；status 同样核对当前包，错误返回 `MODEL_CONFIGURATION`。校验使用 0600 暂存 JSON，不调用模型、不输出值。没有 key 时仍可部署诊断功能。`MODEL_TIMEOUT_MS=0` 需要支持“不设累计期限”的应用版本；旧包不兼容时必须发布支持该配置的新包，不能只因文件同步一致就认定生成可用。
+
 ## Target prerequisites
 
 目标为 Ubuntu + systemd，SSH 用户有非交互 sudo；已有 active Nginx 且 nginx -t 通过，主配置包含选定站点目录和 MIME 映射。只增加受管站点，不替换 nginx.conf，不删除其他站点或杀占用者。

@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "deploy"))
 from runtime import Transaction
 from storage import DeploymentFault, parse_environment
+from system import System
 
 
 def node(*args):
@@ -33,6 +34,7 @@ def package(stage, schema=1, content="fixture A"):
     folder = stage / ("package-" + str(uuid4()))
     files = {"backend/package.json": json.dumps({"name": "@atoms/backend", "type": "module"}),
              "backend/dist/server.js": "// fixture only", "backend/dist/app.js": content,
+             "backend/dist/model/config.js": "export function readModelConfig(env){if(!env.OPENAI_API_KEY || !env.MODEL_ID || env.MODEL_TIMEOUT_MS==='0')throw new Error('configuration');}",
              "backend/dist/storage/migrations.js": "export const migrations=" + json.dumps([{"version": n} for n in range(1, schema + 1)]) + ";",
              "backend/node_modules/.pnpm/contracts/dist/index.js": "export const snapshotSchema={};",
              "frontend/index.html": content, "deploy/nginx.conf.template": "// fixture only"}
@@ -58,6 +60,10 @@ def package(stage, schema=1, content="fixture A"):
 
 
 class FixtureSystem:
+    run = System.run
+    checked = System.checked
+    model_configuration = System.model_configuration
+
     def __init__(self, context):
         self.c = context
         self.running = None
@@ -217,7 +223,7 @@ class TransactionTests(unittest.TestCase):
         original = self.tx.current_release().name
         counts = (self.system.starts, self.system.reloads)
         secret = 'fixture$"\\{{literal-not-template}}'
-        self.c["environment"] = {"OPENAI_API_KEY": secret}
+        self.c["environment"] = {"OPENAI_API_KEY": secret, "MODEL_ID": "fixture-model"}
         result = self.apply()
         self.assertEqual(result["releaseId"], original)
         self.assertEqual(result["mode"], "configure")
@@ -229,6 +235,30 @@ class TransactionTests(unittest.TestCase):
         self.assertNotIn(secret, self.tx.state.read_text() + self.tx.journal.read_text())
         self.assertEqual(self.tx.environment.stat().st_mode & 0o777, 0o600)
         self.assertEqual(self.rows(), [("preserved",)])
+
+    def test_selected_release_rejects_incompatible_model_config_before_stop_and_noop(self):
+        self.apply()
+        before = self.tx.state.read_bytes()
+        current = self.tx.current_release()
+        counts = self.system.starts, self.system.stops, self.system.reloads
+        self.c["environment"] = {"OPENAI_API_KEY": "private-test-key", "MODEL_ID": "fixture-model", "MODEL_TIMEOUT_MS": "0"}
+        with self.assertRaisesRegex(DeploymentFault, "MODEL_CONFIGURATION"):
+            self.apply()
+        self.assertEqual(before, self.tx.state.read_bytes())
+        self.assertEqual(current, self.tx.current_release())
+        self.assertEqual(counts, (self.system.starts, self.system.stops, self.system.reloads))
+        self.assertFalse((self.stage / "model-environment.json").exists())
+        self.c["environment"]["MODEL_TIMEOUT_MS"] = "1000"
+        self.assertEqual(self.apply()["mode"], "configure")
+        self.assertEqual(self.apply()["mode"], "noop")
+        # Health alone cannot certify a manually changed invalid configuration.
+        data = parse_environment(self.tx.environment.read_bytes())
+        data["MODEL_TIMEOUT_MS"] = "0"
+        from storage import environment_bytes
+        self.tx.environment.write_bytes(environment_bytes(data))
+        with self.assertRaisesRegex(DeploymentFault, "MODEL_CONFIGURATION"):
+            self.tx.status()
+        self.assertFalse((self.stage / "model-environment.json").exists())
 
     def test_proxy_only_change_does_not_restart_backend_and_repeats_noop(self):
         self.apply()

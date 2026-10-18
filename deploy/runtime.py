@@ -313,6 +313,7 @@ class Transaction:
             if self.ops.database_schema(self.database) > desired_schema:
                 raise DeploymentFault("SCHEMA_INCOMPATIBLE")
             configs = self.config_data()
+            self.ops.model_configuration(source, configs["environment"])
             backend_healthy = bool(previous and self.ops.health(previous, False))
             proxy_healthy = bool(previous and self.ops.proxy_health(previous))
             baseline = backend_healthy and proxy_healthy
@@ -394,6 +395,8 @@ class Transaction:
         if not self.root_owned():
             return {"ok": True, "status": "not-installed", "healthy": False, "deploymentVerified": False}
         current = self.current_release()
+        if current and regular(self.environment, False):
+            self.ops.model_configuration(current, self.environment.read_bytes())
         saved = self.saved_state()
         journal = read_json(self.journal, optional=True)
         healthy = bool(current and self.ops.health(current, False) and self.ops.health(current, True) and self.ops.proxy_health(current))

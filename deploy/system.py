@@ -12,7 +12,7 @@ import time
 import urllib.request
 import urllib.error
 
-from storage import DeploymentFault, digest, regular
+from storage import DeploymentFault, digest, parse_environment, regular, write_json
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -63,6 +63,25 @@ class System:
             return value
         except (ValueError, AttributeError):
             raise DeploymentFault("RELEASE_INVALID") from None
+
+    def model_configuration(self, release, environment):
+        """Validate with the selected application's parser; never call a provider."""
+        values = parse_environment(environment)
+        if not values.get("OPENAI_API_KEY", "").strip():
+            return  # Models remain optional for diagnostics-only installations.
+        filename = Path(self.c["stage"]) / "model-environment.json"
+        write_json(filename, values)
+        script = ("import {readFileSync} from 'node:fs';import {pathToFileURL} from 'node:url';"
+                  "import path from 'node:path';"
+                  "const env=JSON.parse(readFileSync(process.argv[2],'utf8'));"
+                  "const {readModelConfig}=await import(pathToFileURL(path.join(process.argv[1],"
+                  "'backend/dist/model/config.js')).href);"
+                  "try{readModelConfig(env);}catch{process.exitCode=2;}")
+        try:
+            self.checked([self.c["node"], "--input-type=module", "-e", script,
+                          str(release), str(filename)], "MODEL_CONFIGURATION")
+        finally:
+            filename.unlink(missing_ok=True)
 
     def unit(self, name):
         code, output = self.run(["systemctl", "show", name, "--property=LoadState,MainPID,ActiveState,FragmentPath,DropInPaths"])

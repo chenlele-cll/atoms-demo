@@ -48,7 +48,7 @@
 
 ### Local model configuration
 
-用户补充要求部署时同步本地已有模型密钥。apply 默认读取 Git 忽略、owner/0600 的 backend/.env，复用 Node parseEnv，只传输非空模型白名单，不上传开发端口或数据库路径。显式 --env-file 替代默认来源，空映射可保留远端全部设置。未列出或本地为空的项保留远端值；变化仅重启后端，同值重复部署 no-op。非 apply 命令不读取本地密钥。真实配置对比在内存中完成，公开证据只记录相等与否；流式验收继续用明确隔离的 fixture，不运行计费调用。
+用户补充要求部署时同步本地已有模型密钥。apply 默认读取 Git 忽略、owner/0600 的 backend/.env，复用 Node parseEnv，只传输非空模型白名单，不上传开发端口或数据库路径。显式 --env-file 替代默认来源，空映射可保留远端全部设置。未列出或本地为空的项保留远端值；变化仅重启后端，同值重复部署 no-op。非 apply 命令不读取本地密钥。配置传输一致不能证明发布包接受这些值；提供非空 API key 时，apply 在停服/切换/no-op 前用所选包的 readModelConfig 解析最终合并配置，status 也核对当前包。解析仅使用 0600 暂存 JSON，不触发供应商网络；无 key 时保持模型可选。旧包不接受 0 时明确 MODEL_CONFIGURATION，不静默改成本地未要求的正值。真实配置对比在内存中完成，公开证据只记录相等与否；流式验收继续用明确隔离的 fixture，不运行计费调用。
 
 ## Risks / Trade-offs
 
