@@ -16,6 +16,8 @@ data/
 .playwright-mcp/
 playwright-report/
 test-results/
+.playwright-cli/
+/output/playwright/
 
 # Local-only assignment source material; do not publish.
 /docs/product/assignment.md

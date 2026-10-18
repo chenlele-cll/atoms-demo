@@ -10,6 +10,7 @@
     "dev:frontend": "pnpm --filter @atoms/frontend dev",
     "dev:backend": "pnpm --filter @atoms/backend dev",
     "openspec": "XDG_CONFIG_HOME=\"$PWD/.config\" openspec",
+    "playwright": "bash .agents/skills/playwright/scripts/playwright_cli.sh",
     "build": "pnpm -r build",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "pnpm -r typecheck",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@fission-ai/openspec": "1.14.3",
+    "@playwright/cli": "0.1.22",
     "eslint": "10.12.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.7",

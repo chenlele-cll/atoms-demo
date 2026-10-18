@@ -35,6 +35,7 @@ Implementation rules live in [Development conventions](docs/engineering/developm
 
 ## Skill routing
 
+- For interactive browser verification, read the repository [Playwright skill](.agents/skills/playwright/SKILL.md) directly, then use the project entry and artifact paths in [skills.md](docs/engineering/skills.md#browser-verification). Keep `pnpm smoke` as the existing regression check; do not add a test framework just to use this skill.
 - Before following an OpenSpec workflow, read its repository file directly: `.agents/skills/openspec-<workflow>/SKILL.md` for Codex or `.opencode/skills/openspec-<workflow>/SKILL.md` for OpenCode, using the exact names in the OpenSpec guide. Same-named global skills may differ. Preserve the selected repository workflow's planning and implementation boundaries.
 - For an authorized commit, load [git-commit](.agents/skills/git-commit/SKILL.md). Before staging, group changes by concrete purpose and follow the [commit granularity and message rules](docs/engineering/git-workflow.md#changes-and-commits); each message must identify the specific changes rather than only a broad feature.
 - Use [yeet](.agents/skills/yeet/SKILL.md) only when the user explicitly requests the full stage/commit/push/PR flow.

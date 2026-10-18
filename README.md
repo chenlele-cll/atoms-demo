@@ -64,6 +64,8 @@ pnpm smoke
 
 各命令的实际内容、浏览器前提、已有覆盖和按变更选择检查的要求，统一见 [验证规范](./docs/engineering/verification.md)。检查通过只证明对应范围，不代表尚未实现的产品能力已完成。
 
+交互式浏览器检查使用仓库官方 Playwright Skill 和 `pnpm playwright`，无需全局安装。固定版本、具名会话及截图路径见 [浏览器验收入口](./docs/engineering/skills.md#browser-verification)。
+
 单独执行：
 
 ```sh
@@ -147,7 +149,8 @@ AGENTS.md              开发与交付约定
 DESIGN.md              平台设计入口，链接到详细设计 skill 与现有启动页约定
 .opencode/skills/atoms-frontend-design/   已确认的 Lovable 风格及工作台设计规范
 .opencode/skills/openspec-*/     官方生成的 OpenCode 工作流入口
-.agents/skills/        固定上游 Git 技能与官方生成的 OpenSpec 技能
+.agents/skills/        固定上游 Git、Playwright 技能与官方生成的 OpenSpec 技能
+.playwright/           浏览器 CLI 的项目配置
 .config/openspec/      项目范围的官方 OpenSpec CLI 设置
 openspec/              项目上下文与变更工件
 README.md              本文件
@@ -163,13 +166,14 @@ eslint.config.mjs      前后端共用 lint 配置
 
 ## 项目 Skills
 
-Skills 的完整文件保存在本仓库中：复用上游的 Git 技能位于 `.agents/skills/`，现有设计 skill 位于 `.opencode/skills/`。这些文件作为项目交付内容纳入版本控制，使用规范不依赖开发者机器上的全局 skill 安装。上游版本、许可证及使用边界见 [Skills 说明](./docs/engineering/skills.md)。
+Skills 的完整文件保存在本仓库中：复用上游的 Git、Playwright 技能位于 `.agents/skills/`，现有设计 skill 位于 `.opencode/skills/`。这些文件作为项目交付内容纳入版本控制，使用规范不依赖开发者机器上的全局 skill 安装。上游版本、许可证及使用边界见 [Skills 说明](./docs/engineering/skills.md)。
 
 | Skill | 用途 | 来源与适配 |
 | --- | --- | --- |
 | [atoms-frontend-design](./.opencode/skills/atoms-frontend-design/SKILL.md) | 前端设计、实现与评审，约束平台配色、组件、工作台布局、交互状态、响应式与可访问性 | 基于 awesome-design-md 和 open-design 中的 Lovable 设计分析，按 Atoms 场景编写；来源链接与适配说明见 skill 正文 |
 | [git-commit](./.agents/skills/git-commit/SKILL.md) | 用户请求提交时分析差异、按范围暂存并生成 Conventional Commit | 复用 `github/awesome-copilot` 原版，固定上游提交 |
 | [yeet](./.agents/skills/yeet/SKILL.md) | 用户明确请求暂存、提交、推送并创建 PR 时使用 | 复用 `openai/skills` 原版；执行前遵循仓库 Git 工作流 |
+| [playwright](./.agents/skills/playwright/SKILL.md) | 真实浏览器快照、交互、截图和调试 | 复用 `openai/skills` 原版；CLI `0.1.22` 固定为项目开发依赖 |
 | [OpenSpec workflows](./docs/engineering/openspec.md#skill-entry-points) | 规划、实施、修订、同步、验证与归档 | 固定 CLI `1.14.3`，官方 Codex/OpenCode 适配生成同一组七个工作流入口 |
 
 进行平台 UI 开发前，先阅读 [DESIGN.md](./DESIGN.md)，再加载对应 skill；工具无法自动发现时，直接读取仓库内的 `SKILL.md`。该设计 skill 已用于建立设计规范，产品工作台尚未实现。

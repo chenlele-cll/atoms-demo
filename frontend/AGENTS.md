@@ -11,6 +11,7 @@ Applies to `frontend/` and supplements the [repository map](../AGENTS.md). Repos
 | Vite proxy, environment, or startup | [Lifecycle](../docs/engineering/lifecycle.md) and the current Vite configuration |
 | Dependencies or shared code | [Monorepo contract](../docs/architecture/monorepo.md) |
 | Checks and handoff | [Verification](../docs/engineering/verification.md) |
+| Interactive browser inspection | Repository [Playwright skill](../.agents/skills/playwright/SKILL.md), then [project invocation](../docs/engineering/skills.md#browser-verification) |
 
 An HTTP-client-only change does not require loading the UI design contract unless it also changes visible behavior or presentation. For a shared API contract change, also read the [backend guide](../backend/AGENTS.md).
 

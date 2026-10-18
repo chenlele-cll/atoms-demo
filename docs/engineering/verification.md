@@ -33,6 +33,8 @@
 
 脚本需要 3001、5173、4173 端口空闲，产物写入忽略目录 `test-results/smoke/`。它不覆盖模型生成、持久化、流式取消、计划中的 manager 或线上部署。
 
+交互式浏览器验收复用仓库内官方 Playwright Skill，通过 `pnpm playwright` 使用独立具名会话。调用、Chrome 前提与固定版本见 [Browser verification](./skills.md#browser-verification)；先读快照再引用元素，覆盖相关状态、窄屏与错误路径，记录实际观察，不能只凭截图命令成功就声称布局正确。交互产物写入忽略的 `output/playwright/`，不替代上述固定 smoke 回归。
+
 ## Lifecycle scenarios
 
 以下是实现对应能力时的验收要求，不能作为 manager 或基础设施已经完成的证据：
