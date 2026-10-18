@@ -11,10 +11,13 @@ all:
       # For key authentication, remove ansible_password and set:
       # ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
       # Optional overrides; see docs/engineering/deployment.md.
+      # Production Node must be system-wide and usable by the atoms service.
+      # Optional model settings belong in private deploy.env.local.yml instead.
       # atoms_https_port: 8443
       # atoms_backend_port: 3001
       # atoms_node_binary: "/usr/bin/node"
       # atoms_pnpm_binary: "/usr/bin/pnpm"
       # atoms_nginx_binary: "/usr/sbin/nginx"
+      # atoms_nginx_site_path: "/etc/nginx/conf.d/atoms-demo.conf"
       # atoms_tls_certificate: "/etc/letsencrypt/live/203.0.113.10/fullchain.pem"
       # atoms_tls_key: "/etc/letsencrypt/live/203.0.113.10/privkey.pem"

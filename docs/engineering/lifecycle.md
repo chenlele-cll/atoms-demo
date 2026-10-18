@@ -235,7 +235,7 @@ SQLite 接入后是应用使用的文件数据库，不需要额外数据库守�
 
 ## Deployment release identity
 
-本节维护自动部署必须遵守的版本标识与幂等规则。DEP-002/003 已提供本地工具、只读检查、离线 plan、Ansible 阶段、配置暂存及幂等决策，入口与待接入边界见 [Deployment](./deployment.md)；真实 apply 仍待接入，本地发布构建见下节 Local release lifecycle。[GEN-009 设计](../../openspec/changes/gen-009-local-release-validation/design.md) 已落实以 UUID 作为 releaseId，并在 release.json 记录输入、平台和文件清单；此处补充其创建、复用与激活规则。
+本节维护自动部署的版本与幂等规则。DEP-003 已接入实际产物选择、目标缓存/隔离构建、上传、锁内激活、私有配置、冷备份、健康和兼容恢复；命令与目标前提见 [Deployment](./deployment.md)，本地发布构建见下节。已完成本机隔离验证，真实 Ubuntu/systemd 和公网部署仍待 DEP-004，不自动上线。[GEN-009 设计](../../openspec/changes/gen-009-local-release-validation/design.md) 使用 UUID releaseId 和记录输入/平台/文件的 release.json；此处统一维护创建、复用与激活规则。
 
 ### Identity and ownership
 

@@ -243,11 +243,19 @@ pnpm smoke:projects
 
 `DEP-002` 的 `./deploy.sh bootstrap` 显式准备固定 Ansible/Python 依赖；`./deploy.sh validate` 用真实 Ansible 做语法检查和离线模板渲染。`./deploy.sh test` 使用标准库 unittest：帮助/apply 无工具副本与含空格路径、离线重复 bootstrap、私有文件/字面密码/权限/重复 YAML 键/非法字段保护、真实 Ansible 官方传密与 SSH 失败脱敏、受控本地模块的前提通过/端口冲突/运行/未知状态、重复模板渲染、SIGINT/SIGTERM/超时下独立会话子进程清理与无关进程保护。
 
-DEP-003 将同一入口扩展为离线 plan 文本/JSON、原生分阶段流程及显式依赖门禁；增加同包无操作/代码切换/配置独立更新/健康恢复决策、直接 playbook 空声明仍失败、原生 rescue/always 保留失败状态，以及配置暂存重复无变化、既有秘密 env 保留/过期暂存清理/符号链接拒绝测试。实际 Ansible 模块在隔离目录运行，未给产品增加测试开关，也不解析假 release.json 作为生产契约。
+DEP-003 已接入实际 apply 与成功状态检查。默认 test 覆盖控制端真实分派/私有请求/结果白名单、生产者原生包/篡改/跨平台拒绝/公开源快照、Ansible 配置与失败保护、锁内文件/真实 SQLite 事务。同包 no-op、源/ID 缓存、代码与独立配置更新、冷备份、兼容恢复、schema 不兼容保留及前向修复、成功元数据修复和互斥均有行为断言。事务单测使用显式 OS 替身，包清单由原生产者生成/验证，不给生产入口增加测试开关。
 
-这些测试只用隔离配置、命令/SSH 替身和本地 builtin 模块，不读取真实 inventory、连接真实服务器或调用模型；不将 fixture 结果当成服务器通过。plan/check/status 与接入说明见 [Deployment](./deployment.md)，缺依赖的 apply 仍明确失败。本次框架证据在忽略的 test-results/dep-003/framework/；真实 Nginx/systemd、公网 TLS/流、更新/回退和数据保留仍待后续接点及 DEP-004 目标验收，DEP-001 连接问题保持独立记录。默认 check/verify/CI 不自动安装 Python 工具或执行部署检查。
+可显式启用真实进程专项，两个包必须由 GEN-009 在本平台实际构建且 releaseId 不同，Nginx 必须支持 TLS；依赖缺失时默认测试显示 skipped，不能当作真实进程通过：
 
-DEP-004 的[验收矩阵](../../openspec/changes/dep-004-deployment-acceptance/design.md)和[实际状态](../../openspec/changes/dep-004-deployment-acceptance/acceptance-report.md)分别维护场景断言与证据。框架可先完成，GEN-009 发布包及真实 apply 接点仍待实现，目标部署场景未运行；入口拒绝、模板渲染、纯决策与 fixture 成功不得替代幂等部署、更新、失败恢复或数据保留验收。
+```sh
+DEPLOY_TEST_RELEASE=/absolute/package-A \
+DEPLOY_TEST_RELEASE_B=/absolute/package-B \
+DEPLOY_TEST_NGINX=/absolute/nginx-with-tls ./deploy.sh test
+```
+
+专项使用随机本地端口、自有 Nginx prefix、测试证书及显式测试 CA、生产模板/事务/校验器/HTTP 健康规则和真实 Node/SQLite。验证 HTTPS 创建项目、重复无重启、实际包切换、后端配置重启、代理单独 reload、坏配置拒绝、激活后健康失败恢复及原会话/快照重开；只替换 Ubuntu 服务管理适配，不修改产品包、不读取真实 .env/inventory、不连接真实服务器或模型。生产仍用系统 TLS 信任，不接受测试 CA 开关。本地成功不证明 systemd 沙箱、Ubuntu 权限或公网可达。
+
+证据分别保留在忽略的 test-results/dep-003/framework/（早期框架）和 completion/（补全实现）；命令见 [Deployment](./deployment.md)。默认 check/verify/CI 不安装 Python 工具或执行远端部署。DEP-004 的[验收矩阵](../../openspec/changes/dep-004-deployment-acceptance/design.md)和[实际状态](../../openspec/changes/dep-004-deployment-acceptance/acceptance-report.md)仍维护真实目标断言；GEN-009/DEP-003 代码已具备，专用 Ubuntu、目标产物/基线、可信 IP TLS、实际 SSH/sudo 和最终流式访问仍需目标验收，DEP-001 连接问题不因本机通过自动关闭。
 
 ## Candidate review
 

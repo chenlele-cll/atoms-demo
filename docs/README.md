@@ -10,7 +10,7 @@
 | `engineering/` | [development.md](./engineering/development.md) | 类型、接口、配置、日志及生成与存储规则；修改对应代码时阅读，规则变化时更新 |
 | `engineering/` | [verification.md](./engineering/verification.md) | 检查选择、pnpm verify 本地验收、GitHub Actions 配置与覆盖矩阵；验证任务时阅读，检查与覆盖变化时更新 |
 | `engineering/` | [lifecycle.md](./engineering/lifecycle.md) | manager、Process Compose、基础设施及发布版本标识/幂等更新规则；调整命令、进程或部署时阅读并更新 |
-| `engineering/` | [deployment.md](./engineering/deployment.md) | deploy.sh、Ansible 本地工具、私有 inventory、只读检查与生产模板；服务器部署任务先读，发布身份规则仍由 Lifecycle 维护 |
+| `engineering/` | [deployment.md](./engineering/deployment.md) | deploy.sh、Ansible 工具、私有配置、目标构建/上传、事务更新与兼容恢复；服务器部署先读，发布身份规则仍由 Lifecycle 维护 |
 | `engineering/` | [git-workflow.md](./engineering/git-workflow.md) | 任务编号、分支、提交、推送与合并约定；开展版本控制操作时阅读，流程变化时更新 |
 | `engineering/` | [skills.md](./engineering/skills.md) | 共享技能目录、宿主发现边界、固定上游来源与触发范围；使用或更新项目技能时阅读 |
 | `engineering/` | [openspec.md](./engineering/openspec.md) | OpenSpec CLI、上下文、工件和技能入口；创建、推进或更新变更时阅读，接入方式变化时更新 |

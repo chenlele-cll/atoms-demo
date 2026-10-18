@@ -33,3 +33,4 @@ test-results/
 
 # Private deployment connection configuration and its local backups.
 /server.local*
+/deploy.env.local*

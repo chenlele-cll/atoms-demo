@@ -2,32 +2,41 @@
 
 ## Context
 
-用户已明确本次只实现部署脚本框架，依赖可留待接入，范围以 [proposal.md](./proposal.md) 为准。DEP-002 已有固定 Ansible、私有 inventory 校验、只读 check/status 和生产模板。GEN-009 的产物和目标连接仍不可用；这不阻塞本地框架交付，也不能作为真实部署通过的依据。
+本变更先按用户要求完成可离线检查的部署框架，保留缺失接点；该阶段的任务和证据仍在 tasks.md/framework 记录。用户现要求依赖实现后补全第一批能力，GEN-009 生产者/产物校验已存在，因此恢复真实 apply 的全部接点。本轮只实现并隔离验证，不自动上线；真实 Ubuntu/systemd/公网结果继续归 DEP-004。
 
 ## Goals / Non-Goals
 
-**Goals:** 提供可检查的执行阶段、明确的依赖边界、原生配置暂存和有测试的幂等决策。
+**Goals:** 复用固定 Ansible 和 GEN-009，提供首次安装、缓存复用、幂等更新、配置保留、锁内切换、冷备份、健康和兼容恢复，给出可复核本机证据。
 
-**Non-Goals:** 不实现或假造发布构建、release.json、远端状态、服务激活、健康和数据库恢复；不接管核心产品代码，不连接服务器。
+**Non-Goals:** 不另造清单/构建器，不修改产品 HTTP/模型逻辑，不自动安装系统软件或证书，不改 SSH 认证/防火墙，不覆盖旧库、不替用户执行真实发布或 Git 写操作。
 
 ## Decisions
 
-- 继续用固定 Ansible Core 的 import_tasks、block/rescue/always、file/stat/template；不增加插件框架、第三方 role、collection 或依赖。
-- plan 离线读取实际 apply.yml 的阶段和 integrations.yml 的待接入声明，提供文本与 JSON。声明不是启用开关；清空声明不能使框架变为可部署。plan 成功只表示计划可读取，canApply 始终明确为 false。
-- apply 支持预留的 --release 路径，但当前不读取该路径或 release.json，也不读取私有 inventory；列出依赖后非零。直接 Ansible 入口也在任何连接前失败，不能通过变更 inventory 或环境跳过框架门禁。
-- 主流程为目标预检 → 不可变发布暂存 → 配置暂存 → 激活 → 健康；rescue 保留兼容性恢复接点并继续失败，always 仅报告安全状态。未实现阶段使用 builtin fail，不返回假 ID、默认健康或空成功。
-- 按 Ansible 原生语义，不可达主机和无效任务定义不会触发 block 的 rescue/always；框架不据此承诺连接中断时已恢复，实际目标状态与恢复仍由后续接点和 DEP-004 验证。
-- 配置阶段使用真正的 builtin 模块，只在已确认的专用配置暂存目录生成 Nginx/systemd/base env。已有 backend.env 保留，且删除本阶段此前生成的过期暂存 env；不安装到 /etc、不重载、不触碰持久库。配置合并/秘密指纹留给后续接入。
-- 幂等策略只消费未来可信接入点提供的版本/内容/两类私有配置指纹与明确健康观察，不读写 manifest 或当前成功记录。同 ID 不同内容失败；未知健康失败；同包健康同配置无切换/重启；后台配置与代理配置分别影响对应服务；不健康复用同包修复，代码切换保留旧包。此策略是项目规则，执行仍交给 Ansible，不建立第二套部署状态机。
-- 真实产物选择、目标归属、上传、运行配置合并、冷备份/兼容激活、健康和恢复都保留清晰归属/输入输出要求。当前没有任何 CLI 参数、环境开关或 YAML ready 标记可使未实现阶段成功执行。
+- 控制端 deploy.sh/scripts/deploy.py 管参数/固定工具/私有 inventory，controller.py 形成私有请求和 Ansible 调用。plan 从实际主流程和接点声明生成 implementationReady，不把声明当部署证明；直接 playbook 必须有控制端准备的请求，缺失时在连接前拒绝。
+- Ansible 原生 import_tasks/block/rescue/always 与 builtin 模块负责预检、私有暂存、传输/提取、非 root 构建、模板和收尾，不增加 role/collection 或连接器。受管配置先在每次独立暂存目录渲染，不在锁外写入 live 文件。
+- 产物 bridge 直接导入 GEN-009 validateRelease，源码快照直接调用 copyInputs/releaseInput；没有第二份清单实现。校验器的 SHA256/路径原语提为无依赖模块，接口不变，使目标不必从未验证包加载依赖。只运输该校验器、原语和小型部署 kit。
+- 默认先冻结公开构建源，目标按 sourceDigest 寻找并重新校验完整包；没有匹配才以 SSH 用户 frozen fetch，并调用原 scripts/release.mjs 隔离 offline 构建。支持显式 Linux 包和保留 UUID，拒绝将 Mac 原生包上传 Ubuntu；目标复验精确 Node/pnpm/OS/架构/ABI、字节/链接/模式、运行可读权限和原生 SQLite 读写。
+- 目标 Python 标准库 helper 是跨操作持有内核 flock 的事务边界，非第二个常驻部署系统。它在同一锁内管理 immutable publish、环境合并、配置/数据库快照、原子 current、服务、健康和成功元数据，避免 Ansible 每任务独立进程导致锁提前释放。控制端也持非阻塞锁；不删除锁目录模拟解锁。
+- 归属要求固定 /srv/atoms 的机器/根标记、current 指向 releases、带根标记的 unit/站点，无 drop-in/其他 FragmentPath，监听 PID 属于本后端或 Nginx。未知归属拒绝，不杀进程、不替换全局 Nginx 配置。
+- 生产已有 Ubuntu/systemd/Nginx、非交互 sudo、系统级精确 Node、可信 IP HTTPS 是前提；自动构建还需 Git/精确 pnpm/下载与原生构建前提。证书允许 live 软链接并检查 IP/信任/期限，不自动降级 HTTP 或安装工具。
+- 私有模型补丁是 owner/0600、Git 忽略的 YAML 字符串映射，单独 copy 原样 JSON，避免 Ansible 对值进行 Jinja 求值。环境从普通文件解析/合并后生成 systemd EnvironmentFile，保留未知键和未指定模型值，受管字段固定；拒绝复杂续行、歧义转义、重复键和 DATABASE_PATH 变化，不 source。凭据/指纹仅留私有文件，不放 manifest/公开日志。
+- 幂等 policy 继续只消费可信身份/私有配置指纹和实际健康。健康同包同配置不重建/切换/重启；后端与代理分别处理；代码更新保留旧包。证书续期按最近成功加载指纹触发 reload。发布目录不可覆盖，同 ID 不同内容失败。
+- 激活前安装受管候选站点并 nginx -t/-T 验证实际 include，失败恢复配置且不停止健康后端。需重启时先停所属后端再冷备份 DB/WAL/SHM、quick_check，环境/unit 和 current 原子更新，再启动/reload 受影响服务。
+- 健康需 PID/cwd 对应正确发布包、直接及严格 IP HTTPS 的 /api/health、JSON API 404，以及首页 bytes 匹配当前包；禁止跳转和 SPA 吞 API。只有通过后原子写 deployment.json。operation.json 保留准备/激活/完成/失败及恢复结果；stdout 只白名单投影固定代码、有限状态、UUID/摘要与证据路径。
+- 失败先停新后端，比较现库 user_version 与旧包实际 migrations 能力；兼容才切回代码/配置、用原库重开验收。高 schema 不自动回退，保留新指向/配置、停止服务，成功记录不前移；后续兼容包可前向修复。绝不恢复旧备份覆盖当前库。
+- 网络断开/强杀不能承诺 Ansible rescue/always 执行，目标异步事务可能继续。信号可处理时 helper 在持锁期间恢复；强杀后内核释放锁，下次核验 current/journal/最近成功及 schema，避免凭旧状态猜成功。只清理本次临时目录，保留包、备份和数据。
+
+## Verification
+
+控制端测试真实 Ansible 配置渲染/失败/认证脱敏和取消保护，新增分派/请求/源码隐私/原生包平台拒绝；事务单测用明确 OS 替身、真实生产者清单/文件/SQLite 覆盖更新、互斥、配置、备份、恢复、不兼容及前向修复。显式本机专项用两份实际 GEN-009 包、真实 Node/SQLite/Nginx TLS、生产模板和健康逻辑，只替换 Ubuntu 服务管理；测试 CA 仅在测试适配器注入，生产无该开关。真实目标 OS/权限/systemd/公网/SSE 仍须 DEP-004。
 
 ## Risks / Trade-offs
 
-- 计划可查看但不能部署 → 输出和文档同时显示框架与待接入状态，实际验收仍在 DEP-004。
-- 暂存 env 误覆盖既有秘密 → 检查现有文件类型，存在时保留原文件并清理本阶段旧暂存，不读取或打印秘密。
-- 仅比较 ID 会漏掉异常 → 内容冲突及未知健康明确失败；策略测试与目标实测分开记录。
-- 核心 Agent 正在修改其他源码 → 本次只改部署文件和对应文档，不改应用、契约、包或 lockfile。
+- 源变化/缺 offline 依赖或精确工具链会失败；不以修改 lockfile、搬 Mac 依赖或 root 构建绕过。
+- 未知旧部署不自动接管，需要先专门审阅迁移；既有配置不会静默覆盖。
+- 成功记录和实际指向可能因中断暂时不同，必须结合 journal/健康/schema 验证；数据库永远不随代码回退。
+- 并行核心工作继续，保留现有未提交改动，不改应用实现/依赖声明/lockfile。本轮不创建分支、提交、推送或新建服务器连接。
 
 ## Migration Plan
 
-本次仅本地落盘与隔离验证。后续逐一实现待接入点：复用 GEN-009 验证产物，确认目标归属与权限，再接上传/私有配置/备份兼容激活/真实健康/恢复。接入前重新审阅并验证，不能删除待接入声明或失败任务来绕过。最后执行 DEP-004 真实幂等与故障场景；不删除当前数据或覆盖旧备份。
+先完成实现及本机隔离验收和文档，DEP-003 可记录代码接点完成；再在用户选择的专用真实目标确认 SSH/sudo、系统工具、IP 证书、服务/站点/端口归属和目标平台包后运行 DEP-004 全矩阵。不以本机成功提前勾选目标验收任务。
