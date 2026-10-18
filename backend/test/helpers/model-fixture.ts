@@ -12,6 +12,7 @@ export const requestSchema = z.object({
   tool_choice: z.unknown().optional(),
   parallel_tool_calls: z.boolean().optional(),
   text: z.unknown().optional(),
+  stream: z.boolean().optional(),
 });
 export type FixtureRequest = z.infer<typeof requestSchema>;
 

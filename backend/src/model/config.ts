@@ -8,6 +8,8 @@ export type ModelConfig = {
   readonly baseURL: string;
   readonly timeoutMs: number;
   readonly maxOutputTokens: number;
+  /** AI SDK transport only; the independent OpenCode CLI owns its transport. */
+  readonly streaming?: boolean;
 };
 
 function integer(value: string | undefined, fallback: number, min: number, max: number): number {
@@ -24,6 +26,8 @@ export function readModelConfig(env: NodeJS.ProcessEnv): ModelConfig {
   const apiKey = env['OPENAI_API_KEY']?.trim();
   const modelId = env['MODEL_ID']?.trim();
   const baseURL = env['OPENAI_BASE_URL'] ?? modelBaseURLs[0];
+  const streaming = env['MODEL_STREAMING'];
+  if (streaming !== undefined && streaming !== 'true' && streaming !== 'false') throw new ModelError('configuration');
   if (!apiKey || /\s/.test(apiKey) || !modelId ||
       !/^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$/.test(modelId) || modelId.includes(apiKey) ||
       !modelBaseURLs.some(allowed => allowed === baseURL)) {
@@ -38,5 +42,6 @@ export function readModelConfig(env: NodeJS.ProcessEnv): ModelConfig {
       return value;
     })(),
     maxOutputTokens: integer(env['MODEL_MAX_OUTPUT_TOKENS'], 4096, 256, 8192),
+    ...(streaming === undefined ? {} : { streaming: streaming === 'true' }),
   };
 }

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { modelObservationSchema, safeModelIdentifier, safeProviderRequestId } from './observation.js';
 import type { ModelObservation } from './observation.js';
 import { createOpenAI } from '@ai-sdk/openai';
-import { generateText, Output, stepCountIs, wrapLanguageModel } from 'ai';
+import { generateText, streamText, Output, stepCountIs, wrapLanguageModel } from 'ai';
 import type { ModelMessage, ToolSet } from 'ai';
 import type { z } from 'zod';
 import type { ModelConfig } from './config.js';
@@ -19,7 +19,7 @@ type StepInput = {
 };
 export type ModelSession = {
   check: () => void;
-  step: (input: StepInput) => ReturnType<typeof generateText>;
+  step: (input: StepInput) => Promise<Pick<Awaited<ReturnType<typeof generateText>>, 'text' | 'toolCalls' | 'finishReason' | 'response'> & { output?: unknown }>;
 };
 
 export class ModelFailure extends ModelError {
@@ -124,6 +124,46 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
             // SDK warning strings can contain upstream-controlled details. No raw logs.
             return { ...result, warnings: [] };
           },
+          wrapStream: async ({ doStream }) => {
+            const result = await doStream();
+            let terminal = false;
+            let responseModel: string | null = null;
+            let failure: ModelError | undefined;
+            return { ...result, stream: result.stream.pipeThrough(new TransformStream({
+              transform(part, destination) {
+                check();
+                if (part.type === 'raw') {
+                  const raw = part.rawValue;
+                  if (typeof raw === 'object' && raw !== null && 'type' in raw) {
+                    if (raw.type === 'response.completed' || raw.type === 'response.incomplete' || raw.type === 'response.failed') {
+                      terminal = true;
+                      if (raw.type === 'response.failed') failure = new ModelError('upstream');
+                      else if ('response' in raw) {
+                        try { inspectResponse(raw.response); } catch (error) { failure = safeModelError(error); }
+                      }
+                    }
+                    if (raw.type === 'response.refusal.delta' || raw.type === 'response.refusal.done') failure = new ModelError('refusal');
+                  }
+                }
+                if (part.type === 'response-metadata') responseModel = safeModelIdentifier(part.modelId, config.apiKey);
+                if (part.type === 'error') failure ??= safeModelError(part.error);
+                if (part.type === 'finish') {
+                  if (!terminal) failure ??= new ModelError('invalid_output');
+                  const inputTokens = tokens(part.usage.inputTokens.total);
+                  const outputTokens = tokens(part.usage.outputTokens.total);
+                  const usage = inputTokens === null && outputTokens === null ? null : {
+                    inputTokens, outputTokens,
+                    totalTokens: inputTokens === null || outputTokens === null ? null : inputTokens + outputTokens,
+                  };
+                  metrics.requests[metrics.requestCount - 1] = usage;
+                  record('step-finished', { usage, responseModel, errorCode: failure?.safe.code ?? null });
+                }
+                // Raw chunks are inspected only in memory, never forwarded to observers/logs.
+                if (part.type !== 'raw') destination.enqueue(part.type === 'stream-start' ? { ...part, warnings: [] } : part);
+              },
+              flush() { check(); if (failure) throw failure; if (!terminal) throw new ModelError('invalid_output'); },
+            })) };
+          },
         },
       });
       const session: ModelSession = {
@@ -134,7 +174,7 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
           const before = metrics.requestCount;
           let stepCompleted = false;
           try {
-          const result = await generateText({
+          const options = {
             model, messages: input.messages,
             allowSystemInMessages: true,
             ...(input.tools ? { tools: input.tools } : {}),
@@ -146,7 +186,24 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
             abortSignal: controller.signal,
             stopWhen: stepCountIs(1),
             telemetry: { isEnabled: false },
-          });
+          };
+          let result: Awaited<ReturnType<ModelSession['step']>>;
+          if (config.streaming) {
+            let failure: ModelError | undefined;
+            const stream = streamText({ ...options, includeRawChunks: true,
+              onError: ({ error }) => { failure ??= safeModelError(error); },
+            });
+            // No tool is dispatched until the SDK consumes and validates the entire stream.
+            // Omitting streamRetries disables stream retries; maxRetries remains zero.
+            await stream.consumeStream({ onError: error => { failure ??= safeModelError(error); } });
+            check();
+            if (failure) throw failure;
+            const final = await stream.finalStep;
+            result = { text: final.text, toolCalls: final.toolCalls, finishReason: final.finishReason,
+              response: { ...final.response, messages: await stream.responseMessages },
+              ...(input.schema ? { output: await stream.output } : {}),
+            };
+          } else result = await generateText(options);
           check();
           stepCompleted = true;
           if (result.finishReason === 'length') throw new ModelError('truncated');
