@@ -10,7 +10,7 @@ import { ProjectError, storageOperation } from '../projects/errors.js';
 import { migrate } from './migrations.js';
 import { canonicalJSON, companyTemplateIdentity, parseTemplateBundle } from '../template-assets/bundle.mjs';
 import type { GenerationInput } from '../generation/contracts.js';
-import { versionReviewSchema, adoptResponseSchema } from '@atoms/contracts';
+import { versionReviewSchema, adoptResponseSchema, versionHistorySchema } from '@atoms/contracts';
 
 export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 export function tokenDigest(token: string) { return createHash('sha256').update(token).digest('hex'); }
@@ -243,6 +243,35 @@ export class ProjectStore {
   }
   getProject(ownerId: string, projectId: string) {
     return storageOperation(() => { this.owned(ownerId, projectId); return this.detail(projectId); });
+  }
+  listVersions(ownerId: string, projectId: string, limit: number, beforeSequence?: number) {
+    return storageOperation(() => this.db.transaction(() => {
+      this.owned(ownerId, projectId);
+      const project = this.project(projectId);
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50 ||
+        (beforeSequence !== undefined && (!Number.isSafeInteger(beforeSequence) || beforeSequence < 0))) throw new ProjectError('INVALID_INPUT');
+      const rows = parse(z.array(z.object({ id: idSchema })), beforeSequence === undefined
+        ? this.db.prepare('SELECT id FROM versions WHERE project_id=? ORDER BY sequence DESC LIMIT ?').all(projectId, limit + 1)
+        : this.db.prepare('SELECT id FROM versions WHERE project_id=? AND sequence<? ORDER BY sequence DESC LIMIT ?').all(projectId, beforeSequence, limit + 1));
+      const items = rows.slice(0, limit).map(row => {
+        const { version, successfulRun, changedFiles } = this.candidate(projectId, row.id);
+        const readMessage = (role: 'user' | 'assistant') => {
+          if (!successfulRun) return null;
+          const value: unknown = this.db.prepare(`SELECT ${messageColumns} FROM messages WHERE project_id=? AND run_id=? AND role=? ORDER BY sequence ${role === 'user' ? 'ASC' : 'DESC'} LIMIT 1`)
+            .get(projectId, successfulRun.id, role);
+          return value === undefined ? null : parse(messageSchema, value);
+        };
+        const request = readMessage('user'); const summary = readMessage('assistant');
+        const requestPoints = request ? Array.from(request.content) : [];
+        return { id: version.id, sequence: version.sequence, parentVersionId: version.parentVersionId, kind: version.kind,
+          createdAt: version.createdAt, isCurrent: version.id === project.currentVersionId, runId: successfulRun?.id ?? null,
+          request: request ? { messageId: request.id, excerpt: requestPoints.slice(0, 240).join(''), truncated: requestPoints.length > 240 } : null,
+          summary: { source: summary ? 'stored' : 'fallback', text: summary ? Array.from(summary.content).slice(0, 240).join('') :
+            version.kind === 'template' ? '模板起点' : '已保存生成快照；预览状态以实际预览为准' }, changedFiles };
+      });
+      return parse(versionHistorySchema, { projectId, currentVersionId: project.currentVersionId, items,
+        nextBeforeSequence: rows.length > limit ? items.at(-1)?.sequence ?? null : null });
+    })());
   }
   listProjects(ownerId: string, limit: number, cursor?: string) {
     return storageOperation(() => {

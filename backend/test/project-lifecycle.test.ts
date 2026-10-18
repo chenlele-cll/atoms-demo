@@ -96,7 +96,7 @@ test('normal production shutdown retains its database and a second process can r
       }
       assert.ok(ready, instance.output()); instance.child.kill('SIGTERM');
       assert.equal((await instance.finished).code, 0);
-      const sql = new Database(database); assert.equal(sql.pragma('user_version', { simple: true }), 2); sql.close();
+      const sql = new Database(database); assert.equal(sql.pragma('user_version', { simple: true }), 3); sql.close();
     } finally { if (instance.child.exitCode === null) instance.child.kill('SIGKILL'); await instance.finished; }
   }
 });

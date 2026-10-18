@@ -113,6 +113,16 @@ sessionStorage 仅存项目/request/base/prompt/时间信封，最多 20 项、2
 
 源码来自所选版本完整快照，只读 select/pre/code 文本，不用 HTML 注入，不执行源码，不实现编辑/保存。切换版本同步文件映射；长源码仅在 pre 内横向滚动。iframe 只接收代码和依赖，平台会话、提示词与后端凭据不得传入。输入与响应式规则由 owning design skill 维护。
 
+## Version history
+
+REV-001 的公开历史契约在 `packages/contracts/src/index.ts`（`@atoms/contracts`）维护，后端项目契约直接重导出同一来源。`GET /api/projects/:projectId/versions?limit=20&beforeSequence=N` 只读，limit 为 1..50，beforeSequence 为可选非负安全整数、排他 `<N`；0 返回空页，重复/额外/非规范整数字段拒绝。按项目内 sequence 倒序，返回 `{projectId,currentVersionId,items,nextBeforeSequence}`；有更多时游标为本页末项序号，否则 null。每页 current/isCurrent 来自同一读取事务，跨页可以改变，客户端应统一校准徽标，不以最大序号推断当前版本。
+
+条目只含版本身份/父关联/时间、isCurrent、runId、request、summary 和 changedFiles，无快照正文。生成关联必须是唯一同项目 succeeded 结果且 base 等于 parent；无关联旧数据用 null/fallback，已有矛盾或损坏为安全 DATA_CORRUPT。request 取关联运行最早 user 的 `{messageId,excerpt,truncated}`，summary 取最后 assistant 并标 `stored`，缺少时使用标明 `fallback` 的事实说明；两者正文各最多 240 个 Unicode 码点，不调用模型。stored 仅表示文字来源，不代表编译或业务验收。
+
+列表和 GEN-006 单版本读取复用 store 的同一快照比较：按历史自身结构/摘要验证，与自身父版本比较新增、删除和正文修改，路径去重排序；模板 []。单快照最多 64 文件，两份快照的路径并集上限为 128，不能把修改路径误限为单快照文件数。逐项处理当前页及其父快照，最终 JSON 上限 1 MiB，超限整页安全失败，不截断路径或伪造部分成功。迁移 v3 增加 result/run 消息关联索引，不回填或改写既有版本。
+
+接口每 IP 每分钟 60 次，429 带 Retry-After；有效会话/项目归属/no-store/安全错误沿用项目边界。查询不更新 currentVersionId、updatedAt、消息或运行，不初始化会话、不执行代码或调用模型。历史 UI、恢复事务和恢复后续改分别由 REV-003、REV-002、REV-004 接入，列表可用不代表完整 Top 2 已验收。
+
 ## UI and handoff
 
 UI 规范由 [DESIGN.md](../../DESIGN.md) 导航到现有设计 skill；在该契约维护 token 与交互约定，不在本文复制。

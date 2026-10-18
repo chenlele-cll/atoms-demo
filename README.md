@@ -125,6 +125,7 @@ pnpm smoke:template
 | GET /api/projects/:projectId | `{project,currentVersion,latestRun}`，当前版本含完整 snapshot |
 | GET /api/projects/:projectId/messages?afterSequence=0&limit=20 | `{items,nextAfterSequence}`，原增量协议，按序号升序，最多 50 条 |
 | GET /api/projects/:projectId/messages?direction=backward&limit=50 | `{items,nextBeforeSequence,latestSequence}`；可用互斥的 `beforeSequence=N` 取更早页，items 始终升序 |
+| GET /api/projects/:projectId/versions?limit=20&beforeSequence=N | `{projectId,currentVersionId,items,nextBeforeSequence}`；按版本序号倒序，最多 50 条轻量历史，不含代码正文 |
 
 新项目原子保存服务端可信模板 v0，消息为空、没有生成记录；模板冲突返回 409，客户端不能注入文件或所有者。匿名 cookie 为 HttpOnly、SameSite=Strict、Path=/api，有效期 30 天，复用不延长；HTTPS 配置启用 Secure。数据库只保存 token 摘要。清理 cookie 或到期后会失去旧项目入口，没有找回或认领接口；数据不会自动删除。有效会话访问他人的项目与不存在项目均为 404，无会话为 401。
 
@@ -150,6 +151,8 @@ pnpm smoke:template
 前后端通过 `packages/contracts` 共用会话/目录/项目/消息/分页/版本/快照/run/SSE/采用/安全错误契约。独立 dev/build/typecheck/test 自动准备其 ESM/声明，根 check 也先准备；契约源改变后重新准备或重启应用，不承诺跨包热更新。生产后端部署须含中立包的 package.json、dist 和运行依赖，见 [Monorepo](./docs/architecture/monorepo.md#shared-contract-build)。
 
 先 `pnpm build`，再 `pnpm smoke:candidate`；需要 Chrome、空闲 3001/5173/4173 以及外部 Sandpack 网络。报告位于忽略的 `test-results/candidate-review/<id>/report.json`，以明确 fixture 候选验证真实编译、报价控件、隔离、错误、采用竞争和重启，不消耗真实模型额度。覆盖与限制见 [Verification](./docs/engineering/verification.md#candidate-review)，历史混合工作区证据与隔离验证记录见 [GEN-006 tasks](./openspec/changes/gen-006-candidate-preview-adoption/tasks.md#isolated-review-evidence)。
+
+历史查询由 REV-001 提供：beforeSequence 为排他非负安全整数，0 返回空页，末页 nextBeforeSequence=null；分页间新增版本需刷新首页可见。每项展示版本/父关联/时间、当前标记、对应运行与需求摘录、标明 stored/fallback 的简短摘要和实际修改路径，文本最多 240 个 Unicode 码点。每页当前标记反映该次读取，不代表版本曾被采用或已通过预览。每 IP 每分钟 60 次，响应最多 1 MiB，损坏/超限明确失败；查询不改数据、不调用模型。历史 UI、确认恢复与恢复后续改仍由后续 REV 任务对接；契约与验证分别见 [Version history](./docs/engineering/development.md#version-history) 和 [历史验证](./docs/engineering/verification.md#version-history)。
 
 ## 模型能力探针
 

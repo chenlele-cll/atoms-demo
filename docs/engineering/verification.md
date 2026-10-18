@@ -173,6 +173,16 @@ pnpm smoke:projects
 
 这些验证证明持久化和 HTTP/浏览器传输，不证明真实模型生成、候选编译/采用、完整工作台或线上部署。GEN-008 full 已纳入项目专项，product 保持 NOT_SELECTED。实际完成与证据见 [GEN-003 tasks](../../openspec/changes/gen-003-project-persistence-api/tasks.md)。
 
+## Version history
+
+REV-001 的 `backend/test/version-history.test.ts` 使用现有 Node 测试器、真实临时 SQLite 和 Fastify injection，随 `pnpm check` 执行，不需要模型凭据。聚焦运行可在根目录准备后端资产后执行 `pnpm --filter @atoms/backend exec tsx --test test/version-history.test.ts`；干净副本先运行后端 typecheck/test 的准备入口。
+
+覆盖严格分页参数、超过 50 个同毫秒版本、第二连接追加及较旧 current、祖先/兄弟分支、自身父快照的增删改、240 码点 Unicode 摘录与消息来源、null/fallback、列表与 GEN-006 单版本读取一致、1 MiB 完整响应上限、页外损坏隔离、归属与 no-store、60/min/IP 限流及 Retry-After、损坏/矛盾关联、关闭重开与闭库安全 503。用 SQL 全表读取前后比较和注入的模型传输计数验证无产品写入、零模型调用；不把内部 fixture 指针切换当作真实恢复 API 验收。
+
+迁移测试将隔离库还原为 v2 后实际打开升级至 v3、重复打开，逐项比较数据；捕获实际关联 SQL 的 EXPLAIN，确认使用 `run_version_result` 与 `message_run_role_order`，无临时排序。最大页、大快照及超过 64 条修改路径的样本验证响应完整或明确超限失败，不依靠默认模板补齐历史。
+
+本变更相关整体检查为 `pnpm check` → `pnpm smoke`（已含 build）→ `pnpm smoke:projects`，占端口套件串行。历史页面、restore 与恢复后新生成尚待 REV-002～004 实际接通，不能由现有 fixture 或结构校验代替；实际命令、退出结果和剩余任务见 [REV-001 tasks](../../openspec/changes/rev-001-version-history/tasks.md)。
+
 ## Bounded generation
 
 GEN-004 使用现有 Node 测试器覆盖实际 SDK 与真实临时 SQLite 链路。普通 check 使用显式 fixture 传输与假配置，不读取开发者 .env、调用外部模型或触碰生产 DATABASE_PATH。测试范围：

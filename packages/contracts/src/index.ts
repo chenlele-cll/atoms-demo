@@ -98,6 +98,47 @@ export const adoptResponseSchema = z.object({ projectId: idSchema, currentVersio
 export type VersionReview = z.infer<typeof versionReviewSchema>;
 export type Adoption = z.infer<typeof adoptResponseSchema>;
 
+export const VERSION_HISTORY_MAX_BYTES = 1024 * 1024;
+const historyIntegerQuery = z.string().regex(/^(0|[1-9]\d*)$/).transform(Number).pipe(z.number().int().min(0).max(Number.MAX_SAFE_INTEGER));
+export const versionHistoryQuerySchema = z.strictObject({
+  limit: historyIntegerQuery.default(20).pipe(z.number().min(1).max(50)),
+  beforeSequence: historyIntegerQuery.optional(),
+});
+const historyTextSchema = z.string().min(1).max(480).refine(value => Array.from(value).length <= 240);
+export const versionHistoryItemSchema = z.object({
+  id: idSchema, sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  parentVersionId: idSchema.nullable(), kind: z.enum(['template', 'generated']), createdAt: timeSchema,
+  isCurrent: z.boolean(), runId: idSchema.nullable(),
+  request: z.object({ messageId: idSchema, excerpt: historyTextSchema, truncated: z.boolean() }).nullable(),
+  summary: z.object({ source: z.enum(['stored', 'fallback']), text: historyTextSchema }),
+  changedFiles: z.array(virtualPathSchema).max(128),
+}).superRefine((item, ctx) => {
+  if ((item.kind === 'template' && (item.sequence !== 0 || item.parentVersionId !== null || item.runId !== null || item.request !== null || item.changedFiles.length !== 0)) ||
+    (item.kind === 'generated' && (item.sequence === 0 || item.parentVersionId === null || item.parentVersionId === item.id)) ||
+    (item.runId === null && (item.request !== null || item.summary.source === 'stored')) ||
+    item.changedFiles.some((path, index) => index > 0 && (item.changedFiles[index - 1] ?? '') >= path)) {
+    ctx.addIssue({ code: 'custom', message: 'Invalid history association' });
+  }
+});
+export const versionHistorySchema = z.object({
+  projectId: idSchema, currentVersionId: idSchema, items: z.array(versionHistoryItemSchema).max(50),
+  nextBeforeSequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
+}).superRefine((value, ctx) => {
+  const ids = new Set<string>();
+  const sequences = new Map(value.items.map(item => [item.id, item.sequence]));
+  if (value.items.some((item, index) => {
+    const duplicate = ids.has(item.id); ids.add(item.id);
+    const parentSequence = item.parentVersionId ? sequences.get(item.parentVersionId) : undefined;
+    return duplicate || item.isCurrent !== (item.id === value.currentVersionId) ||
+      (parentSequence !== undefined && parentSequence >= item.sequence) ||
+      (index > 0 && (value.items[index - 1]?.sequence ?? 0) <= item.sequence);
+  }) || (value.nextBeforeSequence !== null && (value.nextBeforeSequence === 0 || value.items.at(-1)?.sequence !== value.nextBeforeSequence))) {
+    ctx.addIssue({ code: 'custom', message: 'Invalid history page' });
+  }
+  if (utf8Bytes(JSON.stringify(value)) > VERSION_HISTORY_MAX_BYTES) ctx.addIssue({ code: 'custom', message: 'History response exceeds limit' });
+});
+export type VersionHistory = z.infer<typeof versionHistorySchema>;
+
 export const sessionRequestSchema = z.strictObject({});
 export const sessionResponseSchema = z.object({ expiresAt: timeSchema });
 

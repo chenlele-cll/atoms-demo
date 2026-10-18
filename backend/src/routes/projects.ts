@@ -3,7 +3,8 @@ import rateLimit from '@fastify/rate-limit';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { errorSchema, listQuerySchema, messagePageSchema, messageQuerySchema, projectDetailSchema, projectListSchema,
-  projectParamsSchema, projectRequestSchema, sessionRequestSchema, sessionResponseSchema, templateListSchema } from '../contracts/projects.js';
+  projectParamsSchema, projectRequestSchema, sessionRequestSchema, sessionResponseSchema, templateListSchema,
+  versionHistoryQuerySchema, versionHistorySchema } from '../contracts/projects.js';
 import { ProjectError } from '../projects/errors.js';
 import { SESSION_LIFETIME_MS } from '../storage/store.js';
 import type { ProjectStore } from '../storage/store.js';
@@ -93,6 +94,10 @@ export async function projectRoutes(app: FastifyInstance, services: ProjectServi
   app.get<{ Params: z.infer<typeof projectParamsSchema> }>('/projects/:projectId', {
     schema: { params: projectParamsSchema, querystring: sessionRequestSchema, response: { 200: projectDetailSchema, ...errors } },
   }, async request => store.getProject(owner(request.cookies), request.params.projectId));
+  app.get<{ Params: z.infer<typeof projectParamsSchema>; Querystring: z.infer<typeof versionHistoryQuerySchema> }>('/projects/:projectId/versions', {
+    config: { rateLimit: { max: 60, timeWindow: 60_000 } },
+    schema: { params: projectParamsSchema, querystring: versionHistoryQuerySchema, response: { 200: versionHistorySchema, ...errors } },
+  }, request => store.listVersions(owner(request.cookies), request.params.projectId, request.query.limit, request.query.beforeSequence));
   app.get<{ Params: z.infer<typeof projectParamsSchema>; Querystring: z.infer<typeof messageQuerySchema> }>('/projects/:projectId/messages', {
     schema: { params: projectParamsSchema, querystring: messageQuerySchema, response: { 200: messagePageSchema, ...errors } },
   }, async request => 'direction' in request.query

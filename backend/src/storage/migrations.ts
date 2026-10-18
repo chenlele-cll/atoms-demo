@@ -44,6 +44,9 @@ CREATE INDEX run_project_order ON generation_runs(project_id,started_at DESC,id 
 ` }, { version: 2, sql: `
 CREATE INDEX run_started ON generation_runs(started_at,project_id);
 CREATE INDEX run_active_project ON generation_runs(project_id) WHERE status='running';
+` }, { version: 3, sql: `
+CREATE INDEX run_version_result ON generation_runs(project_id,result_version_id);
+CREATE INDEX message_run_role_order ON messages(project_id,run_id,role,sequence);
 ` }] as const;
 
 export function migrate(db: Database.Database, definitions: readonly { version: number; sql: string }[] = migrations) {

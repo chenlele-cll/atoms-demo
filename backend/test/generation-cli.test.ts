@@ -93,7 +93,7 @@ test('fixture CLI creates only an isolated database, saves/reopens, and never la
     assert.ok(!`${result.stdout}${result.stderr}`.includes(sentinel));
     assert.ok(!result.stdout.includes('export default function')); assert.ok(!result.stdout.includes('服务类型可选'));
     const sql = new Database(join(directory, report.id, 'project.sqlite'));
-    assert.equal(sql.pragma('user_version', { simple: true }), 2); sql.close();
+    assert.equal(sql.pragma('user_version', { simple: true }), 3); sql.close();
   } finally { await fixture.close(); }
 });
 
