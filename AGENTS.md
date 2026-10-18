@@ -1,28 +1,37 @@
-# Development Contract
+# Repository map
 
-## Scope And Architecture
+This file applies to the whole repository. Before editing an application, also read its scoped guide: [frontend/AGENTS.md](frontend/AGENTS.md) or [backend/AGENTS.md](backend/AGENTS.md). Read both for a shared HTTP contract change.
 
-- Read `README.md` for project scope and `docs/技术栈调研与初始化建议.md` for decisions.
-- Original assignment notes in `docs/笔试背景与要求.md`, when available locally, are private reference material excluded from version control. Do not copy their contents into public documentation.
-- Frontend: React, Vite, TypeScript, CSS Modules. Backend: Fastify, Node.js, TypeScript.
-- Keep frontend and backend independently runnable. Use HTTP under `/api`; never import backend implementations into the frontend.
-- Use pnpm workspaces and one lockfile. Do not add a framework, service, shared package, or dependency without a concrete current need.
-- The skeleton has no generation, database, or preview implementation. Add their dependencies with the corresponding behavior.
+## Project
 
-## Layout
+Atoms Demo has an independently runnable React + Vite frontend and Fastify + Node.js backend. Both use TypeScript; the frontend uses CSS Modules. The current application is a connection-check skeleton; generation, persistence, and generated-app preview are not implemented yet. Lifecycle tooling and OpenSpec will be added with their implementation tasks.
 
-- `frontend/src/`: browser entry, UI components, and HTTP client code.
-- `backend/src/app.ts`: application construction and route registration without listening.
-- `backend/src/server.ts`: environment loading, listening, and process lifecycle.
-- `backend/src/routes/`: HTTP endpoints. Keep generation and storage logic out of route handlers as those responsibilities grow.
-- `backend/test/`: behavior tests using Node's test runner and Fastify injection.
-- `docs/`: assignment background and stack research documents.
-- `scripts/`: repository-level developer scripts, currently the browser smoke test.
-- No empty service/repository directories or speculative abstractions. Add folders with their first implementation.
+Use [README.md](README.md) for project scope, current setup, and production startup. Use [docs/README.md](docs/README.md) to find documentation by responsibility.
 
-## Commands
+## Start a task
 
-Use Node from `.nvmrc` and the pnpm version in `package.json`.
+- Identify the task ID, requested outcome, scope, and acceptance criteria from the request and existing task context.
+- Inspect `git status --short --branch` and relevant diffs. Preserve other tasks' pending changes; do not stash, reset, clean, or move them between branches automatically.
+- Choose the relevant route below, then read only the sections and source files needed for this task. Do not preload every document for a small edit.
+
+## Task routing
+
+| Task | Read first |
+| --- | --- |
+| Frontend UI, browser state, or HTTP client | [Frontend guide](frontend/AGENTS.md) |
+| Backend route, configuration, generation, or storage | [Backend guide](backend/AGENTS.md) |
+| HTTP contract affecting both applications | Both scoped guides, then [runtime validation](docs/engineering/development.md#http-and-runtime-validation) |
+| Workspace, dependencies, or shared code | [Monorepo contract](docs/architecture/monorepo.md); use [stack decisions](docs/architecture/stack-decisions.md) when reconsidering a technology choice |
+| Documentation or navigation | [Documentation index](docs/README.md) and the document that owns the rule |
+| Startup, shutdown, process scripts, or infrastructure | [Lifecycle](docs/engineering/lifecycle.md) |
+| A failing check or unexpected behavior | The affected application's guide and [Verification](docs/engineering/verification.md); reproduce the reported failure before claiming a fix |
+| Selecting checks or preparing handoff | [Verification](docs/engineering/verification.md) |
+
+Implementation rules live in [Development conventions](docs/engineering/development.md). UI rules are maintained in [DESIGN.md](DESIGN.md); update the owning contract when rules change rather than copying them into this map.
+
+## Reliable commands
+
+Run from the repository root, with Node from `.nvmrc` and pnpm from the root package.json:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -33,25 +42,13 @@ pnpm build
 pnpm smoke
 ```
 
-Run frontend and backend in separate terminals. `pnpm check` runs lint, types, and backend tests. `pnpm build` verifies both production builds. `pnpm smoke` builds then drives a real browser through startup, proxy, responsive, and failure paths; it needs a locally installed Google Chrome. See README for production startup and proxy behavior.
+The independent development commands use separate terminals. Select verification by change scope using the verification guide. Planned manager and infrastructure commands must not be presented as available commands.
 
-## Implementation Rules
+## Always-on boundaries
 
-- Keep TypeScript strict. Use `unknown` at untrusted boundaries and narrow or parse it. No `any`, non-null assertions, or type-check suppression to conceal errors.
-- Use platform APIs when sufficient. Configure network timeouts and handle HTTP errors explicitly.
-- Validate API input and model output at the boundary; TypeScript types alone do not validate runtime data.
-- Use Fastify's logger with structured fields; pass errors as `{ err }`. Do not log prompts, generated files, credentials, or session tokens by default.
-- Keep secrets in backend configuration. Frontend environment variables and preview files are public.
-- Use SQLite parameter binding and short transactions when persistence is added. Keep model calls outside write transactions.
-- Generated code must not execute inside the backend process or receive backend credentials.
-- Record actual task activity. Never simulate model work or report generated code as validated without evidence.
-- Read `DESIGN.md` before UI changes; update the contract when introducing new tokens or patterns.
-
-## Verification And Handoff
-
-- Run `pnpm check` and `pnpm build` after relevant changes.
-- Add focused behavior tests for meaningful boundaries and failure handling. Do not test prose or mirror implementation details.
-- Verify UI changes in a browser, including narrow screens and error states. Stream cancellation and real network behavior need running-server tests, not only injection.
-- Update README and `.env.example` when commands or configuration change.
-- State what was verified and what remains unavailable. Do not claim generation, persistence, or deployment works before testing it.
-- Do not commit secrets or local tool output. Do not commit or publish without an explicit request.
+- Keep applications separated by HTTP under `/api`; never import backend implementation into the browser or expose backend credentials to previews.
+- Keep TypeScript strict and validate untrusted data at runtime. Follow the development guide for parsing, network errors, logging, and future storage or generation work.
+- Add dependencies and modules for a concrete current need; do not create empty service directories or speculative abstractions.
+- Record actual activity and observed verification results. Never simulate model work or report generation, persistence, preview, or deployment as validated without evidence.
+- Original notes at `docs/product/assignment.md`, when locally available, remain private reference material excluded from version control. Do not copy their contents into public documents.
+- Do not commit secrets or local tool output. Commit, push, create PRs, merge, or publish only within the user's authorized scope; do not request the same authorization again while it remains valid.

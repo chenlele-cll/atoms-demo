@@ -60,11 +60,7 @@ pnpm build
 pnpm smoke
 ```
 
-`check` 依次执行 ESLint、前后端 TypeScript 检查和后端行为测试。后端使用 Node 内置测试器，通过 Fastify injection 检查接口，并验证环境配置边界。
-
-`build` 分别生成 `frontend/dist/` 与 `backend/dist/`。后端构建不包含测试文件。构建通过不代表模型生成、持久化或预览已经实现。
-
-`smoke` 先执行生产构建，再用 Playwright 驱动系统 Chrome 走完整浏览器验收：前后端独立启动、`/api` 代理连通、320/375/768/1280px 布局无横向溢出、异常响应提示、后端离线错误反馈与按钮恢复、生产构建 + 前端 preview 冒烟。脚本只依赖 `playwright-core`，不下载浏览器，需要本机已安装 Google Chrome；截图输出到 `test-results/smoke/`（已忽略入库）。
+各命令的实际内容、浏览器前提、已有覆盖和按变更选择检查的要求，统一见 [验证规范](./docs/engineering/verification.md)。检查通过只证明对应范围，不代表尚未实现的产品能力已完成。
 
 单独执行：
 
@@ -113,6 +109,7 @@ location /api/ {
 
 ```text
 frontend/              React + Vite 前端应用
+  AGENTS.md            前端任务路由与局部边界
   src/
     api/health.ts       HTTP 客户端与响应校验
     App.tsx            最小启动与连通检查页面
@@ -121,13 +118,24 @@ frontend/              React + Vite 前端应用
     styles.css         全局基础样式
   vite.config.ts       开发与预览代理
 backend/               Fastify 后端应用
+  AGENTS.md            后端任务路由与局部边界
   src/
     app.ts             构建应用，不监听端口
     server.ts          环境加载、监听与退出
     config.ts          服务配置解析
     routes/health.ts   健康接口
   test/                接口与配置行为测试
-docs/                  技术选型文档；原始题目材料仅本地保留
+docs/
+  README.md            文档索引与目录约定
+  architecture/
+    stack-decisions.md 技术选型依据
+    monorepo.md        目录与依赖边界
+  engineering/
+    development.md    开发规范
+    verification.md   验证与交付
+    lifecycle.md      起停行为与后续接口约定
+  product/
+    assignment.md     原始题目整理稿，仅本地保留
 scripts/
   smoke.cjs            浏览器端到端冒烟脚本（pnpm smoke）
 AGENTS.md              开发与交付约定
@@ -145,6 +153,9 @@ eslint.config.mjs      前后端共用 lint 配置
 
 ## 项目资料
 
-- [技术栈调研与初始化建议](./docs/技术栈调研与初始化建议.md)：选型依据及适用边界。
+- [Agent 工作入口](./AGENTS.md)：按任务选择文档与检查；前后端细则分别见 [前端指南](./frontend/AGENTS.md) 和 [后端指南](./backend/AGENTS.md)。
+- [生命周期指南](./docs/engineering/lifecycle.md)：Process Compose 开发编排、现有起停入口与后续 manager、基础设施契约。
+- [文档索引](./docs/README.md)：产品参考、技术决策及 Monorepo、开发、验证和生命周期规范的职责与阅读时机。
+- [技术栈调研与初始化建议](./docs/architecture/stack-decisions.md)：选型依据及适用边界。
 
-原始题目整理稿仅供本地参考，已由 `.gitignore` 排除，不随仓库发布。密钥、`.env` 和本地工具输出不进入版本控制。
+原始题目整理稿位于 `docs/product/assignment.md`，仅供本地参考，已由 `.gitignore` 排除，不随仓库发布。密钥、`.env` 和本地工具输出不进入版本控制。

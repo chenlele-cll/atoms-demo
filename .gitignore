@@ -18,4 +18,4 @@ playwright-report/
 test-results/
 
 # Local-only assignment source material; do not publish.
-/docs/笔试背景与要求.md
+/docs/product/assignment.md
