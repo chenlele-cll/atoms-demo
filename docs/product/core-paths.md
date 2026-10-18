@@ -30,7 +30,7 @@ Top 1 优先获得开发与验证时间。Top 2 和 Top 3 复用同一套项目�
 
 企业官网与产品落地页归入同一获客场景，避免把相近页面重复计为两个方向。“独立站”在此特指品牌电商站；独立域名本身属于交付形式，也可用于另外两个场景。
 
-首轮先接通场景 Top 1 的一个模板。电商场景先限定为浏览器内的商品浏览与购物车体验，真实支付、订单、库存和物流需要另外的服务接入；个人作品集保留为另一种轻量扩展方向。三个场景进入选型范围，不代表首轮必须完成三个模板。
+最初先接通场景 Top 1 的一个模板；2026-10-18 按用户要求扩展为三个场景各一个模板。电商场景限定为浏览器内的商品浏览与购物车体验，真实支付、订单、库存和物流需要另外的服务接入；个人作品集提供作品展示、筛选和详情。
 
 ## Top 1 模板起步与真实生成
 
@@ -44,7 +44,7 @@ Top 1 优先获得开发与验证时间。Top 2 和 Top 3 复用同一套项目�
 | 视觉基线 | 配色、字体、间距、基础控件和响应式布局 | 沿用模板规则组织新增内容，按需求调整展示 |
 | 业务起点 | 所选应用场景已有的页面、内容结构与交互 | 按需求修改内容、组件、输入项及交互逻辑 |
 
-首个模板优先从现成企业官网或产品推广页中选择，复用已有布局、样式和业务交互，完成桌面、320/375px 窄屏和基础交互验收。第一条路径跑通后，时间充足再从另外两个场景补充一个模板，首轮上限两个。模板筛选、引入与适配计入 Top 1 的预算。
+首个模板从现成企业官网或产品推广页中选择，复用已有布局、样式和业务交互，完成桌面、320/375px 窄屏和基础交互验收。后续明确扩展为企业官网、品牌电商及个人作品集三个起点，各自保存独立资产与来源身份。
 
 平台工作台沿用 [DESIGN.md](../../DESIGN.md) 导航的设计契约。生成应用使用自己的模板样式，平台样式与预览保持隔离。
 
@@ -58,7 +58,7 @@ Top 1 优先获得开发与验证时间。Top 2 和 Top 3 复用同一套项目�
 | 品牌电商独立站 | [jefercort e-commerce](https://github.com/jefercort/e-commerce/tree/ec492d15f5614fa7f297714352e5c001f3daddd1)，[MIT](https://github.com/jefercort/e-commerce/blob/ec492d15f5614fa7f297714352e5c001f3daddd1/LICENSE)，React、Vite，包含商品浏览和购物车 | 核对筛选、详情和总额计算；商品来源依赖外部 API，接入时评估改为本地样例数据；订单与账号页面不能作为真实交易或认证能力 |
 | 个人作品集与个人主页 | [veldig react-engineer-portfolio](https://github.com/veldig/react-engineer-portfolio/tree/d859a81d974fc276943f0c398991746b75a1a413)，[MIT](https://github.com/veldig/react-engineer-portfolio/blob/d859a81d974fc276943f0c398991746b75a1a413/LICENSE)，React、Vite，配置驱动个人介绍与项目展示 | 核对作品交互、移动端、图片与简历资源，以及 Tailwind 和动画依赖的预览兼容性 |
 
-企业官网来源已由 GEN-001 引入固定资产并接入隔离基线页；逐文件来源与预览适配见 [模板说明](../../templates/company-landing/ADAPTATIONS.md)，实际验收范围见 [GEN-001 记录](../../openspec/changes/gen-001-company-template-baseline/tasks.md)。品牌电商和作品集仍是未接入的初筛候选。所列建站平台用于判断场景覆盖和交互方向，不作为其中模板已获得代码复用授权的依据。选定模板时保存仓库地址、固定提交、许可证与改动说明，运行验收通过后再将其列为可用模板；这不代表真实模型改造已通过。
+企业官网来源已由 GEN-001 引入固定资产并接入隔离基线页；逐文件来源与预览适配见 [模板说明](../../templates/company-landing/ADAPTATIONS.md)，历史验收范围见 [GEN-001 记录](../../openspec/changes/gen-001-company-template-baseline/tasks.md)。品牌电商与作品集已分别接入为 `brand-store` 和 `personal-portfolio`，来源及适配见 [电商说明](../../templates/brand-store/ADAPTATIONS.md)与[作品集说明](../../templates/personal-portfolio/ADAPTATIONS.md)。三者均保存固定提交和 MIT 许可，接入模板不代表真实模型改造或线上部署已通过。
 
 Atoms 项目可通过 [Remix](https://help.atoms.dev/en/articles/12129575-remix-a-project) 继续构建；官方 [Export](https://help.atoms.dev/en/articles/12129574-share-a-project) 可下载代码 ZIP，当前需要 Pro。若使用这一来源，先确认具体项目的导出权限和复用授权；平台内可 Remix 不作为代码具有开源许可证的依据。首轮不依赖取得 Atoms 账号或导出能力。
 

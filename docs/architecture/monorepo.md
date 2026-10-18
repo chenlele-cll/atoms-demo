@@ -35,7 +35,7 @@
 - Sandpack 间接依赖 es5-ext 的 postinstall 仅输出提示，不生成运行文件；allowBuilds 显式设为 false，不需要执行该脚本。保留既有 esbuild 构建许可，不自动批准包附带的 Agent skills。
 - TypeScript 的公共编译约束在 [tsconfig.base.json](../../tsconfig.base.json)，应用差异保留在各自配置中；ESLint 使用根目录统一入口。
 - 前后端产物分别写入各自的 `dist/`，生产后端构建排除测试。测试源码随项目维护；依赖目录、构建产物和本地运行产物不入库。
-- 前端 dev/build 先运行 scripts/prepare-company-template.mjs，从模板源生成忽略的 frontend/public/template-assets/company-landing.bundle.json；Vite 将它复制到 dist。模板源码不导入宿主 React 树，预览运行依赖与宿主安装依赖分开，样式提前编译。来源及改动见 [模板适配说明](../../templates/company-landing/ADAPTATIONS.md)。
+- 前端 dev/build 先运行 scripts/prepare-company-template.mjs，按 templates/catalog.json 从 company-landing、brand-store 和 personal-portfolio 固定源码生成忽略的 frontend/public/template-assets/*.bundle.json；Vite 将它们复制到 dist。模板源码不导入宿主 React 树，预览运行依赖与宿主安装依赖分开，样式提前编译。各模板目录保存来源及适配说明。
 - 同一准备脚本支持 frontend/backend-src/backend-dist 三个独立目标。后端准备目录含 bundle JSON 与同源中立校验模块/类型，不维护第二套文件规则；src 资源被忽略，构建会准备 src 并将对应副本放入 dist，编译产物独立于前端目录。typecheck/test 也先准备 src，使全新安装可独立运行检查。
 - 后端固定 better-sqlite3 13.0.3、@types/better-sqlite3 9.6.0、@fastify/cookie 11.1.3、@fastify/rate-limit 11.2.1，复用现有 Zod 4.6.7。SQLite 13 自带 N-API 平台预构建且没有安装脚本，本次无需新增 pnpm 脚本许可；保留已有 esbuild 许可和 es5-ext 拒绝。目标平台 frozen install 后必须执行真实绑定读写，不能以声明或复制别处 node_modules 代替。
 

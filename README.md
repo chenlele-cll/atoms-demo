@@ -78,7 +78,17 @@ pnpm dev:frontend
 
 `pnpm smoke:workspace` 在构建后从可见表单走真实 SDK 受控上游、工具、SQLite、Sandpack 报价操作、采用与重开，dev/preview 分别验证；不使用真实模型额度。先运行 `pnpm smoke` 完成构建，需要 Chrome、空闲 3001/5173/4173 和外部 Sandpack 网络，证据在忽略的 `test-results/workspace/`，边界见 [Workspace verification](./docs/engineering/verification.md#project-workspace)。
 
-## 企业官网模板基线
+## 起始模板
+
+首页提供三个固定来源的模板，均支持项目创建、独立预览和候选生成：
+
+| 模板 | 原版预览路径 | 基础交互 |
+| --- | --- | --- |
+| 企业官网 `company-landing` | `/templates/company-landing` | 导航、套餐、FAQ 和主题 |
+| 品牌电商 `brand-store` | `/templates/brand-store` | 商品搜索、分类、详情、购物袋数量及合计 |
+| 个人作品集 `personal-portfolio` | `/templates/personal-portfolio` | 项目筛选、详情及手机导航 |
+
+新增模板分别适配自 MIT 项目 [jefercort/e-commerce](./templates/brand-store/ADAPTATIONS.md) 和 [veldig/react-engineer-portfolio](./templates/personal-portfolio/ADAPTATIONS.md)，固定提交、许可及改动记录随源码保存。商品和个人资料是示例，购物袋仅保留在本轮预览内存，不提供交易、账号或联系发送服务。模板列表由 `templates/catalog.json` 登记；同一准备入口为前端与后端生成三个模板资产。真实模型业务质量与目标服务器部署需要分别验收。
 
 复用固定提交的 MIT 开源模板 `leoMirandaa/shadcn-landing-page`，在与宿主不同源的 Sandpack iframe 中运行 React 18；宿主仍使用 React 19 和 CSS Modules。基线保留导航、价格展示、FAQ、主题和手机菜单，明确标注样例内容；没有注册、支付、订阅或咨询发送服务。来源、逐文件校验值和适配记录见 [模板说明](./templates/company-landing/ADAPTATIONS.md)。
 
