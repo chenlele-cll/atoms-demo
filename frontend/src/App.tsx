@@ -33,7 +33,7 @@ export function App() {
   const navigate = (path: string) => { if (window.location.pathname !== path) window.history.pushState(null, '', path); app.activate(routeFor(path)); };
   const route = state.route;
   return <Suspense fallback={<main><p role="status">正在加载页面…</p></main>}>
-    {route.kind === 'template' ? <TemplateBaseline /> : route.kind === 'candidate' ? <CandidateReview key={route.path} projectId={route.projectId} versionId={route.versionId} />
+    {route.kind === 'template' ? <TemplateBaseline key={route.templateId} templateId={route.templateId} /> : route.kind === 'candidate' ? <CandidateReview key={route.path} projectId={route.projectId} versionId={route.versionId} />
       : route.kind === 'diagnostics' ? <ConnectionCheck /> : route.kind === 'home' || route.kind === 'project' ? <div className={styles.shell}>
         <Navigation state={state} app={app} navigate={navigate} />
         {route.kind === 'home' ? <Creation state={state} app={app} /> : <ProjectWorkspace key={state.activation} state={state} app={app} />}

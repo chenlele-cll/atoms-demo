@@ -18,6 +18,10 @@
 .back:hover, .source a:hover { text-decoration: underline; }
 .badge { font-size: 12px; color: var(--baseline-muted); border: 1px solid var(--baseline-border); padding: 4px 12px; border-radius: 8px; }
 .heading { margin-top: 24px; }
+.templates { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.templates a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 12px; border: 1px solid var(--baseline-border); border-radius: 8px; color: var(--baseline-text); text-decoration: none; }
+.templates a:hover, .templates a[aria-current="page"] { background: var(--baseline-surface); border-color: rgba(28, 28, 28, .4); }
+.templates a[aria-current="page"] { font-weight: 600; }
 .eyebrow { margin: 0 0 4px; color: var(--baseline-muted); font: 12px/1.5 ui-monospace, monospace; }
 .heading h1 { font-size: clamp(24px, 4vw, 32px); line-height: 1.4; font-weight: 600; margin: 0; }
 .description { color: var(--baseline-muted); margin: 8px 0 0; }
