@@ -12,7 +12,8 @@ const rootFiles = new Set(['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yam
 export function allowedInput(name) {
   if (typeof name !== 'string' || name.includes('\\') || name.startsWith('/') || name.split('/').some(part => !part || part === '..' || part === '.')) return false;
   const parts = name.split('/');
-  if (parts.some(part => ['.git', 'node_modules', 'dist', 'data', '.runtime', '.tools', 'test-results', 'template-assets', 'coverage'].includes(part) || /^(?:\.build-|\.previous-|\.env(?!\.example$))/.test(part))) return false;
+  const templateSourceData = /^templates\/[a-z0-9-]+\/src\/data(?:\/|$)/.test(name);
+  if (parts.some(part => ['.git', 'node_modules', 'dist', '.runtime', '.tools', 'test-results', 'template-assets', 'coverage'].includes(part) || (part === 'data' && !templateSourceData) || /^(?:\.build-|\.previous-|\.env(?!\.example$))/.test(part))) return false;
   if (/\.(?:sqlite|db)(?:-.*)?$|\.(?:pem|key|p12)$|(?:credentials|storageState|auth-state)/i.test(name)) return false;
   return rootFiles.has(name) || name === 'deploy/nginx.conf.template' || /^(?:frontend|backend|packages|templates|scripts)\//.test(name) || name.startsWith('.github/workflows/');
 }

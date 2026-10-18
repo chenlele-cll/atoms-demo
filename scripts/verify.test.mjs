@@ -23,7 +23,7 @@ async function fixture(t) {
   await exec('git', ['init', '-q', folder]);
   const put = async (name, value) => { const p = path.join(folder, name); await mkdir(path.dirname(p), { recursive: true }); await writeFile(p, value); };
   await put('package.json', JSON.stringify({ name: 'explicit-control-fixture', private: true }));
-  await put('.gitignore', 'node_modules/\n.env\ndata/\n'); await put('frontend/src/app.ts', 'export const explicitFixture=1;');
+  await put('.gitignore', 'node_modules/\n.env\ndata/\n!templates/*/src/data/\n'); await put('frontend/src/app.ts', 'export const explicitFixture=1;');
   return { folder, put };
 }
 const step = id => ({ id, selected: true, owner: 'GEN-008-control-test', coverage: ['scheduler-control'], timeoutMs: 1000 });
@@ -61,12 +61,18 @@ test('actual Git-visible uncommitted inputs are copied while secrets, generated 
   await f.put('backend/.env', 'PRIVATE_ENV_SENTINEL'); await f.put('backend/.env.example', 'MODEL_ID=example'); await f.put('backend/data/a.sqlite', 'PRIVATE_DB_SENTINEL');
   await f.put('frontend/node_modules/private.js', 'PRIVATE_NODE_SENTINEL'); await f.put('docs/product/assignment.md', 'PRIVATE_ASSIGNMENT_SENTINEL');
   await f.put('scripts/untracked.mjs', 'export const current="uncommitted";');
+  await f.put('templates/brand-store/src/data/products.ts', 'export const products=[];');
   await exec('git', ['add', 'frontend/src/app.ts'], { cwd: f.folder }); await f.put('frontend/src/app.ts', 'export const explicitFixture=2;');
   const before = await readFile(path.join(f.folder, 'frontend/src/app.ts')); const target = path.join(f.folder, 'copy');
   const record = await copyInputs(f.folder, target); assert.ok(record.entries.some(item => item.path === 'scripts/untracked.mjs'));
   assert.deepEqual(await readFile(path.join(target, 'frontend/src/app.ts')), before); assert.deepEqual(await readFile(path.join(f.folder, 'frontend/src/app.ts')), before);
   assert.ok(!(JSON.stringify(record).match(/PRIVATE_|\.env"|sqlite|assignment|node_modules/)));
   await access(path.join(target, 'backend/.env.example')); await assert.rejects(access(path.join(target, 'backend/.env')));
+  assert.equal(await readFile(path.join(target, 'templates/brand-store/src/data/products.ts'), 'utf8'), 'export const products=[];');
+  await exec('git', ['init', '-q', target]);
+  await exec('git', ['add', '--all'], { cwd: target });
+  assert.ok((await manifest(target)).entries.some(entry => entry.path === 'templates/brand-store/src/data/products.ts'));
+  for (const name of ['backend/data/private.json', 'templates/brand-store/data/private.json', 'templates/brand-store/src/data/private.sqlite', 'templates/brand-store/src/data/.env']) assert.equal(allowedInput(name), false);
   for (const name of ['../private', '/tmp/private', 'backend/.env.production', 'frontend/dist/a.js', 'backend/src/template-assets/bundle.json', 'packages/contracts/.build-a/tmp.js']) assert.equal(allowedInput(name), false);
 });
 test('input symlink escape and mutation during copy are rejected; an internal public-file link is dereferenced', async t => {
