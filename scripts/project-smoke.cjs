@@ -98,10 +98,8 @@ async function api(page, method, url, body) {
 }
 async function setup() {
   // Deployment layout deliberately has no frontend or root template source.
-  await mkdir(deploy, { recursive: true });
-  await cp(path.join(root, 'backend/dist'), path.join(deploy, 'dist'), { recursive: true });
-  await cp(path.join(root, 'backend/package.json'), path.join(deploy, 'package.json'));
-  await symlink(path.join(root, 'backend/node_modules'), path.join(deploy, 'node_modules'), 'dir');
+  const { prepareBackendRuntime } = await import('./prepare-backend-runtime.mjs');
+  await prepareBackendRuntime(root, deploy);
   await assert.rejects(access(path.join(runtime, 'deploy/frontend')));
   await assert.rejects(access(path.join(runtime, 'deploy/templates')));
   await mkdir(browserRepo, { recursive: true });
@@ -121,7 +119,7 @@ async function mode(name, port) {
   const errors = []; page.on('pageerror', error => errors.push(error.name)); other.on('pageerror', error => errors.push(error.name));
   let created; let originalHash; let cookie;
   try {
-    await page.goto(`http://127.0.0.1:${port}`); await other.goto(`http://127.0.0.1:${port}`);
+    await page.goto(`http://127.0.0.1:${port}/diagnostics/connection`); await other.goto(`http://127.0.0.1:${port}/diagnostics/connection`);
     await scenario(`${name}: relative API, HttpOnly cookie, template project and empty conversation`, async () => {
       const templates = await api(page, 'GET', '/api/templates'); assert.equal(templates.status, 200);
       assert.equal((await a.cookies()).length, 0);

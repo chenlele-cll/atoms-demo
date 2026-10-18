@@ -17,9 +17,11 @@ An HTTP-client-only change does not require loading the UI design contract unles
 
 ## Source map and local boundaries
 
-- `src/main.tsx` initializes the browser application. `src/App.tsx` keeps the connection-check home and routes `/templates/company-landing` to the isolated template baseline.
+- `src/main.tsx` initializes the browser application. `src/App.tsx` routes `/` to creation and `/projects/:projectId` to the workspace; template/candidate routes remain direct entries. `src/diagnostics/` preserves connection-check UI at `/diagnostics/connection`.
 - `src/templates/` loads the public template bundle through the neutral `templates/bundle.mjs` contract; `src/template-baseline/` owns host UI and actual Sandpack compile/error/retry states. Do not import template React components into the host tree.
 - `src/api/` contains HTTP clients and response parsing. Reuse the boundary pattern in `src/api/health.ts` for timeouts, HTTP failures, and unknown response data.
+- `src/preview/` owns the shared snapshot iframe and per-attempt state machine. `src/candidate-review/` reads shared contracts over HTTP and keeps adoption confirmation separate from local compilation. `test/` uses Node/tsx for pure state and client boundaries.
+- `src/workspace/controller.ts` owns active requests across React subscription replay and internal views; real route changes abort the old activation. `pending.ts` stores bounded request envelopes only, while drafts/read positions/loaded messages stay in memory per project. `api/generation-stream.ts` consumes bounded POST SSE without automatic POST replay. Workspace adoption reuses `candidate-review/useCandidateReview.ts`.
 - Component styles use CSS Modules; `src/styles.css` contains global foundations. Keep detailed tokens and interaction rules in the design contract. Update that contract when introducing tokens or patterns; keep `DESIGN.md` as navigation.
 - Browser source uses browser APIs and relative `/api` paths for platform requests. It must not import backend source, database code, Node-only APIs, or server secrets.
 - Backend unavailability must leave the frontend usable and show an honest failure state. Loading, success, error, and retry controls must reflect the actual request outcome.
@@ -31,9 +33,10 @@ An HTTP-client-only change does not require loading the UI design contract unles
 ```sh
 pnpm dev:frontend
 pnpm --filter @atoms/frontend typecheck
+pnpm --filter @atoms/frontend test
 pnpm --filter @atoms/frontend build
 ```
 
-The dev/build scripts prepare the fixed template asset before Vite. Root `pnpm test:template` checks preparation and bundle boundaries; `pnpm smoke:template` requires a prior build and exercises actual preview/browser behavior. These scoped commands help local development and diagnosis. Final checks follow the central verification guide; UI changes need running-browser checks at narrow widths and in error states. There is currently no frontend unit-test script, and passing backend tests alone does not verify UI behavior.
+The dev/build scripts prepare the fixed template asset before Vite. Root `pnpm test:template` checks preparation and bundle boundaries; `pnpm smoke:template` requires a prior build and exercises actual preview/browser behavior. These scoped commands help local development and diagnosis. Final checks follow the central verification guide; UI changes need running-browser checks at narrow widths and in error states. The frontend test script uses pinned tsx with Node tests for preview/adoption state and HTTP boundaries; these do not replace actual browser compilation and interaction.
 
 When frontend commands or configuration change, update the owning configuration, environment template where applicable, and README; do not duplicate their details here.

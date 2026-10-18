@@ -5,11 +5,12 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { decodeCursor, encodeCursor, idSchema, messageInputSchema, messageSchema, messageListSchema, projectDetailSchema,
   projectListSchema, projectSchema, runErrorSchema, runSchema, snapshotSchema, titleSchema, versionSchema } from '../contracts/projects.js';
-import type { MessageInput, Run, Snapshot } from '../contracts/projects.js';
+import type { MessageInput, Run, Snapshot, Version } from '../contracts/projects.js';
 import { ProjectError, storageOperation } from '../projects/errors.js';
 import { migrate } from './migrations.js';
 import { canonicalJSON, companyTemplateIdentity, parseTemplateBundle } from '../template-assets/bundle.mjs';
 import type { GenerationInput } from '../generation/contracts.js';
+import { versionReviewSchema, adoptResponseSchema } from '@atoms/contracts';
 
 export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 export function tokenDigest(token: string) { return createHash('sha256').update(token).digest('hex'); }
@@ -69,6 +70,59 @@ export class ProjectStore {
   }
   hasRunning(projectId: string) {
     return storageOperation(() => Boolean(this.db.prepare("SELECT 1 FROM generation_runs WHERE project_id=? AND status='running' LIMIT 1").get(projectId)));
+  }
+  private candidate(projectId: string, versionId: string) {
+    const version = this.version(projectId, versionId);
+    const rows: unknown[] = this.db.prepare(`SELECT ${runColumns} FROM generation_runs WHERE project_id=? AND result_version_id=? LIMIT 2`).all(projectId, versionId);
+    if (rows.length > 1) throw new ProjectError('DATA_CORRUPT');
+    const successfulRun = rows.length === 0 ? null : parse(runSchema, rows[0]);
+    let parent: Version | null = null;
+    if (version.parentVersionId) {
+      try { parent = this.version(projectId, version.parentVersionId); }
+      catch (error) {
+        if (error instanceof ProjectError && error.code === 'NOT_FOUND') throw new ProjectError('DATA_CORRUPT');
+        throw error;
+      }
+    }
+    const identity = (value: Snapshot) => Object.fromEntries(Object.entries(value).filter(([key]) => !['files', 'digest'].includes(key)));
+    if ((version.kind === 'template' && (version.sequence !== 0 || parent !== null || successfulRun !== null)) ||
+      (version.kind === 'generated' && (version.sequence === 0 || !parent || parent.sequence >= version.sequence ||
+        canonicalJSON(identity(parent.snapshot)) !== canonicalJSON(identity(version.snapshot)))) ||
+      (successfulRun && (successfulRun.status !== 'succeeded' || successfulRun.baseVersionId !== version.parentVersionId))) {
+      throw new ProjectError('DATA_CORRUPT');
+    }
+    const changedFiles = parent ? [...new Set([...Object.keys(parent.snapshot.files), ...Object.keys(version.snapshot.files)])]
+      .filter(path => parent.snapshot.files[path] !== version.snapshot.files[path]).sort() : [];
+    const eligible = version.kind === 'generated' && parent !== null && successfulRun?.baseVersionId === version.parentVersionId;
+    return { version, successfulRun, changedFiles, eligible };
+  }
+  versionReview(ownerId: string, projectId: string, versionId: string, activity: () => 'busy' | 'unconfirmed' | null) {
+    return storageOperation(() => this.db.transaction(() => {
+      this.owned(ownerId, projectId); const project = this.project(projectId); const value = this.candidate(projectId, versionId);
+      const availability = !value.eligible ? 'not-candidate' : project.currentVersionId === versionId ? 'already-current' :
+        project.currentVersionId !== value.version.parentVersionId ? 'stale' : activity() ?? (this.hasRunning(projectId) ? 'unconfirmed' : 'eligible');
+      return parse(versionReviewSchema, { ...value, currentVersionId: project.currentVersionId, adoptionAvailability: availability });
+    })());
+  }
+  adoptVersion(ownerId: string, projectId: string, versionId: string, expected: string,
+    activity: () => 'busy' | 'unconfirmed' | null, now: () => number = Date.now) {
+    return storageOperation(() => this.db.transaction(() => {
+      const session: unknown = this.db.prepare('SELECT id FROM sessions WHERE id=? AND expires_at>?').get(ownerId, now());
+      if (!session) throw new ProjectError('SESSION_REQUIRED');
+      this.owned(ownerId, projectId); const project = this.project(projectId); const candidate = this.candidate(projectId, versionId);
+      if (!candidate.eligible || candidate.version.parentVersionId !== expected) throw new ProjectError('CANDIDATE_NOT_ADOPTABLE');
+      if (project.currentVersionId === versionId) return parse(adoptResponseSchema, {
+        projectId, currentVersionId: versionId, updatedAt: project.updatedAt, alreadyCurrent: true });
+      if (project.currentVersionId !== expected) throw new ProjectError('CURRENT_VERSION_CONFLICT');
+      const active = activity();
+      if (active === 'busy') throw new ProjectError('PROJECT_BUSY');
+      if (active === 'unconfirmed' || this.hasRunning(projectId)) throw new ProjectError('RUN_STATE_UNCONFIRMED');
+      const updatedAt = new Date(now()).toISOString();
+      const result = this.db.prepare('UPDATE projects SET current_version_id=?,updated_at=? WHERE id=? AND owner_session_id=? AND current_version_id=?')
+        .run(versionId, updatedAt, projectId, ownerId, expected);
+      if (result.changes !== 1) throw new ProjectError('CURRENT_VERSION_CONFLICT');
+      return parse(adoptResponseSchema, { projectId, currentVersionId: versionId, updatedAt, alreadyCurrent: false });
+    }).immediate());
   }
 
   createSession(now = Date.now()) {
@@ -153,6 +207,7 @@ export class ProjectStore {
   }
   private version(projectId: string, versionId: string) {
     const value: unknown = this.db.prepare(`SELECT ${versionColumns} FROM versions WHERE project_id=? AND id=?`).get(projectId, versionId);
+    if (value === undefined) throw new ProjectError('NOT_FOUND');
     const row = parse(z.object({ snapshotJson: z.string() }).passthrough(), value);
     let snapshot: unknown;
     try { snapshot = JSON.parse(row.snapshotJson); } catch { throw new ProjectError('DATA_CORRUPT'); }
@@ -208,6 +263,17 @@ export class ProjectStore {
       page.nextAfterSequence = rows.length > limit ? page.items.at(-1)?.sequence ?? null : null;
       return page;
     });
+  }
+  latestMessages(ownerId: string, projectId: string, limit: number, beforeSequence?: number) {
+    return storageOperation(() => this.db.transaction(() => {
+      this.owned(ownerId, projectId);
+      const latestSequence = parse(z.object({ sequence: z.number().int().nonnegative() }), this.db.prepare('SELECT coalesce(max(sequence),0) AS sequence FROM messages WHERE project_id=?').get(projectId)).sequence;
+      const rows: unknown[] = beforeSequence === undefined
+        ? this.db.prepare(`SELECT ${messageColumns} FROM messages WHERE project_id=? ORDER BY sequence DESC LIMIT ?`).all(projectId, limit + 1)
+        : this.db.prepare(`SELECT ${messageColumns} FROM messages WHERE project_id=? AND sequence<? ORDER BY sequence DESC LIMIT ?`).all(projectId, beforeSequence, limit + 1);
+      const items = rows.slice(0, limit).map(row => parse(messageSchema, row)).reverse();
+      return { items, nextBeforeSequence: rows.length > limit ? items[0]?.sequence ?? null : null, latestSequence };
+    })());
   }
   private append(projectId: string, inputs: MessageInput[], now: string) {
     const messages = z.array(messageInputSchema).max(50).parse(inputs);

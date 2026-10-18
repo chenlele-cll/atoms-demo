@@ -1,6 +1,7 @@
 packages:
   - frontend
   - backend
+  - packages/contracts
 
 engineStrict: true
 saveExact: true

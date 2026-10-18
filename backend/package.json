@@ -4,14 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node ../scripts/prepare-company-template.mjs --target backend-src && tsx watch src/server.ts",
-    "build": "node ../scripts/prepare-company-template.mjs --target backend-src && tsc -p tsconfig.build.json && node ../scripts/prepare-company-template.mjs --target backend-dist",
+    "dev": "node ../scripts/prepare-contracts.mjs && node ../scripts/prepare-company-template.mjs --target backend-src && tsx watch src/server.ts",
+    "build": "node ../scripts/prepare-contracts.mjs && node ../scripts/prepare-company-template.mjs --target backend-src && tsc -p tsconfig.build.json && node ../scripts/prepare-company-template.mjs --target backend-dist",
     "start": "node dist/server.js",
-    "typecheck": "node ../scripts/prepare-company-template.mjs --target backend-src && tsc --noEmit",
-    "test": "node ../scripts/prepare-company-template.mjs --target backend-src && tsx --test test/*.test.ts",
+    "typecheck": "node ../scripts/prepare-contracts.mjs && node ../scripts/prepare-company-template.mjs --target backend-src && tsc --noEmit",
+    "test": "node ../scripts/prepare-contracts.mjs && node ../scripts/prepare-company-template.mjs --target backend-src && tsx --test test/*.test.ts",
     "model:probe": "tsx src/model/probe.ts",
     "model:probe:built": "node dist/model/probe.js",
-    "generation:smoke": "node ../scripts/prepare-company-template.mjs --target backend-src && tsx src/generation/smoke.ts",
+    "generation:smoke": "node ../scripts/prepare-contracts.mjs && node ../scripts/prepare-company-template.mjs --target backend-src && tsx src/generation/smoke.ts",
     "generation:smoke:built": "node dist/generation/smoke.js"
   },
   "dependencies": {
@@ -22,7 +22,8 @@
     "better-sqlite3": "13.0.3",
     "fastify": "5.12.7",
     "proper-lockfile": "4.1.2",
-    "zod": "4.6.7"
+    "zod": "4.6.7",
+    "@atoms/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",

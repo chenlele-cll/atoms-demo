@@ -40,6 +40,8 @@ Fastify preClose 先拒绝新生成并对所有活动 Controller 发 SERVER_SHUT
 
 ## Manager commands
 
+共享契约由 `scripts/prepare-contracts.mjs` 在两应用独立 dev/build/typecheck/test、根 check 和源码 generation:smoke 前准备。它使用 `.runtime/contracts.lock` 串行构建，以输入和输出摘要检查缓存，60 秒预算涵盖取锁与构建；失败阻止后续启动，成功后原子发布 ESM/声明。源码变更后重新准备或重启，不承诺跨包热更新。生产安装必须包含共用包的 package.json/dist/运行依赖，详见 [Shared contract build](../architecture/monorepo.md#shared-contract-build)。
+
 预先选择 `.nvmrc` 的 Node 和 package.json 的 pnpm，然后在仓库根目录运行：
 
 ```sh

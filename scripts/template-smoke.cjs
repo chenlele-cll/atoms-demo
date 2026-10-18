@@ -241,6 +241,8 @@ async function normal(origin, mode) {
           assert.deepEqual(errors, []);
           assert.match(await page.locator('h1').textContent(), /企业官网/);
           await page.getByRole('link', { name: '← 返回首页' }).click();
+          await page.getByRole('button', { name: '创建并生成', exact: true }).waitFor();
+          await page.getByRole('link', { name: '连接诊断', exact: true }).click();
           await page.getByRole('button', { name: '检查后端连接', exact: true }).waitFor();
           await page.getByRole('link', { name: '打开企业官网模板 →' }).click();
           await ready(page);
