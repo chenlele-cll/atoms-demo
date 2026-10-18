@@ -1,0 +1,90 @@
+{
+  "id": "brand-store",
+  "version": 1,
+  "name": "Brand Store / Shopi",
+  "category": "e-commerce",
+  "source": {
+    "repository": "https://github.com/jefercort/e-commerce",
+    "commit": "ec492d15f5614fa7f297714352e5c001f3daddd1",
+    "license": "MIT",
+    "upstreamFiles": [
+      {
+        "path": "LICENSE",
+        "localPath": "LICENSE",
+        "gitBlobSha1": "9aa63b7cb64223b131b3f5f635b4b3b3c4a342ae",
+        "sha256": "47213757545f8924e0b8bf780fd86783113f9675a2b270652656e07d0793eb40"
+      },
+      {
+        "path": "src/main.jsx",
+        "localPath": "src/main.tsx",
+        "gitBlobSha1": "48c9fe35bdb24c0fd95d362e5e93538587a5b74f",
+        "sha256": "d753842347360c7ad77a15eac04e8cfed494ee6b41bbe5b0a34f8474ee1f90e1"
+      },
+      {
+        "path": "src/Pages/App/index.jsx",
+        "localPath": "src/App.tsx",
+        "gitBlobSha1": "762c683616025b3a89888f3e08fa273e99a80ef6",
+        "sha256": "c106e484467f7657a1d452477d550b1dee1a635a56bc89c2bfc9435fd39b34a6"
+      },
+      {
+        "path": "src/Pages/Home/index.jsx",
+        "localPath": "src/App.tsx",
+        "gitBlobSha1": "ac65708e4c789e5b9f9e827ba6f4c57079e84761",
+        "sha256": "00bc1767686f546d7666fd6faca0cefbd9611e295927c175d7a5a09276646717"
+      },
+      {
+        "path": "src/Context/index.jsx",
+        "localPath": "src/App.tsx",
+        "gitBlobSha1": "62548da6adbfa95e1118c9acd4c9287750dcb72b",
+        "sha256": "78973145bc0e7557b83f116ecc73acdae8edda950c92fc1152e7c0d3d5b75737"
+      },
+      {
+        "path": "src/Components/Card/index.jsx",
+        "localPath": "src/components/Card.tsx",
+        "gitBlobSha1": "0efcf495bd389c0411e6c048dff71ee26f1dd5f7",
+        "sha256": "8a4d1df54860b5d54c0da61ff89cee8fe39d390367ce8fb088d13730fcce0447"
+      },
+      {
+        "path": "src/Components/Navbar/index.jsx",
+        "localPath": "src/components/Navbar.tsx",
+        "gitBlobSha1": "ae52d03632efe09156ff9d7a1a8851fcdda61394",
+        "sha256": "8843417974b50af7f881670b489dfb6290637a1fd9c68364dcb4c4e0fde3ca78"
+      },
+      {
+        "path": "src/Components/ProductDetail/index.jsx",
+        "localPath": "src/components/ProductDetail.tsx",
+        "gitBlobSha1": "c8cf4197a76f51f624357f0c8e7b2e427744ac66",
+        "sha256": "aa3a4ce458bb3cd86fa06ca22ce648a695bb28fdc95c577860af9d34fd247d97"
+      },
+      {
+        "path": "src/Components/CheckoutSideMenu/index.jsx",
+        "localPath": "src/components/CheckoutSideMenu.tsx",
+        "gitBlobSha1": "81f5a39919693fe2145403aa2b329f96e282bc28",
+        "sha256": "c92a655b05a73eb8e06b11aa89374af089e7ec2d3cf4ce6caae2cb6a0fdf4e3b"
+      },
+      {
+        "path": "src/Components/OrderCard/index.jsx",
+        "localPath": "src/components/OrderCard.tsx",
+        "gitBlobSha1": "3936d85ab9c9f3e64390091f01ac00353c8a72ff",
+        "sha256": "db6e4d3da1915f968a8450c0edd8d4045961c2c345573713426c5ba39d8e4f64"
+      },
+      {
+        "path": "src/Pages/App/App.css",
+        "localPath": "src/styles.css",
+        "gitBlobSha1": "bd6213e1dfe6b0a79ce7d8b37d0d2dc70f0250bb",
+        "sha256": "186419c47e46d1688974fe6d1d4688d7234f1790113a0c1e933526b522c9a04c"
+      },
+      {
+        "path": "tailwind.config.js",
+        "localPath": "tailwind.config.cjs",
+        "gitBlobSha1": "d37737fc01752cf4b395862b2aaebf67b4cdf596",
+        "sha256": "5b778360021d0958f53d42b7a9c36def0a0989e7c5cc6f47c87fcd7dcb7064eb"
+      }
+    ]
+  },
+  "entry": "/src/main.tsx",
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}
