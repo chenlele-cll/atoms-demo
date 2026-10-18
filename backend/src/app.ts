@@ -23,7 +23,10 @@ export function buildApp(options: FastifyServerOptions = {}, services?: ProjectS
     .send({ error: { code: 'NOT_FOUND', message: 'Resource not found.' }, requestId: request.id }));
   if (services) {
     if (options.trustProxy) throw new Error('Project routes require trustProxy=false');
-    const manager = new GenerationManager(services.store, services.generation);
+    const manager = new GenerationManager(services.store, { ...services.generation, audit: event => {
+      app.log.info({ modelObservation: event }, 'Model invocation observation');
+      services.generation?.audit?.(event);
+    } });
     const lost = () => manager.revokeOwnership();
     services.ownershipSignal?.addEventListener('abort', lost, { once: true });
     if (services.ownershipSignal?.aborted) lost();

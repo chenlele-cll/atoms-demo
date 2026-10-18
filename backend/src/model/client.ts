@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { modelObservationSchema, safeModelIdentifier, safeProviderRequestId } from './observation.js';
+import type { ModelObservation } from './observation.js';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText, Output, stepCountIs, wrapLanguageModel } from 'ai';
 import type { ModelMessage, ToolSet } from 'ai';
@@ -43,7 +46,7 @@ function addUsage(previous: Usage | null, next: Usage | null, first: boolean): U
 export function createModelClient(config: ModelConfig, transport: typeof fetch = fetch) {
   return {
     // Only explicitly configured deadlines span the operation's single-step calls.
-    async run<T>(maxRequests: number, work: (session: ModelSession) => Promise<T>, external?: AbortSignal, observe?: (event: ModelRequestEvent) => void)
+    async run<T>(maxRequests: number, work: (session: ModelSession) => Promise<T>, external?: AbortSignal, observe?: (event: ModelRequestEvent) => void, audit?: (event: ModelObservation) => void)
       : Promise<{ value: T; metrics: CallMetrics }> {
       const controller = new AbortController();
       let ended: 'timeout' | 'cancelled' | undefined;
@@ -51,6 +54,14 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
       const metrics: CallMetrics = { requestCount: 0, usage: null, requests: [] };
       const deadline = config.timeoutMs > 0 ? performance.now() + config.timeoutMs : null;
       let steps = 0;
+      let attempt: { id: string; step: number; started: number; status: number | null; providerId: string | null; completed: boolean } | undefined;
+      const record = (event: ModelObservation['event'], extra: Partial<ModelObservation> = {}) => {
+        if (closed || !attempt || event === 'step-finished' && attempt.completed) return;
+        if (event === 'step-finished') attempt.completed = true;
+        const configuredModel = safeModelIdentifier(config.modelId, config.apiKey);
+        if (!configuredModel) return;
+        try { audit?.(modelObservationSchema.parse({ event, requestAttemptId: attempt.id, step: attempt.step, configuredModel, responseModel: null, providerRequestId: attempt.providerId, httpStatus: attempt.status, durationMs: Math.max(0, Math.round(performance.now() - attempt.started)), usage: null, errorCode: null, ...extra })); } catch { /* Observations cannot alter execution. */ }
+      };
       const notify = (event: ModelRequestEvent) => { if (!closed) { try { observe?.(event); } catch { /* Observers never control transport outcomes. */ } } };
       const measured = (): CallMetrics => ({
         requestCount: metrics.requestCount,
@@ -77,11 +88,16 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
           if (metrics.requestCount >= maxRequests) throw new ModelError('invalid_output');
           metrics.requestCount++;
           metrics.requests.push(null);
+          attempt = { id: randomUUID(), step: metrics.requestCount, started: performance.now(), status: null, providerId: null, completed: false };
+          record('dispatch');
           try {
             // Suppress redirect replay, including credential forwarding and hidden requests.
             const pending = transport(url, { ...init, redirect: 'error', signal: controller.signal });
             notify({ type: 'request-started', step: metrics.requestCount });
-            return await pending;
+            const response = await pending;
+            if (attempt) { attempt.status = response.status; attempt.providerId = safeProviderRequestId(response.headers.get('x-request-id'), config.apiKey); }
+            record('response');
+            return response;
           } catch (error) {
             check();
             if (error instanceof ModelError) throw error;
@@ -103,6 +119,7 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
               totalTokens: inputTokens === null || outputTokens === null ? null : inputTokens + outputTokens,
             };
             metrics.requests[metrics.requestCount - 1] = usage;
+            record('step-finished', { usage, responseModel: safeModelIdentifier(result.response?.modelId, config.apiKey) });
             inspectResponse(result.response?.body);
             // SDK warning strings can contain upstream-controlled details. No raw logs.
             return { ...result, warnings: [] };
@@ -115,6 +132,7 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
           check();
           if (++steps > maxRequests) throw new ModelError('invalid_output');
           const before = metrics.requestCount;
+          let stepCompleted = false;
           try {
           const result = await generateText({
             model, messages: input.messages,
@@ -130,9 +148,13 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
             telemetry: { isEnabled: false },
           });
           check();
+          stepCompleted = true;
           if (result.finishReason === 'length') throw new ModelError('truncated');
           if (!['stop', 'tool-calls'].includes(result.finishReason)) throw new ModelError('invalid_output');
           return result;
+          } catch (error) {
+            if (!stepCompleted && metrics.requestCount > before && metrics.requests[metrics.requestCount - 1] === null) record('step-finished', { errorCode: ended ?? safeModelError(error).safe.code });
+            throw error;
           } finally {
             if (metrics.requestCount > before) notify({ type: 'request-finished', step: metrics.requestCount });
           }

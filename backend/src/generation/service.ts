@@ -1,3 +1,4 @@
+import type { GenerationObservation } from '../model/observation.js';
 import type { ModelMessage } from 'ai';
 import { activitySchema, generationInputSchema, generationResultSchema, generationTools, MAX_REQUESTS, toolNameSchema } from './contracts.js';
 import type { GenerationActivity, GenerationResult } from './contracts.js';
@@ -42,6 +43,7 @@ export async function generateProject(input: unknown, dependencies: {
   transport?: typeof fetch;
   signal?: AbortSignal;
   observe?: Observer;
+  audit?: (event: GenerationObservation) => void;
   clock?: () => number;
   now?: () => number;
   accepted?: AcceptedGeneration;
@@ -152,7 +154,9 @@ export async function generateProject(input: unknown, dependencies: {
           if (error instanceof GenerationError || error instanceof ProjectError) applicationError = generationError(error);
           throw error;
         }
-      }, controller.signal, event => emit(event));
+      }, controller.signal, event => emit(event), event => {
+        try { dependencies.audit?.({ ...event, runId: accepted.run.id, projectId: request.projectId, requestId: request.requestId }); } catch { /* No observer may change the run. */ }
+      });
       metrics = execution.metrics;
     } catch (error) {
       if (error instanceof ModelFailure) metrics = error.metrics;

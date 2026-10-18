@@ -156,3 +156,10 @@ The dependent REV-004 continuation guard waits for a successful current GET afte
 2026-10-18 按用户要求修订：MODEL_TIMEOUT_MS 默认 0，不建立模型操作/生成服务的累计截止或定时器；本地显式配置也为 0。正值 1000–2147483647ms 为主动选择的有限总期限，最大值仅防止 Node timer 整数溢出；0 不受该时长约束。模型请求、工具执行、提交检查仍使用同一取消信号；用户取消、原连接断开、服务关闭和所有权丢失可中止活动请求，禁止迟到保存。步骤、token、文件/上下文、并发/配额限制保持不变。
 
 前端 SSE 不再默认为 150 秒累计截止，持续收到 10 秒心跳的长任务可一直等待。10 秒首响应、25 秒无数据和 Nginx 相邻读取期限是连接故障检测，不是任务累计时长。状态查询和 iframe 编译是各自独立操作，仍有故障期限。live 验收同样不再用 10 分钟全局计时器终止真实生成；无总期限时需明确取消或 SIGINT/SIGTERM 结束，清理继续有界。
+
+## Model invocation observations
+
+GEN-010 的 model/observation.ts 维护服务端私有观测白名单。生产真实 fetch 的调用边界记录 dispatch，原样返回响应时只读取允许的 HTTP status/x-request-id 元数据，SDK 结束时记录可得的 responseModel 与 token usage；不克隆/消费正文，不增加请求、重试或超时预算。每个 attempt 使用独立 UUID，与 generation runId/projectId/requestId 和 1–6 step 关联，三个请求标识不混用。
+
+app.ts 通过既有结构化 logger 写 modelObservation；观察失败不会改变产品结果，也不进入公开 SSE/HTTP 契约或数据库迁移。允许字段为事件、关联 ID、配置/响应模型、HTTP 状态、受限 req_ 请求标识、耗时、nullable 用量与安全错误分类。原始 headers/body/cause、提示词、工具正文、文件、推理与认证值均禁止；字段缺失为 null。x-request-id 只供排查，不能证明业务或预览成功，依据见 [OpenAI 官方请求追踪](https://developers.openai.com/api/reference/overview#debugging-requests)。
+

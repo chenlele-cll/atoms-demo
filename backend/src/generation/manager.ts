@@ -1,3 +1,4 @@
+import type { GenerationObservation } from '../model/observation.js';
 import { generationStatusSchema } from '../contracts/generations.js';
 import type { GenerationStatus, GenerationEvent } from '../contracts/generations.js';
 import type { GenerationInput, GenerationActivity } from './contracts.js';
@@ -18,6 +19,7 @@ export type GenerationOptions = {
   limits?: { global?: number; daily?: number; postPerMinute?: number; queryPerMinute?: number; cancelPerMinute?: number };
   streamLimits?: Partial<StreamLimits>;
   shutdownMs?: number;
+  audit?: (event: GenerationObservation) => void;
 };
 export class GenerationManager {
   private readonly active = new Map<string, Active>();
@@ -94,6 +96,7 @@ export class GenerationManager {
     const { request } = active.accepted;
     active.promise = generateProject(request, { store: this.store, env: this.options.env ?? process.env,
       accepted: active.accepted, signal: active.controller.signal, observe, canWrite: () => active.canWrite,
+      ...(this.options.audit ? { audit: this.options.audit } : {}),
       ...(this.options.transport ? { transport: this.options.transport } : {}),
       ...(this.options.now ? { now: this.options.now } : {}) }).then(result => {
       if (active.finalized) return;
