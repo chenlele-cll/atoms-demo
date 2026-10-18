@@ -7,14 +7,22 @@ import { ProjectError } from './projects/errors.js';
 import { openStore } from './storage/store.js';
 import type { ProjectStore } from './storage/store.js';
 import { loadCatalog } from './templates/catalog.js';
+import { acquireOwnership } from './storage/ownership.js';
 
 let app: ReturnType<typeof buildApp> | undefined;
 let store: ProjectStore | undefined;
 let stopping = false;
+let ownership: Awaited<ReturnType<typeof acquireOwnership>> | undefined;
+const ownershipLost = new AbortController();
+let closing: Promise<void> | undefined;
 
 async function close() {
   stopping = true;
-  try { await app?.close(); } finally { store?.close(); }
+  return closing ??= (async () => {
+    try { await app?.close(); } finally {
+      try { store?.close(); } finally { await ownership?.release(); }
+    }
+  })();
 }
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, () => {
@@ -31,8 +39,17 @@ async function start() {
   const persistence = readPersistenceConfig(process.env);
   const catalog = await loadCatalog();
   if (stopping) return;
-  store = openStore(persistence.databasePath);
-  app = buildApp({}, { store, catalog, origins: persistence.origins, secureCookies: persistence.secureCookies });
+  ownership = await acquireOwnership(persistence.databasePath, () => {
+    ownershipLost.abort();
+    process.stderr.write('Database service ownership lost.\n');
+    process.exitCode = 1;
+    void close().catch(() => { process.stderr.write('Backend shutdown failed.\n'); });
+  });
+  if (stopping) { await ownership.release(); return; }
+  store = openStore(ownership.filename);
+  store.recoverRunning();
+  app = buildApp({}, { store, catalog, origins: persistence.origins, secureCookies: persistence.secureCookies,
+    ownershipSignal: ownershipLost.signal, releaseOwnership: ownership.release });
   if (stopping) { await close(); return; }
   await app.listen(config);
 }

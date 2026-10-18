@@ -8,6 +8,8 @@ import { ProjectError } from '../projects/errors.js';
 import { SESSION_LIFETIME_MS } from '../storage/store.js';
 import type { ProjectStore } from '../storage/store.js';
 import type { TemplateCatalog } from '../templates/catalog.js';
+import type { GenerationOptions, GenerationManager } from '../generation/manager.js';
+import { generationRoutes } from './generations.js';
 
 export type ProjectServices = {
   store: ProjectStore;
@@ -16,9 +18,12 @@ export type ProjectServices = {
   secureCookies: boolean;
   now?: () => number;
   limits?: { sessionPerMinute?: number; projectsPerMinute?: number; projectsPerSession?: number };
+  generation?: GenerationOptions;
+  releaseOwnership?: () => Promise<void>;
+  ownershipSignal?: AbortSignal;
 };
 const errors = { '4xx': errorSchema, '5xx': errorSchema };
-export async function projectRoutes(app: FastifyInstance, services: ProjectServices) {
+export async function projectRoutes(app: FastifyInstance, services: ProjectServices & { manager: GenerationManager }) {
   const { store, catalog } = services;
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
@@ -45,6 +50,7 @@ export async function projectRoutes(app: FastifyInstance, services: ProjectServi
       status === 429 ? 'RATE_LIMITED' : status === 413 ? 'BODY_TOO_LARGE' :
         status === 415 ? 'JSON_REQUIRED' : status === 400 ? 'INVALID_INPUT' : 'INTERNAL_ERROR');
     if (safe.status >= 500) request.log.error({ err: { name: 'ProjectError', message: safe.message, code: safe.code } }, 'Project request failed');
+    if (safe.retryAfter) reply.header('Retry-After', safe.retryAfter);
     return reply.code(safe.status).send({ error: { code: safe.code, message: safe.message }, requestId: request.id });
   });
   const owner = (cookies: Record<string, string | undefined>) => {
@@ -52,6 +58,7 @@ export async function projectRoutes(app: FastifyInstance, services: ProjectServi
     if (!session) throw new ProjectError('SESSION_REQUIRED');
     return session.id;
   };
+  generationRoutes(app, services.manager, owner);
 
   app.post('/session', {
     bodyLimit: 8192,

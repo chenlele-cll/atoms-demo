@@ -228,7 +228,7 @@ test('manager lifecycle with real Process Compose and applications', { timeout: 
       if (result.code !== 0) return false;
       const value = JSON.parse(result.stdout);
       return value.services.find((item) => item.name === 'backend').pid !== backend.pid ? value : false;
-    });
+    }, 50_000); // Backend ownership survives SIGKILL until proper-lockfile's 30-second stale window.
     report.recovery_prior_exit_code = recovered.services.find((item) => item.name === 'backend').exitCode;
     assert.equal(recovered.services.find((item) => item.name === 'frontend').pid, before.services.find((item) => item.name === 'frontend').pid);
     await Promise.all(['stop', 'start', 'restart', 'stop', 'start'].map((action) => success(cwd, action, '--json')));
