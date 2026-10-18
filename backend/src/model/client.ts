@@ -6,7 +6,8 @@ import type { ModelConfig } from './config.js';
 import { inspectResponse, ModelError, safeModelError } from './errors.js';
 
 export type Usage = { inputTokens: number | null; outputTokens: number | null; totalTokens: number | null };
-export type CallMetrics = { requestCount: number; usage: Usage | null };
+export type CallMetrics = { requestCount: number; usage: Usage | null; requests: (Usage | null)[] };
+export type ModelRequestEvent = { type: 'request-started' | 'request-finished'; step: number };
 type StepInput = {
   messages: ModelMessage[];
   tools?: ToolSet;
@@ -42,15 +43,20 @@ function addUsage(previous: Usage | null, next: Usage | null, first: boolean): U
 export function createModelClient(config: ModelConfig, transport: typeof fetch = fetch) {
   return {
     // Each bounded operation owns a deadline shared by all its single-step calls.
-    async run<T>(maxRequests: number, work: (session: ModelSession) => Promise<T>, external?: AbortSignal)
+    async run<T>(maxRequests: number, work: (session: ModelSession) => Promise<T>, external?: AbortSignal, observe?: (event: ModelRequestEvent) => void)
       : Promise<{ value: T; metrics: CallMetrics }> {
       const controller = new AbortController();
       let ended: 'timeout' | 'cancelled' | undefined;
       let closed = false;
-      const metrics: CallMetrics = { requestCount: 0, usage: null };
+      const metrics: CallMetrics = { requestCount: 0, usage: null, requests: [] };
       const deadline = performance.now() + config.timeoutMs;
-      let observed = 0;
       let steps = 0;
+      const notify = (event: ModelRequestEvent) => { if (!closed) { try { observe?.(event); } catch { /* Observers never control transport outcomes. */ } } };
+      const measured = (): CallMetrics => ({
+        requestCount: metrics.requestCount,
+        usage: metrics.requests.reduce<Usage | null>((sum, usage, index) => addUsage(sum, usage, index === 0), null),
+        requests: metrics.requests.map(usage => usage ? { ...usage } : null),
+      });
       const abort = (reason: 'timeout' | 'cancelled') => {
         if (!ended) { ended = reason; controller.abort(); }
       };
@@ -70,9 +76,12 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
           check();
           if (metrics.requestCount >= maxRequests) throw new ModelError('invalid_output');
           metrics.requestCount++;
+          metrics.requests.push(null);
           try {
             // Suppress redirect replay, including credential forwarding and hidden requests.
-            return await transport(url, { ...init, redirect: 'error', signal: controller.signal });
+            const pending = transport(url, { ...init, redirect: 'error', signal: controller.signal });
+            notify({ type: 'request-started', step: metrics.requestCount });
+            return await pending;
           } catch (error) {
             check();
             if (error instanceof ModelError) throw error;
@@ -93,7 +102,7 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
               inputTokens, outputTokens,
               totalTokens: inputTokens === null || outputTokens === null ? null : inputTokens + outputTokens,
             };
-            metrics.usage = addUsage(metrics.usage, usage, observed++ === 0);
+            metrics.requests[metrics.requestCount - 1] = usage;
             inspectResponse(result.response?.body);
             // SDK warning strings can contain upstream-controlled details. No raw logs.
             return { ...result, warnings: [] };
@@ -105,8 +114,11 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
         step: async input => {
           check();
           if (++steps > maxRequests) throw new ModelError('invalid_output');
+          const before = metrics.requestCount;
+          try {
           const result = await generateText({
             model, messages: input.messages,
+            allowSystemInMessages: true,
             ...(input.tools ? { tools: input.tools } : {}),
             ...(input.toolChoice ? { toolChoice: input.toolChoice } : {}),
             ...(input.schema ? { output: Output.object({ schema: input.schema }) } : {}),
@@ -121,6 +133,9 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
           if (result.finishReason === 'length') throw new ModelError('truncated');
           if (!['stop', 'tool-calls'].includes(result.finishReason)) throw new ModelError('invalid_output');
           return result;
+          } finally {
+            if (metrics.requestCount > before) notify({ type: 'request-finished', step: metrics.requestCount });
+          }
         },
       };
       // Racing also rejects a non-cooperative test transport; check() fences late results.
@@ -133,9 +148,9 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
         check();
         const value = await Promise.race([work(session), aborted]);
         check();
-        return { value, metrics: { ...metrics } };
+        return { value, metrics: measured() };
       } catch (error) {
-        throw new ModelFailure(ended ? new ModelError(ended) : safeModelError(error), { ...metrics });
+        throw new ModelFailure(ended ? new ModelError(ended) : safeModelError(error), measured());
       } finally {
         closed = true;
         clearTimeout(timer);

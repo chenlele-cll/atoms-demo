@@ -3,12 +3,13 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { decodeCursor, encodeCursor, idSchema, messageInputSchema, messageListSchema, projectDetailSchema,
+import { decodeCursor, encodeCursor, idSchema, messageInputSchema, messageSchema, messageListSchema, projectDetailSchema,
   projectListSchema, projectSchema, runErrorSchema, runSchema, snapshotSchema, titleSchema, versionSchema } from '../contracts/projects.js';
 import type { MessageInput, Run, Snapshot } from '../contracts/projects.js';
 import { ProjectError, storageOperation } from '../projects/errors.js';
 import { migrate } from './migrations.js';
 import { canonicalJSON, companyTemplateIdentity, parseTemplateBundle } from '../template-assets/bundle.mjs';
+import type { GenerationInput } from '../generation/contracts.js';
 
 export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 export function tokenDigest(token: string) { return createHash('sha256').update(token).digest('hex'); }
@@ -66,6 +67,61 @@ export class ProjectStore {
       const value: unknown = this.db.prepare('SELECT id,expires_at AS expiresAt FROM sessions WHERE token_hash=? AND expires_at>?').get(tokenDigest(token), now);
       return value === undefined ? null : parse(sessionSchema, value);
     });
+  }
+  private generationOwner(input: GenerationInput, now: number) {
+    const value: unknown = this.db.prepare('SELECT id,expires_at AS expiresAt FROM sessions WHERE id=? AND expires_at>?').get(input.sessionId, now);
+    if (value === undefined) throw new ProjectError('SESSION_REQUIRED');
+    parse(sessionSchema, value); this.owned(input.sessionId, input.projectId);
+  }
+  private generationRequest(input: GenerationInput) {
+    const value: unknown = this.db.prepare(`SELECT ${runColumns} FROM generation_runs WHERE project_id=? AND request_id=?`).get(input.projectId, input.requestId);
+    if (value === undefined) return null;
+    const run = parse(runSchema, value);
+    const message: unknown = this.db.prepare("SELECT content FROM messages WHERE project_id=? AND run_id=? AND role='user' ORDER BY sequence ASC LIMIT 1").get(input.projectId, run.id);
+    const original = z.object({ content: z.string() }).safeParse(message);
+    if (!original.success || original.data.content !== input.prompt || run.baseVersionId !== input.baseVersionId) throw new ProjectError('REQUEST_CONFLICT');
+    return { run, baseVersion: this.version(input.projectId, run.baseVersionId),
+      candidateVersion: run.resultVersionId ? this.version(input.projectId, run.resultVersionId) : null };
+  }
+  inspectGeneration(input: GenerationInput, now: () => number = Date.now) {
+    return storageOperation(() => this.db.transaction(() => {
+      this.generationOwner(input, now()); return this.generationRequest(input);
+    })());
+  }
+  acceptGeneration(input: GenerationInput, check: () => void, now: () => number = Date.now, quota?: number) {
+    return storageOperation(() => this.db.transaction(() => {
+      this.generationOwner(input, now());
+      const existing = this.generationRequest(input);
+      if (existing) return { accepted: false as const, existing };
+      if (quota !== undefined) {
+        const time = now();
+        const rows = parse(z.array(z.object({ startedAt: z.string() })), this.db.prepare(`SELECT r.started_at AS startedAt FROM generation_runs r
+          JOIN projects p ON p.id=r.project_id WHERE p.owner_session_id=? AND r.started_at>? ORDER BY r.started_at ASC`)
+          .all(input.sessionId, new Date(time - 86_400_000).toISOString()));
+        if (rows.length >= quota) throw new ProjectError('GENERATION_QUOTA', Math.max(1, Math.ceil((Date.parse(rows[0]?.startedAt ?? new Date(time).toISOString()) + 86_400_000 - time) / 1000)));
+      }
+      check();
+      const project = this.project(input.projectId);
+      if (project.currentVersionId !== input.baseVersionId) throw new ProjectError('BASE_VERSION_CHANGED');
+      const baseVersion = this.version(input.projectId, input.baseVersionId);
+      const rows: unknown[] = this.db.prepare(`SELECT ${messageColumns} FROM messages WHERE project_id=? ORDER BY sequence DESC LIMIT 10`).all(input.projectId);
+      const history = rows.map(row => parse(messageSchema, row));
+      const totalHistory = parse(z.object({ count: z.number().int() }), this.db.prepare('SELECT count(*) AS count FROM messages WHERE project_id=?').get(input.projectId)).count;
+      const run = this.createRun({ projectId: input.projectId, baseVersionId: input.baseVersionId, requestId: input.requestId,
+        messages: [{ role: 'user', content: input.prompt }] });
+      check();
+      return { accepted: true as const, run, baseVersion, history, totalHistory };
+    }).immediate());
+  }
+  completeGeneration(input: GenerationInput, runId: string, snapshot: Snapshot, summary: string, check: () => void, now: () => number = Date.now) {
+    return storageOperation(() => this.db.transaction(() => {
+      this.generationOwner(input, now()); check();
+      const run = this.run(input.projectId, runId);
+      if (this.project(input.projectId).currentVersionId !== input.baseVersionId || run.baseVersionId !== input.baseVersionId) throw new ProjectError('BASE_VERSION_CHANGED');
+      const saved = this.saveCandidate({ projectId: input.projectId, runId, snapshot, messages: [{ role: 'assistant', content: summary }] });
+      check(); // Inside the transaction: a deadline/cancel failure rolls back all writes.
+      return saved;
+    }).immediate());
   }
   private project(projectId: string) {
     const value: unknown = this.db.prepare(`SELECT ${projectColumns} FROM projects WHERE id=?`).get(projectId);

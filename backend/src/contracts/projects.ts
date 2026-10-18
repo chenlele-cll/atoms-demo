@@ -45,7 +45,14 @@ export const versionSchema = z.object({
   kind: z.enum(['template', 'generated']), snapshot: snapshotSchema, createdAt: timeSchema,
 });
 export const runStatusSchema = z.enum(['running', 'succeeded', 'failed', 'cancelled', 'interrupted']);
-export const runErrorSchema = z.enum(['MODEL_ERROR', 'INVALID_OUTPUT', 'TIMEOUT', 'CANCELLED', 'INTERRUPTED', 'INTERNAL_ERROR']);
+export const runErrorSchema = z.enum([
+  'USER_CANCELLED', 'CLIENT_DISCONNECTED', 'SERVER_SHUTDOWN', 'PROCESS_RESTARTED', 'SLOW_CONSUMER', 'STREAM_WRITE_FAILED',
+  'MODEL_ERROR', 'INVALID_OUTPUT', 'TIMEOUT', 'CANCELLED', 'INTERRUPTED', 'INTERNAL_ERROR',
+  'INVALID_INPUT', 'SESSION_REQUIRED', 'NOT_FOUND', 'REQUEST_CONFLICT', 'BASE_VERSION_CHANGED',
+  'UNSUPPORTED_TEMPLATE', 'FILE_POLICY', 'TOOL_ERROR', 'NO_SUBMISSION', 'STEP_LIMIT', 'CONTEXT_LIMIT',
+  'GENERATION_TIMEOUT', 'STORAGE_UNAVAILABLE', 'MODEL_CONFIGURATION', 'MODEL_AUTHENTICATION',
+  'MODEL_ACCESS', 'MODEL_QUOTA_RATE_LIMIT', 'MODEL_UPSTREAM', 'MODEL_NETWORK', 'MODEL_REFUSAL', 'MODEL_TRUNCATED',
+]);
 export const runSchema = z.object({
   id: idSchema, projectId: idSchema, requestId: idSchema, baseVersionId: idSchema,
   resultVersionId: idSchema.nullable(), status: runStatusSchema, errorCode: runErrorSchema.nullable(),
