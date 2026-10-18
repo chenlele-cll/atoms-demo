@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import tarfile
 import re
 from uuid import UUID, uuid4
 
@@ -69,10 +70,17 @@ def file_digest(filename):
 
 
 def archive(folder, destination):
-    result = subprocess.run(["tar", "-czf", str(destination), "-C", str(folder), "."],
-                            capture_output=True, timeout=120)
-    if result.returncode:
-        raise InputError("Deployment archive preparation failed; no target was changed.")
+    # Python's portable tar writer never synthesizes macOS AppleDouble/xattr
+    # files. BSD tar added hundreds of ._ entries when extracting on Ubuntu.
+    def portable_owner(info):
+        info.uid = info.gid = 0
+        info.uname = info.gname = ""
+        return info
+    try:
+        with tarfile.open(destination, "w:gz", format=tarfile.PAX_FORMAT, dereference=False) as bundle:
+            bundle.add(folder, arcname=".", filter=portable_owner)
+    except (OSError, tarfile.TarError):
+        raise InputError("Deployment archive preparation failed; no target was changed.") from None
     os.chmod(destination, 0o600)
     return file_digest(destination)
 
@@ -108,6 +116,42 @@ def environment_patch(filename, root=None):
         raise InputError("Private environment patch is invalid; use a 0600 YAML mapping of documented model settings.") from None
 
 
+def local_model_environment(root):
+    """Use Node's own dotenv parser, matching backend/server.ts, without sourcing."""
+    root = Path(root).resolve()
+    path = root / "backend/.env"
+    if not path.exists() and not path.is_symlink():
+        return {}
+    try:
+        info = path.lstat()
+        if (path.is_symlink() or not path.is_file() or info.st_uid != os.getuid()
+                or info.st_mode & 0o777 != 0o600 or info.st_size > 65536):
+            raise ValueError
+        ignored = subprocess.run(["git", "check-ignore", "--quiet", "--", str(path)],
+                                 cwd=root, capture_output=True, timeout=5)
+        if ignored.returncode:
+            raise ValueError
+        script = ("import {parseEnv} from 'node:util';import {readFileSync} from 'node:fs';"
+                  "const env=parseEnv(readFileSync(process.argv[1],'utf8'));"
+                  "const keys=JSON.parse(process.argv[2]);"
+                  "process.stdout.write(JSON.stringify(Object.fromEntries(keys.filter(k=>"
+                  "typeof env[k]==='string'&&env[k].trim()).map(k=>[k,env[k]]))));")
+        result = subprocess.run([node_binary(root), "--input-type=module", "-e", script,
+                                 str(path), json.dumps(sorted(MODEL_KEYS))],
+                                capture_output=True, text=True, timeout=5,
+                                env={**os.environ, "NODE_OPTIONS": "", "NODE_PATH": ""})
+        if result.returncode:
+            raise ValueError
+        value = json.loads(result.stdout)
+        if (not isinstance(value, dict) or not set(value) <= MODEL_KEYS
+                or any(not isinstance(item, str) or any(ord(c) < 32 for c in item)
+                       for item in value.values())):
+            raise ValueError
+        return value
+    except (OSError, ValueError, TypeError, UnicodeError, subprocess.TimeoutExpired):
+        raise InputError("Local backend/.env model configuration is invalid; use an ignored owner-only 0600 file with single-line settings.") from None
+
+
 def prepare(root, options, action="apply"):
     root = Path(root).resolve()
     run_id = str(uuid4())
@@ -120,7 +164,10 @@ def prepare(root, options, action="apply"):
         destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         shutil.copyfile(root / name, destination)
         destination.chmod(0o600)
-    patch = environment_patch(getattr(options, "env_file", None), root)
+    explicit_env = getattr(options, "env_file", None)
+    patch = {}
+    if action == "apply":
+        patch = environment_patch(explicit_env, root) if explicit_env else local_model_environment(root)
     env = work / "environment.json"
     env.write_text(json.dumps(patch))
     env.chmod(0o600)

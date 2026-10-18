@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import tarfile
 from types import SimpleNamespace
 import unittest
 from uuid import uuid4
@@ -19,6 +20,92 @@ from test_transaction import package
 
 
 class ControllerTests(unittest.TestCase):
+    def test_local_model_config_uses_node_dotenv_and_imports_only_nonempty_model_keys(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            (root / "backend").mkdir()
+            (root / ".nvmrc").write_bytes((ROOT / ".nvmrc").read_bytes())
+            (root / ".gitignore").write_text("backend/.env\n")
+            subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
+            self.assertEqual(controller.local_model_environment(root), {})
+            env = root / "backend/.env"
+            secret = 'literal\\)${NOT_EXPANDED}#private'
+            env.write_text("# explicit dotenv fixture\nexport OPENAI_API_KEY='" + secret + "'\n"
+                           "MODEL_ID=fixture-model # inline comment\nMODEL_TIMEOUT_MS=\n"
+                           "HOST=0.0.0.0\nDATABASE_PATH=/do/not/copy\n")
+            env.chmod(0o600)
+            from unittest.mock import patch
+            preload = root / "unexpected.cjs"
+            marker = root / "unexpected-loaded"
+            preload.write_text("require('node:fs').writeFileSync(" + json.dumps(str(marker)) + ", 'loaded');")
+            with patch.dict(os.environ, {"NODE_OPTIONS": "--require=" + str(preload)}):
+                self.assertEqual(controller.local_model_environment(root), {
+                    "OPENAI_API_KEY": secret, "MODEL_ID": "fixture-model"})
+            self.assertFalse(marker.exists())
+            env.chmod(0o644)
+            with self.assertRaises(InputError):
+                controller.local_model_environment(root)
+            env.chmod(0o600)
+            (root / ".gitignore").write_text("")
+            with self.assertRaises(InputError):
+                controller.local_model_environment(root)
+            (root / ".gitignore").write_text("backend/.env\n")
+            actual = root / "private-env"
+            env.rename(actual)
+            env.symlink_to(actual)
+            with self.assertRaises(InputError):
+                controller.local_model_environment(root)
+
+    def test_prepare_explicit_patch_overrides_auto_import_and_status_never_reads_local_secrets(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            for name in (".nvmrc", "package.json", "deploy/artifact.mjs", "scripts/release/artifact.mjs",
+                         "scripts/verification/primitives.mjs", "deploy/policy.py", "deploy/storage.py",
+                         "deploy/system.py", "deploy/runtime.py", "deploy/remote.py"):
+                destination = root / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes((ROOT / name).read_bytes())
+            options = SimpleNamespace(release=None, release_id=str(uuid4()), env_file=None)
+            with patch.object(controller, "local_model_environment", return_value={"MODEL_ID": "automatic"}) as local:
+                work, _ = controller.prepare(root, options)
+                self.assertEqual(json.loads((work / "environment.json").read_text()), {"MODEL_ID": "automatic"})
+                local.assert_called_once_with(root)
+            options.env_file = "explicit-private.yml"
+            with patch.object(controller, "local_model_environment") as local, patch.object(controller, "environment_patch", return_value={}):
+                work, _ = controller.prepare(root, options)
+                self.assertEqual(json.loads((work / "environment.json").read_text()), {})
+                local.assert_not_called()
+            with patch.object(controller, "local_model_environment") as local, patch.object(controller, "environment_patch") as explicit:
+                work, _ = controller.prepare(root, options, action="status")
+                self.assertEqual(json.loads((work / "environment.json").read_text()), {})
+                local.assert_not_called()
+                explicit.assert_not_called()
+
+    def test_portable_archive_does_not_synthesize_metadata_and_preserves_manifest_inputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            (source / "code.js").write_text("public fixture")
+            (source / "code.js").chmod(0o644)
+            (source / "alias.js").symlink_to("code.js")
+            try:
+                os.setxattr(source / "code.js", "user.atoms-deployment-test", b"fixture")
+            except (OSError, AttributeError):
+                pass
+            destination = root / "input.tar.gz"
+            checksum = controller.archive(source, destination)
+            self.assertEqual(checksum, controller.file_digest(destination))
+            self.assertEqual(destination.stat().st_mode & 0o777, 0o600)
+            with tarfile.open(destination) as bundle:
+                entries = {item.name: item for item in bundle.getmembers()}
+                self.assertEqual(set(entries), {".", "./code.js", "./alias.js"})
+                self.assertEqual(entries["./code.js"].mode, 0o644)
+                self.assertTrue(entries["./alias.js"].issym())
+                self.assertEqual(entries["./alias.js"].linkname, "code.js")
+                self.assertTrue(all(item.uid == item.gid == 0 for item in entries.values()))
+
     def test_dispatch_uses_real_apply_playbook_and_private_request_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

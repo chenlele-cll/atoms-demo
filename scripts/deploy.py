@@ -1,6 +1,7 @@
 """Small control-node adapter; Ansible owns SSH and remote inspection."""
 
 import argparse
+from contextlib import contextmanager
 import importlib.metadata
 import ipaddress
 import json
@@ -8,9 +9,12 @@ import os
 from pathlib import Path
 import re
 import signal
+import shutil
 import stat
 import subprocess
 import sys
+import tempfile
+import time
 import venv
 
 
@@ -32,7 +36,9 @@ check/status default to server.local.yml (owner-only mode 0600).
 apply defaults to a matching target package or an isolated target-platform build.
 --release <directory> supplies an existing Linux artifact; --release-id <UUID>
 selects a retained target package (including a compatible rollback).
---env-file <0600.yml> patches only documented optional model settings.
+apply imports nonempty model settings from ignored owner-only backend/.env.
+--env-file <0600.yml> selects an explicit model patch instead ({} preserves remote settings).
+Password authentication uses Ansible's sshpass FD transport (sshpass >=1.06).
 plan/apply/status support --json. Only explicit apply changes managed state.
 See docs/engineering/deployment.md for setup and scope.
 """
@@ -139,7 +145,7 @@ def clean_environment():
     env = {key: value for key, value in os.environ.items()
            if not key.startswith("ANSIBLE_") and key not in (
                "PYTHONPATH", "PYTHONHOME", "PYTHONINSPECT", "PYTHONSTARTUP",
-               "SSH_ASKPASS", "SSH_ASKPASS_REQUIRE", "NODE_OPTIONS", "NODE_PATH")}
+               "SSHPASS", "SSH_ASKPASS", "SSH_ASKPASS_REQUIRE", "NODE_OPTIONS", "NODE_PATH")}
     env.update(ANSIBLE_CONFIG=str(ROOT / "deploy/ansible.cfg"),
                ANSIBLE_NOCOLOR="1", ANSIBLE_DEBUG="0", ANSIBLE_VERBOSITY="0",
                ANSIBLE_LOCAL_TEMP=str(ROOT / ".runtime/deploy/tmp"),
@@ -147,12 +153,44 @@ def clean_environment():
     return env
 
 
+@contextmanager
+def command_environment(command):
+    env = clean_environment()
+    if Path(command[0]).name != "ansible-playbook":
+        yield env
+        return
+    # Unix control sockets have a short pathname limit. Keep this invocation's
+    # 0700 directory short even when a release/source workspace is deeply nested.
+    with tempfile.TemporaryDirectory(prefix="atoms-ssh-", dir="/tmp") as folder:
+        env["ANSIBLE_SSH_CONTROL_PATH_DIR"] = folder
+        try:
+            yield env
+        finally:
+            # Only sockets in this invocation's owner-only, random directory
+            # are ours. Never use the user's global SSH control directory.
+            for socket in Path(folder).iterdir():
+                if not stat.S_ISSOCK(socket.lstat().st_mode):
+                    continue
+                result = subprocess.run(["/usr/bin/ssh", "-F", "/dev/null", "-S", str(socket),
+                                         "-O", "exit", "localhost"], capture_output=True, timeout=3)
+                if result.returncode not in (0, 255):
+                    raise InputError("Owned SSH connection cleanup failed; inspect private deployment evidence.")
+            deadline = time.monotonic() + 2
+            while any(Path(folder).iterdir()) and time.monotonic() < deadline:
+                time.sleep(0.05)
+
+
 def run(command, timeout=90, log_path=None):
+    with command_environment(command) as env:
+        return run_process(command, timeout, log_path, env)
+
+
+def run_process(command, timeout, log_path, env):
     """Bounded process group; cancellation never leaves an SSH child running."""
     log = open(log_path, "xb") if log_path else None
     if log:
         os.chmod(log_path, 0o600)
-    process = subprocess.Popen(command, cwd=ROOT, env=clean_environment(),
+    process = subprocess.Popen(command, cwd=ROOT, env=env,
                                stdout=log, stderr=subprocess.STDOUT if log else None, start_new_session=True)
     try:
         return process.wait(timeout=timeout)
@@ -179,6 +217,32 @@ def require_tools():
         valid = False
     if not valid or Path(sys.prefix).resolve() != TOOLS.resolve():
         raise InputError("Run ./deploy.sh bootstrap to prepare pinned local tools.")
+
+
+def require_sshpass():
+    binary = shutil.which("sshpass")
+    if not binary:
+        raise InputError("Password deployment requires sshpass >=1.06. Install it with brew install sshpass or your OS package manager.")
+    try:
+        result = subprocess.run([binary, "-V"], capture_output=True, text=True, timeout=5,
+                                env=clean_environment())
+        match = re.search(r"^sshpass (\d+)\.(\d+)(?:\s|$)", result.stdout)
+        if result.returncode or not match or tuple(map(int, match.groups())) < (1, 6):
+            raise ValueError
+    except (OSError, ValueError, subprocess.SubprocessError):
+        raise InputError("A working sshpass >=1.06 is required for password deployment; version output suppressed.") from None
+
+
+def require_password_transport(inventory):
+    import yaml
+    try:
+        host = yaml.safe_load(inventory.read_text())["all"]["hosts"]["atoms"]
+        if not isinstance(host, dict):
+            raise ValueError
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError):
+        raise InputError("Validated private inventory changed or could not be read; connection refused.") from None
+    if "ansible_password" in host:
+        require_sshpass()
 
 
 def inventory_path(value):
@@ -302,6 +366,7 @@ def main():
         print_framework_plan(plan, args.json)
         return 0
     if args.command == "test":
+        require_sshpass()
         return run([sys.executable, "-B", "-m", "unittest", "discover", "-s", "deploy/tests", "-v"], timeout=600)
     playbook = str(TOOLS / "bin/ansible-playbook")
     if args.command == "validate":
@@ -311,6 +376,7 @@ def main():
                 return code
         return run([playbook, "-i", "localhost,", "deploy/validate.yml"])
     inventory = inventory_path(args.inventory or str(ROOT / "server.local.yml"))
+    require_password_transport(inventory)
     if args.command in ("apply", "status"):
         from controller import execute
         return execute(ROOT, args, inventory, run, args.command)

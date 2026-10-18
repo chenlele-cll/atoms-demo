@@ -36,6 +36,7 @@ def directory(path, mode=0o700):
     path.mkdir(parents=True, exist_ok=True, mode=mode)
     if not path.is_dir() or path.is_symlink():
         raise DeploymentFault("UNSAFE_PATH")
+    os.chmod(path, mode)
     return path
 
 

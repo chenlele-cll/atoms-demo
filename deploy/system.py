@@ -149,7 +149,12 @@ class System:
 
     def start(self):
         self.checked(["systemctl", "daemon-reload"], "UNIT_RELOAD")
-        self.checked(["systemctl", "reset-failed", "atoms-backend.service"], "UNIT_RESET")
+        state = self.unit("atoms-backend.service").get("ActiveState")
+        reset, _ = self.run(["systemctl", "reset-failed", "atoms-backend.service"])
+        # Ubuntu may garbage-collect a new inactive unit immediately, making
+        # reset-failed return 1. A genuinely failed loaded unit must reset.
+        if reset and state == "failed":
+            raise DeploymentFault("UNIT_RESET")
         self.checked(["systemctl", "enable", "atoms-backend.service"], "UNIT_ENABLE")
         self.checked(["systemctl", "start", "atoms-backend.service"], "BACKEND_START")
 

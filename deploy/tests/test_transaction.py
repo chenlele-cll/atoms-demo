@@ -172,7 +172,12 @@ class TransactionTests(unittest.TestCase):
             db.close()
 
     def test_first_install_and_healthy_repeat_preserve_identity_processes_and_data(self):
-        installed = self.apply()
+        previous_umask = os.umask(0o077)
+        try:
+            installed = self.apply()
+        finally:
+            os.umask(previous_umask)
+        self.assertEqual(self.tx.root.stat().st_mode & 0o777, 0o755)
         before = self.tx.state.read_bytes()
         counts = (self.system.starts, self.system.reloads)
         second = self.apply()
@@ -364,6 +369,25 @@ class TransactionTests(unittest.TestCase):
             os.waitpid(child, 0)
         self.assertTrue((self.tx.root / ".deployment.lock").is_file())
         self.assertEqual(self.apply()["mode"], "noop")
+
+
+class SystemAdapterTests(unittest.TestCase):
+    def test_reset_failure_is_tolerated_only_for_an_inactive_unit(self):
+        from system import System
+        for state, reset_code in [("inactive", 1), ("failed", 0), ("failed", 1)]:
+            with self.subTest(state=state, reset=reset_code):
+                system = System({})
+                calls = []
+                system.checked = lambda args, code: calls.append(args)
+                system.unit = lambda name: {"ActiveState": state}
+                system.run = lambda args: (reset_code, b"")
+                if state == "failed" and reset_code:
+                    with self.assertRaisesRegex(DeploymentFault, "UNIT_RESET"):
+                        system.start()
+                    self.assertFalse(any("start" in args for args in calls))
+                else:
+                    system.start()
+                    self.assertEqual(calls[-1], ["systemctl", "start", "atoms-backend.service"])
 
 
 if __name__ == "__main__":

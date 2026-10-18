@@ -1,3 +1,36 @@
+- name: Preserve pipeline failure details only in private controller evidence
+  ansible.builtin.copy:
+    content: "{{ {'task': ansible_failed_task.name, 'result': ansible_failed_result} | to_nice_json }}"
+    dest: "{{ atoms_request.result_file | dirname }}/pipeline-private.json"
+    mode: '0600'
+  delegate_to: localhost
+  become: false
+  when: atoms_request is defined
+  no_log: true
+
+- name: Find bounded producer diagnostics before cleaning the private stage
+  ansible.builtin.find:
+    paths: "{{ atoms_stage.path }}/input/.runtime/release-build"
+    patterns: ['*.log', report.json]
+    recurse: true
+    depth: 2
+    follow: false
+  become: true
+  register: atoms_failed_producer_files
+  when: atoms_request is defined and atoms_stage is defined
+  no_log: true
+
+- name: Preserve producer diagnostics only in private controller evidence
+  ansible.builtin.fetch:
+    src: "{{ item.path }}"
+    dest: "{{ atoms_request.result_file | dirname }}/producer/{{ item.path | dirname | basename }}/{{ item.path | basename }}"
+    flat: true
+    fail_on_missing: false
+  loop: "{{ atoms_failed_producer_files.files | default([]) }}"
+  become: true
+  when: atoms_request is defined and atoms_stage is defined
+  no_log: true
+
 - name: Keep transaction failure visible without duplicating target recovery
   ansible.builtin.fail:
     msg: Deployment failed. The lock-owning target transaction handles compatible recovery; no controller-side database restore is performed.

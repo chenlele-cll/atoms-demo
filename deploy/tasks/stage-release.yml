@@ -78,11 +78,53 @@
   when: not atoms_resolution.found and atoms_request.mode == 'source'
   no_log: true
 
-- name: Prepare frozen dependency cache as the unprivileged SSH user
+- name: Record the selected lockfile before fetching packages
+  ansible.builtin.stat:
+    path: "{{ atoms_stage.path }}/input/pnpm-lock.yaml"
+    checksum_algorithm: sha256
+    get_mime: false
+  register: atoms_lock_before_fetch
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  no_log: true
+
+- name: Prepare lockfile dependency cache as the unprivileged SSH user
   ansible.builtin.command:
     # Public runtime files need consistent service-readable modes regardless of
     # the SSH user's private umask. This still execs the existing producer tools.
-    argv: [python3, -c, "import os,sys; os.umask(0o022); os.execv(sys.argv[1],sys.argv[1:])", "{{ atoms_config.pnpm_binary }}", fetch, --frozen-lockfile]
+    argv: [python3, -c, "import os,sys; os.umask(0o022); os.execv(sys.argv[1],sys.argv[1:])", "{{ atoms_config.pnpm_binary }}", fetch]
+    chdir: "{{ atoms_stage.path }}/input"
+  environment:
+    PATH: "{{ atoms_config.node_binary | dirname }}:{{ atoms_config.pnpm_binary | dirname }}:/usr/local/bin:/usr/bin:/bin"
+    NODE_OPTIONS: ''
+    NODE_PATH: ''
+    COREPACK_ENABLE_NETWORK: '0'
+    COREPACK_ENABLE_AUTO_PIN: '0'
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  async: 240
+  poll: 2
+  changed_when: false
+  no_log: true
+
+- name: Verify fetch preserved the selected lockfile
+  ansible.builtin.stat:
+    path: "{{ atoms_stage.path }}/input/pnpm-lock.yaml"
+    checksum_algorithm: sha256
+    get_mime: false
+  register: atoms_lock_after_fetch
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  no_log: true
+
+- name: Require unchanged lockfile inputs before the offline frozen build
+  ansible.builtin.assert:
+    that: atoms_lock_before_fetch.stat.checksum == atoms_lock_after_fetch.stat.checksum
+    quiet: true
+    fail_msg: Dependency fetching changed the selected lockfile; deployment refused.
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  no_log: true
+
+- name: Prepare producer dependencies from the selected offline lockfile
+  ansible.builtin.command:
+    argv: [python3, -c, "import os,sys; os.umask(0o022); os.execv(sys.argv[1],sys.argv[1:])", "{{ atoms_config.pnpm_binary }}", install, --offline, --frozen-lockfile, --ignore-scripts]
     chdir: "{{ atoms_stage.path }}/input"
   environment:
     PATH: "{{ atoms_config.node_binary | dirname }}:{{ atoms_config.pnpm_binary | dirname }}:/usr/local/bin:/usr/bin:/bin"

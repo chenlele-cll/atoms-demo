@@ -161,17 +161,58 @@ class EntryTests(Fixture):
             os.environ.pop("ANSIBLE_DEBUG")
             os.environ.pop("ANSIBLE_STDOUT_CALLBACK")
 
+    def test_password_transport_requires_working_sshpass_but_private_key_does_not(self):
+        password = self.inventory()
+        with patch.object(adapter.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(adapter.InputError, "requires sshpass"):
+                adapter.require_password_transport(password)
+        key = self.inventory(ansible_password=None, ansible_ssh_private_key_file="~/.ssh/fixture")
+        data = yaml.safe_load(key.read_text())
+        del data["all"]["hosts"]["atoms"]["ansible_password"]
+        key.write_text(yaml.safe_dump(data))
+        with patch.object(adapter.shutil, "which", return_value=None):
+            adapter.require_password_transport(key)
+        with patch.object(adapter.shutil, "which", return_value="/fixture/sshpass"), patch.object(
+                adapter.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "sshpass 1.05\n", "")):
+            with self.assertRaisesRegex(adapter.InputError, "working sshpass"):
+                adapter.require_sshpass()
+
+    def test_external_password_environment_is_not_forwarded(self):
+        with patch.dict(os.environ, {"SSHPASS": FAKE_PASSWORD, "SSH_ASKPASS": "/fixture/askpass",
+                                    "ANSIBLE_SSH_PASSWORD_MECHANISM": "ssh_askpass"}):
+            env = adapter.clean_environment()
+            for key in ("SSHPASS", "SSH_ASKPASS", "ANSIBLE_SSH_PASSWORD_MECHANISM"):
+                self.assertNotIn(key, env)
+            with patch.object(adapter.shutil, "which", return_value="/fixture/sshpass"), patch.object(
+                    adapter.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "sshpass 1.06\n", "")) as run:
+                adapter.require_sshpass()
+                for key in ("SSHPASS", "SSH_ASKPASS", "ANSIBLE_SSH_PASSWORD_MECHANISM"):
+                    self.assertNotIn(key, run.call_args.kwargs["env"])
+
 
 class AnsibleTests(Fixture):
     def ssh_environment(self, hang=False):
         stub = self.path / "ssh"
         marker = self.path / "ssh-result.json"
         stub.write_text(f'''#!{sys.executable}
-import json,os,pathlib,subprocess,sys,time
+import json,os,pathlib,sys,termios,time
 if '-V' in sys.argv:
  sys.stderr.write('OpenSSH_9.9');sys.exit(0)
-password=subprocess.run([os.environ['SSH_ASKPASS'], 'fixture password:'],capture_output=True,text=True,check=True).stdout
-pathlib.Path({str(marker)!r}).write_text(json.dumps({{'pid':os.getpid(),'literal_matches':password=={FAKE_PASSWORD!r}}}))
+fd=os.open('/dev/tty',os.O_RDWR)
+before=termios.tcgetattr(fd);quiet=before.copy();quiet[3]&=~termios.ECHO
+termios.tcsetattr(fd,termios.TCSANOW,quiet)
+os.write(fd,b'fixture password: ')
+received=bytearray()
+while True:
+ char=os.read(fd,1)
+ if not char or char[0] in (10,13):break
+ received.extend(char)
+termios.tcsetattr(fd,termios.TCSANOW,before);os.close(fd)
+password=received.decode()
+pathlib.Path({str(marker)!r}).write_text(json.dumps({{'pid':os.getpid(),'literal_matches':password=={FAKE_PASSWORD!r},
+ 'password_not_in_argv':all(password not in arg for arg in sys.argv),
+ 'password_not_in_env':all(password not in value for value in os.environ.values()),
+ 'no_askpass':not bool(os.environ.get('SSH_ASKPASS'))}}))
 if {hang!r}:time.sleep(120)
 sys.stderr.write({FAKE_PASSWORD!r}+' Permission denied (publickey,password).')
 sys.exit(255)
@@ -189,6 +230,9 @@ sys.exit(255)
             self.assertNotEqual(result.returncode, 0)
             self.assertTrue(marker.exists(), result.stdout + result.stderr)
             self.assertTrue(json.loads(marker.read_text())["literal_matches"])
+            observed = json.loads(marker.read_text())
+            for key in ("password_not_in_argv", "password_not_in_env", "no_askpass"):
+                self.assertTrue(observed[key], key)
             self.assert_safe(result)
             if command == "check":
                 self.assertIn("censored", result.stdout)

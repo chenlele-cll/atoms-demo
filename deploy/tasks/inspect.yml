@@ -8,6 +8,7 @@
   ansible.builtin.command:
     argv: "{{ item.argv }}"
   environment:
+    PATH: "{{ atoms_config.node_binary | dirname }}:{{ atoms_config.pnpm_binary | dirname }}:/usr/local/bin:/usr/bin:/bin"
     COREPACK_ENABLE_NETWORK: '0'
     COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
     COREPACK_ENABLE_AUTO_PIN: '0'
