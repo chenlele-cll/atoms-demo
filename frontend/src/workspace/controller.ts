@@ -41,6 +41,7 @@ export class WorkspaceController {
   private streamController: AbortController | undefined;
   private detailController: AbortController | undefined;
   private historyController: AbortController | undefined;
+  private candidateController: AbortController | undefined;
   private detailRead = 0; private factsRead = 0; private writeId = 0; private writing = false;
   private restoreReadPending = false;
   private poll: ReturnType<typeof setTimeout> | undefined;
@@ -58,7 +59,7 @@ export class WorkspaceController {
   private clearPrivate() { this.drafts.clear(); this.conversations.clear(); this.reading.clear(); this.pending.clear(); this.update({ projects: [], project: null, review: null, selected: null, selectedReview: null, viewedVersionId: null, messages: [], task: null, draft: '', history: initialHistory(), preview: null, operation: initialOperation() }); }
   private unauthorized() { this.sessionInvalidated = true; this.leave(); this.clearPrivate(); this.update({ activation: this.state.activation + 1, loading: false, error: '会话已失效。请返回首页明确重新开始；不会自动认领旧项目。', home: { ...this.state.home, sessionReady: false } }); }
   private matches(activation: number, projectId?: string) { return this.state.activation === activation && (!projectId || this.state.route.kind === 'project' && this.state.route.projectId === projectId); }
-  leave() { this.getController.abort(); this.detailController?.abort(); this.historyController?.abort(); this.detailRead++; this.factsRead++; this.writeId++; this.writing = false; this.streamController?.abort(); this.streamController = undefined; clearTimeout(this.poll); this.poll = undefined; this.polling = false; this.checks = 0; this.checkStarted = 0; this.nextCheckAt = 0; }
+  leave() { this.getController.abort(); this.detailController?.abort(); this.historyController?.abort(); this.candidateController?.abort(); this.detailRead++; this.factsRead++; this.writeId++; this.writing = false; this.streamController?.abort(); this.streamController = undefined; clearTimeout(this.poll); this.poll = undefined; this.polling = false; this.checks = 0; this.checkStarted = 0; this.nextCheckAt = 0; }
   activate(route: Route, force = false) {
     if (!force && route.path === this.state.route.path) return;
     if (this.state.route.kind === 'project' && this.state.project) this.conversations.set(this.state.route.projectId, { items: this.state.messages, before: this.state.before });
@@ -344,6 +345,7 @@ export class WorkspaceController {
       : generationBodySchema.parse({ requestId: crypto.randomUUID(), baseVersionId: project.project.currentVersionId, prompt }); }
     catch { this.update({ error: '需求须为 1–4000 字符且不超过 16 KiB。' }); return; }
     const projectId = project.project.id; const activation = this.state.activation;
+    this.candidateController?.abort(); this.candidateController = undefined;
     this.streamController?.abort(); const controller = new AbortController(); this.streamController = controller; clearTimeout(this.poll); this.checks = 0; this.checkStarted = 0; this.polling = false;
     this.pending.save({ ...payload, projectId, createdAt: (this.options.now ?? Date.now)() });
     this.setTask({ payload, phase: 'submitting', state: null, events: [], accepted: false, message: '正在请求生成，需求尚待受理确认…', local: true });
@@ -382,20 +384,28 @@ export class WorkspaceController {
       clearTimeout(this.poll); this.polling = false; this.pending.remove(state.projectId);
       if (state.status !== 'succeeded' && !this.state.draft) this.setDraft(task.payload.prompt);
       void this.calibrate(state.projectId, this.state.activation);
-      if (state.candidateVersionId) void this.loadCandidate(state.projectId, state.candidateVersionId, this.state.activation);
+       if (state.candidateVersionId) void this.loadCandidate(state, this.state.activation);
     }
   }
-  private async loadCandidate(projectId: string, versionId: string, activation: number) {
+  private async loadCandidate(origin: GenerationStatus, activation: number) {
+    const { projectId, candidateVersionId: versionId, requestId, runId } = origin; if (!versionId) return;
+    this.candidateController?.abort(); const controller = new AbortController(); this.candidateController = controller;
     const epoch = this.state.factEpoch;
+    const valid = () => {
+      const task = this.state.task;
+      return this.matches(activation, projectId) && this.candidateController === controller && !controller.signal.aborted &&
+        task?.payload.requestId === requestId && task.state?.runId === runId && task.state?.candidateVersionId === versionId;
+    };
     try {
-      const [detail, review] = await Promise.all([this.api.project(projectId, this.getController.signal), getVersion(projectId, versionId,
-        { signal: this.getController.signal, ...(this.options.transport ? { transport: this.options.transport } : {}) })]);
-      if (this.matches(activation, projectId)) {
+      const [detail, review] = await Promise.all([this.api.project(projectId, controller.signal), getVersion(projectId, versionId,
+        this.requestOptions(controller.signal))]);
+      if (valid()) {
         if (epoch === this.state.factEpoch) this.facts(detail, activation);
+        if (!valid()) return;
         this.update({ review });
-        if (this.state.intent !== 'history') void this.viewVersion('candidate', versionId);
+        if (valid() && this.state.intent !== 'history') void this.viewVersion('candidate', versionId);
       }
-    } catch (error) { if (this.matches(activation, projectId)) { if (error instanceof VersionApiError && error.status === 401) this.unauthorized(); else this.update({ error: `候选已保存，但读取失败：${safeMessage(error)}` }); } }
+    } catch (error) { if (valid()) { if (error instanceof VersionApiError && error.status === 401) this.unauthorized(); else this.update({ error: `候选已保存，但读取失败：${safeMessage(error)}` }); } }
   }
   async cancel() {
     if (this.state.route.kind !== 'project' || !this.state.task || this.state.task.phase === 'terminal') return;

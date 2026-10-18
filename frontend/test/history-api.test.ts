@@ -141,15 +141,22 @@ for (const endpoint of ['history', 'restore'] as const) {
     }
     assert.equal(new Set(messages.values()).size, 4); assert.equal(calls, 14);
     await assert.rejects(request({ transport: async () => json({ message: 'PRIVATE_SENTINEL' }, 401) }),
-      error => error instanceof VersionApiError && error.status === 401 && error.code === null && !error.message.includes('PRIVATE_SENTINEL'));
+      error => error instanceof VersionApiError && error.status === 401 && error.code === 'SESSION_REQUIRED' && !error.message.includes('PRIVATE_SENTINEL'));
   });
 
   test(`${endpoint} rejects bad JSON/UTF-8 and safely classifies network failures`, async () => {
     const f = fixture(); const request = (options: ApiOptions) => endpoint === 'history' ? getVersionHistory(f.projectId, options)
       : restoreVersion(f.projectId, f.targetId, f.expected, options);
-    for (const status of [200, 401, 503]) {
-      await rejects(request({ transport: async () => new Response('<html>PRIVATE_SENTINEL</html>', { status }) }), 'invalid');
-      await rejects(request({ transport: async () => new Response(new Uint8Array([0xff]), { status }) }), 'invalid');
+    for (const status of [200, 401, 404, 503]) {
+      for (const body of ['<html>PRIVATE_SENTINEL</html>', new Uint8Array([0xff])]) {
+        await assert.rejects(request({ transport: async () => new Response(body, { status, headers: { 'retry-after': '5' } }) }), error => {
+          assert.ok(error instanceof VersionApiError);
+          assert.equal(error.kind, status === 200 ? 'invalid' : 'http');
+          assert.equal(error.status, status === 200 ? null : status);
+          if (status !== 200) assert.equal(error.retryAfter, 5);
+          assert.ok(!error.message.includes('PRIVATE_SENTINEL')); return true;
+        });
+      }
     }
     await rejects(request({ transport: async () => { throw new Error('PRIVATE_SENTINEL'); } }), 'network');
   });
@@ -160,11 +167,15 @@ for (const endpoint of ['history', 'restore'] as const) {
     const value = endpoint === 'history' ? { ...f.page, nextBeforeSequence: null } : f.restored;
     for (const status of [200, 503]) {
       const max = endpoint === 'restore' ? 16 * 1024 : status === 200 ? 1024 * 1024 : 64 * 1024;
-      await rejects(request({ responseLimit: 32 * 1024 * 1024, transport: async () => new Response('{}', { status, headers: { 'content-length': String(max + 1) } }) }), 'tooLarge');
+      const check = (error: unknown) => {
+        assert.ok(error instanceof VersionApiError); assert.equal(error.kind, status === 200 ? 'tooLarge' : 'http');
+        assert.equal(error.status, status === 200 ? null : status); return true;
+      };
+      await assert.rejects(request({ responseLimit: 32 * 1024 * 1024, transport: async () => new Response('{}', { status, headers: { 'content-length': String(max + 1) } }) }), check);
       let cancelled = false;
-      await rejects(request({ transport: async () => new Response(new ReadableStream<Uint8Array>({
+      await assert.rejects(request({ transport: async () => new Response(new ReadableStream<Uint8Array>({
         start(controller) { controller.enqueue(new TextEncoder().encode(' '.repeat(max + 1))); }, cancel() { cancelled = true; },
-      }), { status }) }), 'tooLarge');
+      }), { status }) }), check);
       assert.equal(cancelled, true);
     }
     const max = endpoint === 'history' ? 1024 * 1024 : 16 * 1024;
@@ -174,6 +185,38 @@ for (const endpoint of ['history', 'restore'] as const) {
     const multiByte = JSON.stringify({ ...value, ignored: '\u4e2d'.repeat(Math.floor(max / 3)) });
     assert.ok(multiByte.length < max);
     await rejects(request({ transport: async () => new Response(multiByte) }), 'tooLarge');
+  });
+
+  test(`${endpoint} rejects 401 at headers and cancels stalled or oversized bodies without waiting for cancellation`, async () => {
+    const f = fixture(); const request = (options: ApiOptions) => endpoint === 'history' ? getVersionHistory(f.projectId, options)
+      : restoreVersion(f.projectId, f.targetId, f.expected, options);
+    for (const oversized of [false, true]) {
+      let cancelled = false; let calls = 0;
+      await assert.rejects(request({ timeoutMs: 50, transport: async () => {
+        calls++;
+        return new Response(new ReadableStream<Uint8Array>({
+          cancel() { cancelled = true; return new Promise(() => {}); },
+        }), { status: 401, headers: oversized ? { 'content-length': String(2 * 1024 * 1024) } : {} });
+      } }), error => error instanceof VersionApiError && error.kind === 'http' && error.status === 401 && error.code === 'SESSION_REQUIRED');
+      assert.equal(cancelled, true); assert.equal(calls, 1);
+    }
+  });
+
+  test(`${endpoint} preserves 404 for declared/streamed overflow and interrupted error bodies`, async () => {
+    const f = fixture(); const request = (options: ApiOptions) => endpoint === 'history' ? getVersionHistory(f.projectId, options)
+      : restoreVersion(f.projectId, f.targetId, f.expected, options);
+    for (const mode of ['declared', 'streamed', 'interrupted'] as const) {
+      let cancelled = false;
+      const response = new Response(new ReadableStream<Uint8Array>({
+        start(controller) {
+          if (mode === 'streamed') controller.enqueue(new Uint8Array(65 * 1024));
+          if (mode === 'interrupted') controller.error(new Error('PRIVATE_SENTINEL'));
+        }, cancel() { cancelled = true; },
+      }), { status: 404, headers: { 'retry-after': '7', ...(mode === 'declared' ? { 'content-length': String(65 * 1024) } : {}) } });
+      await assert.rejects(request({ transport: async () => response }), error => error instanceof VersionApiError && error.kind === 'http' &&
+        error.status === 404 && error.retryAfter === 7 && !error.message.includes('PRIVATE_SENTINEL'));
+      if (mode !== 'interrupted') assert.equal(cancelled, true);
+    }
   });
 
   test(`${endpoint} bounds fetch/body waits, handles pre/mid-request abort and fences late responses`, async () => {

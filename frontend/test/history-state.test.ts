@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
+import { generationBodySchema } from '@atoms/contracts';
 import type { ProjectDetail, VersionHistory, VersionReview } from '@atoms/contracts';
 import { WorkspaceController } from '../src/workspace/controller';
 import { mergeHistory } from '../src/workspace/history-state';
@@ -125,6 +126,39 @@ test('new candidate completion preserves active historical viewing and candidate
   await app.viewVersion('candidate'); assert.equal(app.snapshot().selected?.id, s.f.versionId);
 });
 
+test('a newer generated task fences delayed candidate details and project facts from the previous task', async t => {
+  const s = historyServer(); const app = await mount(s); t.after(() => app.leave());
+  const candidateA = s.f.versionId; const candidateB = s.items[0]?.id; const newCurrent = s.items[1]?.id; assert.ok(candidateB && newCurrent);
+  const delayedA = deferred<Response>(); let candidateSignal: AbortSignal | null | undefined;
+  let requests = 0; const requestIds: string[] = [];
+  s.detail(async (url, init) => {
+    if (url.endsWith(candidateA)) { candidateSignal = init?.signal; return delayedA.promise; }
+    const review = s.reviews.get(url.split('/').at(-1) ?? ''); assert.ok(review); return jsonResponse(review);
+  });
+  s.post(async (url, init) => {
+    assert.ok(url.endsWith('/generations'));
+    const payload = generationBodySchema.parse(JSON.parse(String(init?.body)));
+    requestIds.push(payload.requestId); const candidate = ++requests === 1 ? candidateA : candidateB;
+    const runId = crypto.randomUUID(); const review = s.reviews.get(candidate); assert.ok(review?.successfulRun);
+    s.reviews.set(candidate, { ...review, successfulRun: { ...review.successfulRun, id: runId, requestId: payload.requestId } });
+    if (requests === 2) s.setCurrent(newCurrent);
+    return jsonResponse({ ...s.f.succeeded, requestId: payload.requestId, runId, candidateVersionId: candidate });
+  });
+  await app.start('Task A'); await until(() => candidateSignal !== undefined);
+  assert.equal(app.snapshot().task?.state?.candidateVersionId, candidateA);
+  assert.equal(app.snapshot().selected?.id, s.f.baseId);
+  await app.start('Task B'); await until(() => app.snapshot().selected?.id === candidateB);
+  const latest = app.snapshot(); const key = app.previewIdentity();
+  assert.notEqual(requestIds[0], requestIds[1]); assert.equal(latest.review?.version.id, candidateB);
+  assert.equal(latest.project?.project.currentVersionId, newCurrent);
+  delayedA.resolve(jsonResponse(s.reviews.get(candidateA))); await delay(10);
+  assert.equal(app.snapshot().review, latest.review); assert.equal(app.snapshot().selected, latest.selected);
+  assert.equal(app.snapshot().selectedReview, latest.selectedReview); assert.equal(app.snapshot().viewedVersionId, candidateB);
+  assert.equal(app.snapshot().project, latest.project); assert.equal(app.snapshot().factEpoch, latest.factEpoch);
+  assert.equal(app.snapshot().task?.state?.candidateVersionId, candidateB); assert.equal(app.previewIdentity(), key);
+  assert.equal(candidateSignal?.aborted, true, 'Starting B aborts A candidate reads');
+});
+
 test('restore gate consumes only current actual compiled identity, locks failures, and invalidates frozen confirmation', async t => {
   const s = historyServer(); const app = await mount(s); t.after(() => app.leave()); await app.viewVersion('history', s.f.versionId);
   assert.equal(app.versionWriteAvailable('restore'), false); app.openRestore(); assert.equal(app.snapshot().operation.status, 'idle');
@@ -204,6 +238,26 @@ test('conflict, busy, unconfirmed and definite failure have distinct states with
     s.post(async () => safeErrorResponse(http, code)); app.openRestore(); await app.submitRestore();
     assert.equal(app.snapshot().operation.status, status); assert.equal(posts(s).length, 1); assert.equal(app.snapshot().selected?.id, s.f.versionId);
     if (status === 'busy' || status === 'unconfirmed') { await app.start(); assert.equal(posts(s).length, 1); await app.refreshCurrent(); assert.equal(app.snapshot().operation.status, 'error'); assert.equal(app.versionWriteAvailable('restore'), false); }
+  }
+});
+
+test('malformed, oversized and stalled 401 bodies clear private state on history reads and restore writes', { timeout: 2000 }, async t => {
+  for (const stage of ['history', 'restore'] as const) {
+    for (const body of ['malformed', 'oversized', 'stalled'] as const) {
+      const s = historyServer(); const app = await mount(s); t.after(() => app.leave());
+      await app.loadHistory(); await app.viewVersion('history', s.f.versionId); compiled(app); app.setDraft('Private draft');
+      let cancelled = false;
+      const response = () => body === 'malformed' ? new Response('<html>PRIVATE_SENTINEL</html>', { status: 401 })
+        : new Response(new ReadableStream<Uint8Array>({
+          cancel() { cancelled = true; return new Promise(() => {}); },
+        }), { status: 401, headers: body === 'oversized' ? { 'content-length': String(2 * 1024 * 1024) } : {} });
+      if (stage === 'history') { s.history(async () => response()); await app.loadHistory(false, true); }
+      else { s.post(async () => response()); app.openRestore(); await app.submitRestore(); }
+      assert.equal(app.snapshot().project, null); assert.equal(app.snapshot().selected, null);
+      assert.equal(app.snapshot().draft, ''); assert.equal(app.snapshot().history.items.length, 0);
+      assert.ok(!s.calls.some(call => call.url === '/api/session'));
+      if (body !== 'malformed') assert.equal(cancelled, true);
+    }
   }
 });
 

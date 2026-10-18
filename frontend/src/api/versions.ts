@@ -109,8 +109,19 @@ const safeExplanations = {
   VERSION_NOT_RESTORABLE: '该版本无法恢复。', DATA_CORRUPT: '已存版本数据无法验证。', RATE_LIMITED: '请求频率过高，请稍后再查询。',
 } as const;
 export async function readJsonResponse<T>(response: Response, schema: z.ZodType<T>, signal: AbortSignal, limit = 16 * 1024 * 1024, safeErrorMessages = false): Promise<T> {
-  const text = await readText(response, response.ok ? limit : Math.min(limit, 64 * 1024), signal);
-  let data: unknown; try { data = JSON.parse(text); } catch { throw new VersionApiError('invalid', '服务器响应不是有效的 JSON。'); }
+  // Authentication failure is authoritative at headers, even if its body never arrives.
+  if (response.status === 401) {
+    void response.body?.cancel().catch(() => {});
+    throw new VersionApiError('http', safeExplanations.SESSION_REQUIRED, 401, 'SESSION_REQUIRED', retryAfter(response.headers));
+  }
+  let data: unknown;
+  try {
+    const text = await readText(response, response.ok ? limit : Math.min(limit, 64 * 1024), signal);
+    try { data = JSON.parse(text); } catch { throw new VersionApiError('invalid', '服务器响应不是有效的 JSON。'); }
+  } catch (error) {
+    if (!response.ok) throw new VersionApiError('http', `请求失败（HTTP ${response.status}）。`, response.status, null, retryAfter(response.headers));
+    throw error;
+  }
   if (!response.ok) {
     const error = errorSchema.safeParse(data);
     if (safeErrorMessages) {

@@ -52,7 +52,8 @@ test('HTTP errors are bounded plain text and do not execute HTML', async () => {
   const f = fixture();
   await assert.rejects(getVersion(f.projectId, f.candidateId, { transport: async () => json({ error: { code: 'NOT_FOUND', message: '<img src=x onerror=alert(1)>' }, requestId: 'fixture' }, 404) }),
     error => error instanceof VersionApiError && error.status === 404 && error.message === '<img src=x onerror=alert(1)>');
-  await rejects(getVersion(f.projectId, f.candidateId, { transport: async () => new Response('x'.repeat(65 * 1024), { status: 503 }) }), 'tooLarge');
+  await assert.rejects(getVersion(f.projectId, f.candidateId, { transport: async () => new Response('x'.repeat(65 * 1024), { status: 503 }) }),
+    error => error instanceof VersionApiError && error.kind === 'http' && error.status === 503);
 });
 test('16 MiB response cap enforces declared and streamed bytes, cancelling body', async () => {
   const f = fixture();
