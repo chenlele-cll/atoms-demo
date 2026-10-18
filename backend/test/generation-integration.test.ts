@@ -274,3 +274,28 @@ test('partial/failed model usage is unknown and sensitive prompts, code and prov
     for (const secret of [sentinel, 'PRIVATE_PROMPT', 'RAW_PROVIDER', 'function App()']) assert.ok(!visible.includes(secret));
   } finally { await fixture.close(); }
 });
+
+
+test('unlimited default survives multiple old deadlines across real SDK HTTP tool steps', async t => {
+  const f = await generationFixture(t);let elapsed = 0;const started = performance.now();
+  t.mock.method(performance, 'now', () => started + elapsed);
+  const fixture = await startFixture((body, res, index) => {
+    elapsed += 180_000;
+    res.end(JSON.stringify(successfulGeneration(body, index)));
+  });
+  try {
+    const result = await generateProject(f.input, { store: f.store, env: { ...fixtureEnv, MODEL_TIMEOUT_MS: undefined }, transport: fixture.transport, clock: () => elapsed });
+    assert.equal(result.status, 'succeeded');assert.equal(result.errorCode, null);assert.equal(result.metrics.requestCount, 3);assert.equal(elapsed, 540_000);
+    assert.ok(result.candidateVersionId);assert.equal(f.store.getProject(f.session.id, f.input.projectId).currentVersion.id, f.input.baseVersionId);
+  } finally { await fixture.close(); }
+});
+
+test('unlimited generation still cancels its real upstream connection and never saves late output', async t => {
+  const f = await generationFixture(t);const controller = new AbortController();
+  const fixture = await startFixture(() => { controller.abort('USER_CANCELLED'); });
+  try {
+    const result = await generateProject(f.input, {store:f.store,env:{...fixtureEnv,MODEL_TIMEOUT_MS:'0'},transport:fixture.transport,signal:controller.signal});
+    await delay(30);assert.equal(fixture.aborted(),1);assert.equal(result.status,'cancelled');assert.equal(result.errorCode,'USER_CANCELLED');assert.equal(result.candidateVersionId,null);assert.equal(fixture.requests.length,1);
+    assert.equal(f.store.getProject(f.session.id,f.input.projectId).currentVersion.id,f.input.baseVersionId);
+  } finally { await fixture.close(); }
+});

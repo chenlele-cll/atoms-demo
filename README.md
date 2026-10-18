@@ -105,7 +105,7 @@ pnpm smoke:template
 | `backend/.env` | `OPENAI_API_KEY` | 无；仅模型调用时必填 | 所配置 API 服务的后端凭据 |
 | `backend/.env` | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | 仅允许官方或用户指定的 `https://ai.elegantyc.com/v1` |
 | `backend/.env` | `MODEL_ID` | 无；模板建议 `gpt-6.1-sol` | 显式指定模型；无权限时失败，不自动切换 |
-| `backend/.env` | `MODEL_TIMEOUT_MS` | `60000` | 每项完整能力样例的时限，整数 1000–120000ms |
+| `backend/.env` | `MODEL_TIMEOUT_MS` | `0` | 无累计截止；显式正值 1000–2147483647ms 才启用总期限 |
 | `backend/.env` | `MODEL_MAX_OUTPUT_TOKENS` | `4096` | 每次请求的输出上限，整数 256–8192 |
 | `frontend/.env` | `API_PROXY_TARGET` | `http://127.0.0.1:3001` | 仅供 Vite 开发／预览代理使用 |
 
@@ -186,7 +186,7 @@ pnpm model:probe:built --case all --report
 
 ## 有界候选生成
 
-GEN-004 提供 generateProject 内核，GEN-005 将其接入下节公开接口；生成 UI 由 GEN-007 接入。内核从已保存当前版本读取代码，通过 list_files/read_files/submit_files 修改有限业务文件，最多六次模型请求、共享默认 60 秒期限、零重试。受理记录与用户输入先保存，合法提交将完整候选、事实摘要和成功状态原子保存，当前版本保持不变。失败保留输入；同一 requestId 重放不再次调用模型。
+GEN-004 提供 generateProject 内核，GEN-005 将其接入下节公开接口；GEN-007 已接入创建与对话 UI。内核从已保存当前版本读取代码，通过 list_files/read_files/submit_files 修改有限业务文件，最多六次模型请求、默认无任务总期限（MODEL_TIMEOUT_MS=0）、零重试。受理记录与用户输入先保存，合法提交将完整候选、事实摘要和成功状态原子保存，当前版本保持不变。失败保留输入；同一 requestId 重放不再次调用模型。
 
 ```sh
 pnpm generation:smoke --help

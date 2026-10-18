@@ -19,7 +19,8 @@ export async function generate(projectId: string, input: GenerationBody, options
   const controller = new AbortController(); let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   const stop = (code: 'cancelled' | 'timeout') => { if (!controller.signal.aborted) controller.abort(code); };
   const external = () => stop('cancelled'); options.signal?.addEventListener('abort', external, { once: true }); if (options.signal?.aborted) external();
-  const total = setTimeout(() => stop('timeout'), options.limits?.totalMs ?? 150_000);
+  const totalMs = options.limits?.totalMs ?? 0;
+  const total = totalMs > 0 ? setTimeout(() => stop('timeout'), totalMs) : undefined;
   const headersTimer = setTimeout(() => stop('timeout'), options.limits?.headersMs ?? 10_000);
   let idle: ReturnType<typeof setTimeout> | undefined;
   let rejectAbort: () => void = () => {};

@@ -271,7 +271,7 @@ GEN-009 提供 `pnpm release:build [--json]` 和 `pnpm smoke:deployment --releas
 
 验收在 `test-results/deployment/<runId>/` 新建私有布局：`releases/relocated release/<releaseId>` 为搬迁后的只读包，`shared/data/atoms.sqlite` 为绝对持久路径，`shared/backup` 为停服冷备份，`shared/restored` 为隔离恢复演练，`private` 为日志/本地 SDK 启动器/Nginx prefix，分享只取 `export`。原包不修改、不安装/构建，搬迁临时副本移除后实际导入契约并打开 SQLite；进程 cwd 为搬迁包 backend，绝对 Node 执行 dist/server.js，环境白名单剔除开发者凭据、代理和 NODE_OPTIONS。正式配置由外部监督器传入，禁止把 .env、cookie、DB 或测试启动器打包。
 
-本机 HTTP origin 精确为 `http://127.0.0.1:8080`，不能混用 localhost。APP_ORIGINS 与浏览器 origin 保持一致；公开服务使用精确 HTTPS 域名/IP 与已验证证书。Nginx 保留原 Host 端口、Origin、Cookie、URI 与查询，关闭 SSE 缓冲/缓存/重试/错误回退，read timeout 150s 是相邻读取期限；后端仍有总期限和 10s 心跳。trustProxy 仍关闭，后端按代理地址限流，公开单机 Demo 的客户端共享代理 IP 配额。此本地 HTTP 验收不证明 TLS、Secure Cookie、公网或多层代理通过。
+本机 HTTP origin 精确为 `http://127.0.0.1:8080`，不能混用 localhost。APP_ORIGINS 与浏览器 origin 保持一致；公开服务使用精确 HTTPS 域名/IP 与已验证证书。Nginx 保留原 Host 端口、Origin、Cookie、URI 与查询，关闭 SSE 缓冲/缓存/重试/错误回退，read timeout 150s 是相邻读取期限；后端默认无任务总期限并有 10s 心跳。trustProxy 仍关闭，后端按代理地址限流，公开单机 Demo 的客户端共享代理 IP 配额。此本地 HTTP 验收不证明 TLS、Secure Cookie、公网或多层代理通过。
 
 真实切换采用停机操作：先验收目标平台新包 → 所属监督器停止旧后端并确认退出 → 冷备份 DB 及仍存在的 WAL/SHM → 使用包内 SQLite 对备份只读 quick_check → 设置 backend cwd、外置 DATABASE_PATH/APP_ORIGINS 和 frontend 静态根 → 对所属配置执行 nginx -t → 启动单个后端并检查健康/同源/项目重开 → reload 所属 Nginx。不要复制运行中的单个 sqlite 文件，不删除 generation.lock；硬杀后按 30s stale 等待，验收保留 32s 窗口。
 

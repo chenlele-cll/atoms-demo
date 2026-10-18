@@ -42,14 +42,14 @@ function addUsage(previous: Usage | null, next: Usage | null, first: boolean): U
 
 export function createModelClient(config: ModelConfig, transport: typeof fetch = fetch) {
   return {
-    // Each bounded operation owns a deadline shared by all its single-step calls.
+    // Only explicitly configured deadlines span the operation's single-step calls.
     async run<T>(maxRequests: number, work: (session: ModelSession) => Promise<T>, external?: AbortSignal, observe?: (event: ModelRequestEvent) => void)
       : Promise<{ value: T; metrics: CallMetrics }> {
       const controller = new AbortController();
       let ended: 'timeout' | 'cancelled' | undefined;
       let closed = false;
       const metrics: CallMetrics = { requestCount: 0, usage: null, requests: [] };
-      const deadline = performance.now() + config.timeoutMs;
+      const deadline = config.timeoutMs > 0 ? performance.now() + config.timeoutMs : null;
       let steps = 0;
       const notify = (event: ModelRequestEvent) => { if (!closed) { try { observe?.(event); } catch { /* Observers never control transport outcomes. */ } } };
       const measured = (): CallMetrics => ({
@@ -61,12 +61,12 @@ export function createModelClient(config: ModelConfig, transport: typeof fetch =
         if (!ended) { ended = reason; controller.abort(); }
       };
       const cancel = () => abort('cancelled');
-      const timer = setTimeout(() => abort('timeout'), config.timeoutMs);
+      const timer = deadline === null ? undefined : setTimeout(() => abort('timeout'), config.timeoutMs);
       external?.addEventListener('abort', cancel, { once: true });
       if (external?.aborted) cancel();
       const check = () => {
         if (closed) throw new ModelError('cancelled');
-        if (!ended && performance.now() >= deadline) abort('timeout');
+        if (!ended && deadline !== null && performance.now() >= deadline) abort('timeout');
         if (ended) throw new ModelError(ended);
       };
       const provider = createOpenAI({

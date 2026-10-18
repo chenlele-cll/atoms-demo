@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { setImmediate as nextTurn } from 'node:timers/promises';
 import type { GenerationEvent } from '@atoms/contracts';
 import { generate, GenerationStreamError } from '../src/api/generation-stream';
 import { jsonResponse, safeErrorResponse, workspaceFixture } from './helpers/workspace';
@@ -64,4 +65,16 @@ test('JSON body deadline and noncooperative reader cancellation cannot keep a re
   const response=new Response(new ReadableStream<Uint8Array>({cancel(){cancelled=true;return new Promise(()=>{});}}),{headers:{'content-type':'text/event-stream'}});
   await assert.rejects(generate(f.projectId,f.body,{limits:{idleMs:5},transport:async()=>response,onEvent:()=>assert.fail('No frame emitted')}),GenerationStreamError); assert.equal(cancelled,true);
   await assert.rejects(generate(f.projectId,f.body,{limits:{headersMs:5},transport:async()=>new Response(new ReadableStream(),{headers:{'content-type':'application/json'}}),onEvent:()=>{}}),error=>error instanceof GenerationStreamError&&error.code==='timeout');
+});
+
+
+test('default SSE stays alive beyond 150 seconds while heartbeats continue, then accepts the real terminal', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});const f=workspaceFixture();let stream:ReadableStreamDefaultController<Uint8Array>|undefined;
+  const encoder=new TextEncoder();const seen:GenerationEvent[]=[];let failure:unknown;
+  const response=new Response(new ReadableStream<Uint8Array>({start(controller){stream=controller;controller.enqueue(encoder.encode(encode([f.accepted])));}}),{headers:{'content-type':'text/event-stream'}});
+  const pending=generate(f.projectId,f.body,{transport:async()=>response,onEvent:event=>seen.push(event)}).catch((error:unknown)=>{failure=error;return undefined;});
+  await nextTurn();assert.equal(seen.length,1);assert.ok(stream);
+  for(let i=0;i<20;i++){t.mock.timers.tick(10_000);await nextTurn();assert.equal(failure,undefined);stream.enqueue(encoder.encode(': heartbeat\n\n'));await nextTurn();}
+  stream.enqueue(encoder.encode(encode([f.activity,f.terminal])));stream.close();
+  const result=await pending;assert.equal(failure,undefined);assert.equal(result?.status,'succeeded');assert.deepEqual(seen.map(event=>event.seq),[1,2,3]);
 });

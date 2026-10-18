@@ -47,7 +47,7 @@ GEN-004 的 backend/src/generation/contracts.ts 是内部请求、结果和工�
 
 company-landing 策略只允许已有 App.tsx 与 components/data/lib/generated 内的 TS/TSX 业务文件，以及已有 src/generated CSS；新文件仅在 /src/generated 下为 ts/tsx/css。根路径与 src 路径的业务规则均明确判断，实际接入使用 GEN-001 的 src 布局。入口引导、配置、许可、资源及预编译 CSS 只读。至少成功读取一个文件，覆盖已有路径必须已读取；拒绝路径绕过、重复、空正文、删除及完全无变化。全量复制文件映射后一次合并，复用快照契约校验 64 文件/2 MiB、身份和依赖，服务端重算 digest/changedFiles。新增样式使用普通 CSS；不做字符串伪编译或宿主执行，结果始终 previewStatus=unverified。
 
-整个操作共享 MODEL_TIMEOUT_MS（默认 60000ms）和外部 AbortSignal，最多 6 次实际模型请求，每次沿用输出预算且 maxRetries=0。请求、工具、验证和事务前均检查；成功事务退出前再次检查，取消/超时使写入整体回滚。模型与网络等待不在数据库事务内，外部连接可写。受理原子保存 running/user；完成原子保存候选、事实摘要及 succeeded，保持 currentVersionId 不变；摘要只声明“候选已保存，预览未验证”。运行中基线改变拒绝保存。受理后失败保留输入，取消写 cancelled，超时写 failed/GENERATION_TIMEOUT；终态也写不入时返回 STORAGE_UNAVAILABLE、terminalStatePersisted=false，不冒充已持久化终止。成功已提交后到达的取消不改写结果。
+整个操作使用外部 AbortSignal，MODEL_TIMEOUT_MS 默认 0（不设累计截止），显式正值才启用共享期限，最多 6 次实际模型请求，每次沿用输出预算且 maxRetries=0。请求、工具、验证和事务前均检查；成功事务退出前再次检查，取消/超时使写入整体回滚。模型与网络等待不在数据库事务内，外部连接可写。受理原子保存 running/user；完成原子保存候选、事实摘要及 succeeded，保持 currentVersionId 不变；摘要只声明“候选已保存，预览未验证”。运行中基线改变拒绝保存。受理后失败保留输入，取消写 cancelled，超时写 failed/GENERATION_TIMEOUT；终态也写不入时返回 STORAGE_UNAVAILABLE、terminalStatePersisted=false，不冒充已持久化终止。成功已提交后到达的取消不改写结果。
 
 活动只包含 runId、单调序号、时间、步骤、批准工具名、字节/路径、安全分类和保存标识。完成活动在相应动作后发出，saved 在事务提交后；观察者异常只计入 observerErrors，不影响事实结果。请求次数来自实际传输，用量按已观测单次值累计，任一步未知则合计 null；保留分项，重放未知指标全为 null。原始供应商异常、提示词、代码、工具正文与思维链均不进入结果或日志。进程硬杀可能留下 running，启动恢复按 Lifecycle 的独占所有权规则执行，不自动重试模型。
 
@@ -107,7 +107,7 @@ GEN-007 的 `/` 明确创建，`/projects/:projectId` 读取私有工作台；�
 
 JSON 客户端复用 GEN-006 的 10 秒期限、16 MiB 成功/64 KiB 错误正文上限、UTF-8/JSON/schema/摘要验证；任务 JSON 上限 256 KiB。平台错误仅使用固定分类说明，丢弃原始网络或未知服务消息。创建没有幂等协议，未知响应只保留原输入并刷新真实列表，不自动重发或按名称猜项目。创建响应在离页后到达也不得跳回或开始生成；模型配置失败时保留已创建项目和原需求。
 
-POST SSE 使用 eventsource-parser 4.1.2：parser 缓冲 8192 字符，业务帧 UTF-8 8 KiB，业务最多 128 帧，总传输最多 320 KiB（含心跳），首响应 10 秒/空闲 25 秒/总计 150 秒。逐块 fatal UTF-8 解码，同步校验 accepted 首帧、项目/request/base/run 关联、严格连续 seq、唯一终态及终态内部关联；拒绝 id/retry/未知字段、截断与双终态。200 terminal JSON 与 202 running JSON 独立验证，200/EOF 不构成成功。不自动重连 POST；截止时间和离页清除 reader/计时器/监听，迟到事件不能修改其他 activation。
+POST SSE 使用 eventsource-parser 4.1.2：parser 缓冲 8192 字符，业务帧 UTF-8 8 KiB，业务最多 128 帧，总传输最多 320 KiB（含心跳），首响应 10 秒/空闲 25 秒，默认无累计总期限；测试可显式设置有限 totalMs。逐块 fatal UTF-8 解码，同步校验 accepted 首帧、项目/request/base/run 关联、严格连续 seq、唯一终态及终态内部关联；拒绝 id/retry/未知字段、截断与双终态。200 terminal JSON 与 202 running JSON 独立验证，200/EOF 不构成成功。不自动重连 POST；连接故障和离页清除 reader/计时器/监听，迟到事件不能修改其他 activation。
 
 控制器由应用拥有，StrictMode 订阅重放和聊天/预览/源码切换不取消任务；真实离页关闭最初连接，服务端按 GEN-005 取消未完成运行。202 取消仅表示请求，提交后的成功优先。丢帧或未知状态只查询原 requestId，每 2 秒、最多 75 次/150 秒，隐藏暂停、离页结束，429 尊重 Retry-After；限额/404/503 保持待确认，只有明确手动重试复用原 payload，新尝试才分配新 ID。另一个标签页的 latestRun 不能替换本地原请求。
 
@@ -150,3 +150,9 @@ REV-003 uses the existing workspace controller, version API client and SnapshotP
 Restore and adoption share the controller operation lock with generation. Restore confirmation freezes project/activation/target/expected/digest/attempt and requires this preview attempt to be compiled without a known error. Identity, current, task or preview changes invalidate confirmation. Only expectedCurrentVersionId is posted; restore eligibility is independent of adoption parent rules. An acknowledged POST survives a failed calibration GET; an uncertain POST performs one GET and then offers manual queries, with no automatic write replay. 401 clears private state, while 404 removes inaccessible content.
 
 The dependent REV-004 continuation guard waits for a successful current GET after acknowledged restoration. Unknown operations and failed fact reads prevent new generation; a different current preserves draft and inspected selection. Original unknown generation retries keep their request payload. No view, preview, restore or refresh starts generation automatically. This section describes selected implementation, not new validation evidence.
+
+## Generation duration
+
+2026-10-18 按用户要求修订：MODEL_TIMEOUT_MS 默认 0，不建立模型操作/生成服务的累计截止或定时器；本地显式配置也为 0。正值 1000–2147483647ms 为主动选择的有限总期限，最大值仅防止 Node timer 整数溢出；0 不受该时长约束。模型请求、工具执行、提交检查仍使用同一取消信号；用户取消、原连接断开、服务关闭和所有权丢失可中止活动请求，禁止迟到保存。步骤、token、文件/上下文、并发/配额限制保持不变。
+
+前端 SSE 不再默认为 150 秒累计截止，持续收到 10 秒心跳的长任务可一直等待。10 秒首响应、25 秒无数据和 Nginx 相邻读取期限是连接故障检测，不是任务累计时长。状态查询和 iframe 编译是各自独立操作，仍有故障期限。live 验收同样不再用 10 分钟全局计时器终止真实生成；无总期限时需明确取消或 SIGINT/SIGTERM 结束，清理继续有界。

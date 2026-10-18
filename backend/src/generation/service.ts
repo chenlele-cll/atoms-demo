@@ -85,17 +85,17 @@ export async function generateProject(input: unknown, dependencies: {
     if ('existing' in prepared && prepared.existing) return replay(prepared.existing);
     const config = prepared.config;
     if (!config) throw new GenerationError('MODEL_CONFIGURATION');
-    const deadline = clock() + config.timeoutMs;
+    const deadline = config.timeoutMs > 0 ? clock() + config.timeoutMs : null;
     controller = new AbortController();
     const check = () => {
-      if (!stopCode && clock() >= deadline) { stopCode = 'GENERATION_TIMEOUT'; controller?.abort(); }
+      if (!stopCode && deadline !== null && clock() >= deadline) { stopCode = 'GENERATION_TIMEOUT'; controller?.abort(); }
       if (closed || dependencies.signal?.aborted) externalCancel();
       if (dependencies.canWrite && !dependencies.canWrite()) throw new ProjectError('SERVER_SHUTDOWN');
       if (stopCode) throw new ProjectError(stopCode);
     };
     dependencies.signal?.addEventListener('abort', externalCancel, { once: true });
     if (dependencies.signal?.aborted) externalCancel();
-    timer = setTimeout(() => { if (!stopCode) { stopCode = 'GENERATION_TIMEOUT'; controller?.abort(); } }, config.timeoutMs);
+    if (deadline !== null) timer = setTimeout(() => { if (!stopCode) { stopCode = 'GENERATION_TIMEOUT'; controller?.abort(); } }, config.timeoutMs);
     check();
     const accepted = dependencies.accepted ?? acceptPreparedGeneration(prepared, store, check, now);
     if (!accepted.accepted) return replay(accepted.existing);

@@ -31,7 +31,12 @@ export function readModelConfig(env: NodeJS.ProcessEnv): ModelConfig {
   }
   return {
     apiKey, modelId, baseURL,
-    timeoutMs: integer(env['MODEL_TIMEOUT_MS'], 60_000, 1000, 120_000),
+    // Zero disables the operation deadline. Positive values are explicitly opt-in.
+    timeoutMs: (() => {
+      const value = integer(env['MODEL_TIMEOUT_MS'], 0, 0, 2_147_483_647);
+      if (value !== 0 && value < 1000) throw new ModelError('configuration');
+      return value;
+    })(),
     maxOutputTokens: integer(env['MODEL_MAX_OUTPUT_TOKENS'], 4096, 256, 8192),
   };
 }
