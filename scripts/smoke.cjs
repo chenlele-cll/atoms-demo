@@ -1,17 +1,20 @@
 /* global document, window, requestAnimationFrame */
 const assert = require('node:assert/strict');
-const { existsSync, mkdirSync } = require('node:fs');
+const { existsSync, mkdirSync, mkdtempSync, rmSync } = require('node:fs');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
+const os = require('node:os');
 const { setTimeout: delay } = require('node:timers/promises');
 const { chromium } = require('playwright-core');
 
 const root = path.resolve(__dirname, '..');
 const artifacts = path.join(root, 'test-results', 'smoke');
 const children = [];
+const backendWorkingDirectory = mkdtempSync(path.join(os.tmpdir(), 'atoms-connection-smoke-'));
+const backendEnvironment = { PATH: process.env.PATH ?? '', HOST: '127.0.0.1', PORT: '3001', DATABASE_PATH: path.join(backendWorkingDirectory, 'data/atoms.sqlite') };
 
-function launch(args, cwd) {
-  const child = spawn('pnpm', args, { cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+function launch(args, cwd, node = false) {
+  const child = spawn(node ? process.execPath : 'pnpm', args, { cwd, detached: true, ...(node ? { env: backendEnvironment } : {}), stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (chunk) => { output += chunk.toString(); });
   child.stderr.on('data', (chunk) => { output += chunk.toString(); });
@@ -19,14 +22,19 @@ function launch(args, cwd) {
   return { child, output: () => output };
 }
 
-function stop(child) {
-  try {
-    if (child.exitCode === null && child.signalCode === null) {
-      process.kill(-child.pid, 'SIGTERM');
-    }
-  } catch (error) {
-    if (error.code !== 'ESRCH') throw error;
-  }
+function groupExists(child) {
+  if (!child.pid) return false;
+  try { process.kill(-child.pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+}
+async function stop(child) {
+  if (!groupExists(child)) return;
+  process.kill(-child.pid, 'SIGTERM');
+  const deadline = Date.now() + 5000;
+  while (groupExists(child) && Date.now() < deadline) await delay(50);
+  if (groupExists(child)) process.kill(-child.pid, 'SIGKILL');
+  const hardDeadline = Date.now() + 2000;
+  while (groupExists(child) && Date.now() < hardDeadline) await delay(50);
+  assert.equal(groupExists(child), false, 'Owned smoke process group leaked');
 }
 
 async function waitForReady(url, proc) {
@@ -74,7 +82,7 @@ async function run() {
 
   mkdirSync(artifacts, { recursive: true });
 
-  const backend = launch(['dev'], path.join(root, 'backend'));
+  const backend = launch(['--import', require.resolve('tsx', { paths: [path.join(root, 'backend')] }), path.join(root, 'backend/src/server.ts')], backendWorkingDirectory, true);
   const frontend = launch(['dev'], path.join(root, 'frontend'));
   await Promise.all([
     waitForReady('http://127.0.0.1:3001/api/health', backend),
@@ -108,15 +116,14 @@ async function run() {
     await page.getByText('后端健康检查响应格式不正确').waitFor();
     await page.unroute('**/api/health');
 
-    stop(backend.child);
-    await new Promise((resolve) => backend.child.once('exit', resolve));
+    await stop(backend.child);
     await delay(300);
     await page.getByRole('button', { name: '检查后端连接' }).click();
     await page.getByText(/后端返回 HTTP/).waitFor();
     assert.equal(await page.getByRole('button', { name: '检查后端连接' }).isEnabled(), true);
     await page.screenshot({ path: path.join(artifacts, 'dev-backend-offline.png'), fullPage: true });
 
-    const production = launch(['start'], path.join(root, 'backend'));
+    const production = launch([path.join(root, 'backend/dist/server.js')], backendWorkingDirectory, true);
     const preview = launch(['preview'], path.join(root, 'frontend'));
     await Promise.all([
       waitForReady('http://127.0.0.1:3001/api/health', production),
@@ -138,6 +145,8 @@ async function run() {
 run().catch((error) => {
   console.error(error);
   process.exitCode = 1;
-}).finally(() => {
-  for (const child of children) stop(child);
+}).finally(async () => {
+  const stopped = await Promise.allSettled(children.map(child => stop(child)));
+  rmSync(backendWorkingDirectory, { recursive: true, force: true });
+  if (stopped.some(result => result.status === 'rejected')) process.exitCode = 1;
 });

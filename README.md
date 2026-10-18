@@ -133,6 +133,8 @@ pnpm model:probe:built --case all --report
 
 ## 验证
 
+项目专项需先构建，再运行 `pnpm smoke:projects`，覆盖真实浏览器的 dev/preview 代理、cookie 隔离、完整快照恢复和构建后端重启；测试中的消息、run 与候选明确为内部夹具，不消耗模型额度。
+
 既有工程与生命周期验收运行；模板专项另按上节执行：
 
 ```sh
@@ -147,6 +149,7 @@ pnpm verify
 pnpm check
 pnpm build
 pnpm smoke
+pnpm smoke:projects
 pnpm test:manager
 pnpm test:infra
 ```
@@ -250,6 +253,7 @@ scripts/
   prepare-company-template.test.mjs 模板准备与边界行为测试
   template-smoke.cjs              模板真实浏览器回归
   template-smoke-control.test.mjs  模板验收的端口归属与信号清理检查
+  project-smoke.cjs               项目 API、浏览器会话隔离和 dist 重启恢复
   check-dev-port.cjs   托管服务启动前检查固定端口，不终止占用者
   manager.mjs          短时运行的生命周期命令，调用 Process Compose
   setup.mjs            无需 node_modules 的 bootstrap / doctor / infra 入口

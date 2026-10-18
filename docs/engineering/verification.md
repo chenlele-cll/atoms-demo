@@ -137,6 +137,32 @@ GEN-002 的 [模型模块](../../backend/src/model/client.ts) 只由显式调用
 
 本地替身通过不能替代 OpenAI 账户和模型权限实测。默认 check/smoke/verify、CI、manager 均不执行上述真实探针；现有 smoke 继续验证既有前后端连通，模板专项见上节。实际命令结果、未完成真实验收及供 GEN-004 复用的边界见 [GEN-002 tasks](../../openspec/changes/gen-002-model-access-validation/tasks.md)。这些能力不构成项目生成、持久化、预览编译或完整 Top 1 已完成。
 
+## Project persistence
+
+GEN-003 使用已有 Node 测试器和真实临时 SQLite 文件，覆盖迁移幂等/回滚/高版本拒绝、项目原子保存、不可变快照、同项目外键、消息分页、run 状态、候选保存不采用及关闭重开。HTTP injection 通过两个匿名会话覆盖完整调用顺序、Origin/JSON/strict 校验、cookie 到期、归属 401/404、稳定分页、模板冲突、事务配额、不可伪造 IP 的限流及 Retry-After、413/415/503/500 和敏感哨兵不泄露。启动子进程使用隔离工作目录与配置，不读取开发者 .env，覆盖只读文件、高 schema、缺资产、端口冲突和正常释放/再启动。
+
+模板准备测试新增后端 src/dist 的独立目标、内容标识一致、资源/中立校验代码齐备以及失败保留旧输出且不残留暂存。manager 隔离副本排除生成资产、环境、数据与 node_modules，从 frozen offline install 重新安装，再实际打开/写入/查询原生 SQLite 绑定；v13 自带 N-API 预构建，保留现有 ignore-scripts 场景不代表跳过绑定验证。首次 bootstrap 的网络、缓存及固定工具前提仍适用。
+
+```sh
+pnpm check
+pnpm test:template
+pnpm test:manager
+pnpm smoke
+pnpm smoke:template
+pnpm smoke:projects
+```
+
+端口场景串行执行；smoke 已含 build，另外两项浏览器专项使用该构建，不重复构建。连接 smoke 的后端源码/生产进程改用隔离 cwd 和临时 DATABASE_PATH，正常关闭后才删除临时数据；不接触开发者数据库。项目专项复用 playwright-core 与系统 Chrome，不增加测试框架或产品测试页：
+
+- 在独立前端副本的已有首页，用浏览器 fetch('/api/...') 分别走 dev/preview 代理，检查公开目录不创建 cookie、HttpOnly/Strict/Path cookie、模板创建、空对话及刷新恢复。
+- 独立上下文 A/B 的列表、详情及对话隔离；其他归属与不存在项目为相同 404 错误结构。
+- 后端部署布局仅含自己的 dist、package 和当前平台依赖，不含前端或原模板源；停止后通过内部入口写入明确的测试消息/run/候选，保留原 cookie 与数据库后重启，比较完整快照摘要、项目 ID、消息序号和当前版本不变。临时移走目录 JSON 时，已保存项目仍能由 store 读回；正式 server 仍要求加载可用目录后监听。
+- 测试进程、浏览器和临时数据库均归本次所有，信号中止不启动后续场景；端口冲突不停止占用者。报告在忽略的 test-results/project-persistence/<runId>/，运行目录在清理后删除。
+
+同一 smoke:projects 命令随后运行 project-smoke-control.test.mjs，以真实外部 HTTP 占用者和活动浏览器分别验证端口保护、SIGINT=130、SIGTERM=143、十秒内退出、最终取消报告、临时目录删除和端口释放。只清理本次 runner 所属进程，不接管其他测试或用户服务。
+
+这些验证证明持久化和 HTTP/浏览器传输，不证明真实模型生成、候选编译/采用、完整工作台或线上部署。默认 verify/CI 仍不自动加入新项目专项，后续 GEN-008 再整合。实际完成与证据见 [GEN-003 tasks](../../openspec/changes/gen-003-project-persistence-api/tasks.md)。
+
 ## Lifecycle scenarios
 
 `OPS-001` 的原生配置验收使用真实进程，检查双服务与单服务启动、HTTP readiness、健康响应及前端 API 代理、所属进程故障恢复、就绪持续失败、外部端口冲突和停止后的进程清理。核对状态时同时检查是否运行、就绪、退出码与重试次数，不把 `process list` 命令成功当作项目健康；注意 [原生状态及就绪限制](./lifecycle.md#behavior-and-limits)，退出码可能属于前一轮进程。原生记录见 [OPS-001](../../openspec/changes/ops-001-process-compose/tasks.md)。

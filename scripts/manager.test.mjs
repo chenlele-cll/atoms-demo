@@ -34,14 +34,30 @@ async function fixture(name, { install = true, tools = true } = {}) {
   await cp(path.join(root, 'scripts/vendor'), path.join(dest, 'scripts/vendor'), { recursive: true });
   if (tools) await symlink(path.join(root, '.tools'), path.join(dest, '.tools'), 'dir');
   for (const app of ['backend', 'frontend']) {
-    await cp(path.join(root, app), path.join(dest, app), { recursive: true, filter: (source) => !['node_modules', 'dist', '.env', 'template-assets'].includes(path.basename(source)) && !path.basename(source).startsWith('.env.') });
+    await cp(path.join(root, app), path.join(dest, app), { recursive: true, filter: (source) =>
+      !['node_modules', 'dist', '.env', 'template-assets', 'data', '.runtime'].includes(path.basename(source)) &&
+      !path.basename(source).startsWith('.env.') && !/\.(?:sqlite|db)(?:-(?:wal|shm|journal))?$/.test(source) });
   }
-  if (install) await exec('pnpm', ['install', '--offline', '--frozen-lockfile', '--ignore-scripts'], { cwd: dest, timeout: 60000, maxBuffer: 1024 * 1024 });
+  if (install) {
+    await exec('pnpm', ['install', '--offline', '--frozen-lockfile', '--ignore-scripts'], { cwd: dest, timeout: 60000, maxBuffer: 1024 * 1024 });
+    await verifyNativeBinding(dest);
+  }
   return dest;
 }
 
+async function verifyNativeBinding(cwd) {
+  // v13 ships platform N-API prebuilds; execute the installed binding, never copy it.
+  const result = await exec('pnpm', ['--filter', '@atoms/backend', 'exec', 'node', '--input-type=module', '-e',
+    'import Database from "better-sqlite3"; const db=new Database(":memory:"); db.exec("CREATE TABLE native_check(value INTEGER)"); db.prepare("INSERT INTO native_check VALUES (?)").run(1); if(db.prepare("SELECT value FROM native_check").get().value!==1) throw new Error("Native binding check failed"); db.close();'],
+  { cwd, timeout: 15000, maxBuffer: 1024 * 1024 });
+  assert.equal(result.stderr, '');
+  report.native_binding = `${process.platform}/${process.arch}`;
+}
+
 function launch(cwd, args, env = process.env) {
-  const child = spawn(path.join(cwd, 'manager.sh'), args, { cwd: '/tmp', env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(path.join(cwd, 'manager.sh'), args, { cwd: '/tmp',
+    env: { ...env, DATABASE_PATH: path.join(cwd, 'data/atoms.sqlite'), APP_ORIGINS: 'http://127.0.0.1:5173,http://127.0.0.1:4173' },
+    stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
   child.stdout.on('data', (data) => { stdout += data; });
@@ -122,6 +138,7 @@ test('manager lifecycle with real Process Compose and applications', { timeout: 
     const first = await success(fresh, 'bootstrap', '--json');
     assert.equal(first.tool, 'installed');
     assert.equal(first.servicesStarted, false);
+    await verifyNativeBinding(fresh);
     const binary = path.join(fresh, '.tools/process-compose', first.processCompose, 'process-compose');
     const stat = await lstat(binary);
     assert.equal((await success(fresh, 'bootstrap', '--json')).tool, 'reused');
