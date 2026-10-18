@@ -1,3 +1,3 @@
-- name: Refuse an unverified automatic rollback
+- name: Keep transaction failure visible without duplicating target recovery
   ansible.builtin.fail:
-    msg: Recovery integration is pending; no database restore or schema downgrade was attempted. Deployment remains failed.
+    msg: Deployment failed. The lock-owning target transaction handles compatible recovery; no controller-side database restore is performed.

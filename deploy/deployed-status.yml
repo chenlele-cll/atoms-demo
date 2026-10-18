@@ -1,0 +1,17 @@
+- name: Inspect the owned deployment without changing managed state
+  hosts: atoms
+  gather_facts: false
+  vars_files: [defaults.yml]
+  pre_tasks:
+    - ansible.builtin.import_tasks: tasks/require-integrations.yml
+  tasks:
+    - name: Inspect current deployment with the same verifier and health adapter
+      block:
+        - ansible.builtin.import_tasks: tasks/prepare-context.yml
+        - ansible.builtin.command:
+            argv: [python3, "{{ atoms_stage.path }}/kit/deploy/remote.py", status, "{{ atoms_stage.path }}/context.json", --result, "{{ atoms_stage.path }}/result.json"]
+          become: true
+          changed_when: false
+          no_log: true
+      always:
+        - ansible.builtin.import_tasks: tasks/report.yml

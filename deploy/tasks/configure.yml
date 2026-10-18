@@ -18,7 +18,7 @@
 
 - name: Inspect the pending directory without following a link
   ansible.builtin.stat:
-    path: "{{ atoms_root }}/shared/config/pending"
+    path: "{{ atoms_configuration_directory | default(atoms_root ~ '/shared/config/pending') }}"
     follow: false
     get_checksum: false
     get_mime: false
@@ -34,7 +34,7 @@
 
 - name: Create the owned pending configuration directory
   ansible.builtin.file:
-    path: "{{ atoms_root }}/shared/config/pending"
+    path: "{{ atoms_configuration_directory | default(atoms_root ~ '/shared/config/pending') }}"
     state: directory
     mode: '0700'
   no_log: true
@@ -42,7 +42,7 @@
 - name: Render unit and proxy configuration without installing them
   ansible.builtin.template:
     src: "{{ playbook_dir }}/templates/{{ item.source }}"
-    dest: "{{ atoms_root }}/shared/config/pending/{{ item.target }}"
+    dest: "{{ atoms_configuration_directory | default(atoms_root ~ '/shared/config/pending') }}/{{ item.target }}"
     mode: '0600'
   loop:
     - {source: atoms-backend.service.j2, target: atoms-backend.service}
@@ -52,14 +52,14 @@
 - name: Stage initial environment only when none already exists
   ansible.builtin.template:
     src: "{{ playbook_dir }}/templates/backend.env.j2"
-    dest: "{{ atoms_root }}/shared/config/pending/backend.env"
+    dest: "{{ atoms_configuration_directory | default(atoms_root ~ '/shared/config/pending') }}/backend.env"
     mode: '0600'
   when: not atoms_existing_env.stat.exists
   no_log: true
 
 - name: Remove only our obsolete pending environment when the live file exists
   ansible.builtin.file:
-    path: "{{ atoms_root }}/shared/config/pending/backend.env"
+    path: "{{ atoms_configuration_directory | default(atoms_root ~ '/shared/config/pending') }}/backend.env"
     state: absent
   when: atoms_existing_env.stat.exists
   no_log: true

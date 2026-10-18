@@ -1,4 +1,4 @@
-- name: Atoms deployment framework
+- name: Apply a verified Atoms release
   hosts: atoms
   gather_facts: false
   vars_files: [defaults.yml, integrations.yml]
@@ -15,6 +15,8 @@
         - name: Stage managed configuration
           ansible.builtin.import_tasks: tasks/configure.yml
           become: true
+          vars:
+            atoms_configuration_directory: "{{ atoms_stage.path }}/configuration"
         - name: Back up and activate compatible release
           ansible.builtin.import_tasks: tasks/activate.yml
         - name: Verify actual application and public access

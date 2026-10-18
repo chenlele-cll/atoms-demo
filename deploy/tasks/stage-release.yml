@@ -1,3 +1,126 @@
-- name: Require verified release transfer integration
-  ansible.builtin.fail:
-    msg: Pending GEN-009 release verification and immutable transfer; no package is uploaded or ID generated here.
+- name: Require a retained release to exist
+  ansible.builtin.assert:
+    that: atoms_request.mode != 'retained' or atoms_resolution.found
+    quiet: true
+    fail_msg: Requested retained release was not found or could not be verified.
+
+- name: Transport input only when no matching verified package is available
+  ansible.builtin.copy:
+    src: "{{ atoms_request.archive }}"
+    dest: "{{ atoms_stage.path }}/input.tar.gz"
+    mode: '0600'
+  when: not atoms_resolution.found
+  changed_when: false
+  no_log: true
+
+- name: Verify transport checksum before extraction
+  ansible.builtin.stat:
+    path: "{{ atoms_stage.path }}/input.tar.gz"
+    checksum_algorithm: sha256
+  register: atoms_transport
+  when: not atoms_resolution.found
+  no_log: true
+
+- name: Require an unchanged archive
+  ansible.builtin.assert:
+    that: atoms_transport.stat.checksum == atoms_request.archive_digest
+    quiet: true
+  when: not atoms_resolution.found
+  no_log: true
+
+- name: Create private extraction directory
+  ansible.builtin.file:
+    path: "{{ atoms_stage.path }}/input"
+    state: directory
+    mode: '0700'
+  when: not atoms_resolution.found
+  changed_when: false
+  no_log: true
+
+- name: Extract verified controller snapshot or release
+  ansible.builtin.unarchive:
+    src: "{{ atoms_stage.path }}/input.tar.gz"
+    dest: "{{ atoms_stage.path }}/input"
+    remote_src: true
+    extra_opts: [--no-same-owner]
+  when: not atoms_resolution.found
+  changed_when: false
+  no_log: true
+
+- name: Initialize version-control index in the isolated public source copy
+  ansible.builtin.command:
+    argv: "{{ item }}"
+    chdir: "{{ atoms_stage.path }}/input"
+  loop: [[git, init, -q], [git, add, --all]]
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  changed_when: false
+  no_log: true
+
+- name: Inspect the pinned build tool without implicit Corepack installation
+  ansible.builtin.command:
+    argv: ["{{ atoms_config.pnpm_binary }}", --version]
+  environment:
+    PATH: "{{ atoms_config.node_binary | dirname }}:{{ atoms_config.pnpm_binary | dirname }}:/usr/local/bin:/usr/bin:/bin"
+    COREPACK_ENABLE_NETWORK: '0'
+    COREPACK_ENABLE_AUTO_PIN: '0'
+    NODE_OPTIONS: ''
+    NODE_PATH: ''
+  register: atoms_pnpm_version
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  changed_when: false
+  no_log: true
+
+- name: Require the exact producer toolchain
+  ansible.builtin.assert:
+    that: atoms_pnpm_version.stdout | trim == atoms_expected_pnpm
+    quiet: true
+    fail_msg: The target pnpm version must match package.json before building.
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  no_log: true
+
+- name: Prepare frozen dependency cache as the unprivileged SSH user
+  ansible.builtin.command:
+    # Public runtime files need consistent service-readable modes regardless of
+    # the SSH user's private umask. This still execs the existing producer tools.
+    argv: [python3, -c, "import os,sys; os.umask(0o022); os.execv(sys.argv[1],sys.argv[1:])", "{{ atoms_config.pnpm_binary }}", fetch, --frozen-lockfile]
+    chdir: "{{ atoms_stage.path }}/input"
+  environment:
+    PATH: "{{ atoms_config.node_binary | dirname }}:{{ atoms_config.pnpm_binary | dirname }}:/usr/local/bin:/usr/bin:/bin"
+    NODE_OPTIONS: ''
+    NODE_PATH: ''
+    COREPACK_ENABLE_NETWORK: '0'
+    COREPACK_ENABLE_AUTO_PIN: '0'
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  async: 240
+  poll: 2
+  changed_when: false
+  no_log: true
+
+- name: Invoke the existing GEN-009 isolated release builder on Ubuntu
+  ansible.builtin.command:
+    argv: [python3, -c, "import os,sys; os.umask(0o022); os.execv(sys.argv[1],sys.argv[1:])", "{{ atoms_config.node_binary }}", scripts/release.mjs, --json]
+    chdir: "{{ atoms_stage.path }}/input"
+  environment:
+    PATH: "{{ atoms_config.node_binary | dirname }}:{{ atoms_config.pnpm_binary | dirname }}:/usr/local/bin:/usr/bin:/bin"
+    NODE_OPTIONS: ''
+    NODE_PATH: ''
+    COREPACK_ENABLE_NETWORK: '0'
+    COREPACK_ENABLE_AUTO_PIN: '0'
+  register: atoms_build
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  async: 660
+  poll: 2
+  changed_when: false
+  no_log: true
+
+- name: Select the real producer result
+  ansible.builtin.set_fact:
+    atoms_selected_release: "{{ (atoms_build.stdout_lines | last | from_json).directory }}"
+  when: not atoms_resolution.found and atoms_request.mode == 'source'
+  no_log: true
+
+- name: Select explicitly supplied artifact
+  ansible.builtin.set_fact:
+    atoms_selected_release: "{{ atoms_stage.path }}/input"
+  when: not atoms_resolution.found and atoms_request.mode == 'artifact'
+  no_log: true

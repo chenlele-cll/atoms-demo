@@ -1,6 +1,20 @@
-- name: Report framework state without publishing raw failed results
-  ansible.builtin.debug:
-    msg:
-      stage: framework
-      deployment_verified: false
-      note: Inspect bounded private evidence; no successful deployment is asserted by this framework.
+- name: Fetch bounded target outcome into private local evidence
+  ansible.builtin.fetch:
+    src: "{{ atoms_stage.path }}/result.json"
+    dest: "{{ atoms_request.result_file }}"
+    flat: true
+    fail_on_missing: false
+  become: true
+  when: atoms_stage is defined
+  failed_when: false
+  changed_when: false
+  no_log: true
+
+- name: Clean only this command's private staging directory
+  ansible.builtin.file:
+    path: "{{ atoms_stage.path }}"
+    state: absent
+  become: true
+  when: atoms_stage is defined
+  changed_when: false
+  no_log: true

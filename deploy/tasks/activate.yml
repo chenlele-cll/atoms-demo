@@ -1,3 +1,37 @@
-- name: Require private configuration and compatible activation integration
-  ansible.builtin.fail:
-    msg: Pending runtime configuration, cold backup and compatibility checks; no service is stopped or current pointer changed.
+- name: Remove a prior preflight result before attempting activation
+  ansible.builtin.file:
+    path: "{{ atoms_stage.path }}/result.json"
+    state: absent
+  become: true
+  changed_when: false
+  no_log: true
+
+- name: Execute one target transaction under its OS lock
+  ansible.builtin.command:
+    argv: [python3, "{{ atoms_stage.path }}/kit/deploy/remote.py", apply, "{{ atoms_stage.path }}/context.json", --release, "{{ atoms_selected_release }}", --result, "{{ atoms_stage.path }}/result.json"]
+  become: true
+  async: 900
+  poll: 2
+  register: atoms_activation
+  failed_when: false
+  changed_when: false
+  no_log: true
+
+- name: Read only the bounded activation result
+  ansible.builtin.slurp:
+    src: "{{ atoms_stage.path }}/result.json"
+  become: true
+  register: atoms_activation_report
+  no_log: true
+
+- name: Decode activation status
+  ansible.builtin.set_fact:
+    atoms_result: "{{ atoms_activation_report.content | b64decode | from_json }}"
+  no_log: true
+
+- name: Preserve a failed deployment even if recovery restored service
+  ansible.builtin.assert:
+    that: atoms_result.ok | default(false)
+    quiet: true
+    fail_msg: Deployment failed; the target transaction retained data and recorded recovery state.
+  changed_when: atoms_result.changed | default(false)

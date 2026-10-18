@@ -1,3 +1,9 @@
-- name: Require actual health and persistence observations
-  ansible.builtin.fail:
-    msg: Pending health integration; no successful deployment state is recorded from a template or release ID alone.
+- name: Require committed target identity and observed health
+  ansible.builtin.assert:
+    that:
+      - atoms_result.ok
+      - atoms_result.deploymentVerified
+      - atoms_result.releaseId is match('^[a-f0-9-]{36}$')
+      - atoms_result.releaseDigest is match('^[a-f0-9]{64}$')
+    quiet: true
+    fail_msg: Target health and committed identity were not confirmed.

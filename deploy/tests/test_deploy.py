@@ -65,14 +65,14 @@ class EntryTests(Fixture):
         clone = self.path / "copy with spaces"
         (clone / "scripts").mkdir(parents=True)
         (clone / "deploy").mkdir()
-        for source in ["deploy.sh", "scripts/deploy.py", "deploy/requirements.txt"]:
+        for source in ["deploy.sh", "scripts/deploy.py", "deploy/requirements.txt", "deploy/policy.py"]:
             shutil.copy2(ROOT / source, clone / source)
         for _ in range(2):
             help_result = subprocess.run([str(clone / "deploy.sh")], text=True, capture_output=True, check=True)
             self.assertIn("Usage:", help_result.stdout)
             result = subprocess.run([str(clone / "deploy.sh"), "apply", "--inventory", "/missing/private.yml"], text=True, capture_output=True)
             self.assertEqual(result.returncode, 2)
-            self.assertIn("DEP-003", result.stderr)
+            self.assertIn("bootstrap", result.stderr)
             self.assertFalse((clone / ".tools").exists())
             self.assertFalse((clone / ".runtime").exists())
 
@@ -81,26 +81,25 @@ class EntryTests(Fixture):
         self.assertEqual(result.returncode, 2)
         self.assert_safe(result)
 
-    def test_plan_is_offline_and_apply_is_gated_before_private_inputs(self):
+    def test_plan_is_offline_and_apply_validates_private_inputs(self):
         inventory = self.inventory()
         before = inventory.read_bytes()
-        # Invalid private YAML must not be read by either planning or blocked apply.
+        # Planning stays offline; apply validates private YAML before transport.
         inventory.write_text(FAKE_PASSWORD)
         for _ in range(2):
-            result = self.cli("plan", "--json", "--release", FAKE_PASSWORD)
+            result = self.cli("plan", "--json")
             self.assertEqual(result.returncode, 0, result.stderr)
             plan = json.loads(result.stdout)
-            self.assertFalse(plan["canApply"])
+            self.assertTrue(plan["implementationReady"])
+            self.assertFalse(plan["targetVerified"])
             self.assertFalse(plan["deploymentVerified"])
-            self.assertTrue(plan["releaseProvided"])
+            self.assertFalse(plan["releaseProvided"])
             self.assertEqual(len(plan["phases"]["block"]), 5)
-            self.assertEqual({p["id"] for p in plan["pendingIntegrations"]},
-                             {"release", "ownership", "transfer", "runtime_config", "activation", "health", "recovery"})
+            self.assertEqual(plan["pendingIntegrations"], [])
             self.assert_safe(result)
             blocked = self.cli("apply", "--json", "--inventory", str(inventory), "--release", FAKE_PASSWORD)
             self.assertEqual(blocked.returncode, 2)
-            self.assertFalse(json.loads(blocked.stdout)["canApply"])
-            self.assertIn("pending integrations", blocked.stderr)
+            self.assertIn("Inventory must contain only", blocked.stderr)
             self.assert_safe(blocked)
             self.assertEqual(inventory.read_text(), FAKE_PASSWORD)
         inventory.write_bytes(before)
@@ -109,7 +108,7 @@ class EntryTests(Fixture):
         clone = self.path / "framework"
         shutil.copytree(ROOT / "deploy", clone / "deploy")
         dependencies = clone / "deploy/integrations.yml"
-        for value in ["atoms_pending_integrations: {}", "atoms_pending_integrations: [" + FAKE_PASSWORD]:
+        for value in ["atoms_integrations: {}", "atoms_integrations: [" + FAKE_PASSWORD]:
             dependencies.write_text(value)
             with patch.object(adapter, "ROOT", clone):
                 with self.assertRaises(adapter.InputError) as caught:
@@ -191,7 +190,13 @@ sys.exit(255)
             self.assertTrue(marker.exists(), result.stdout + result.stderr)
             self.assertTrue(json.loads(marker.read_text())["literal_matches"])
             self.assert_safe(result)
-            self.assertIn("censored", result.stdout)
+            if command == "check":
+                self.assertIn("censored", result.stdout)
+            else:
+                evidence = result.stdout.split("Evidence: ")[-1].strip()
+                log = (ROOT / evidence / "ansible.log").read_text()
+                self.assertIn("censored", log)
+                self.assertNotIn(FAKE_PASSWORD, log)
             self.assertEqual(inventory.read_bytes(), original)
 
     def check_cancel(self, signum):
@@ -382,9 +387,8 @@ elif name=='sudo' and sys.argv[2] not in ['openssl','test']:os.execvp(sys.argv[2
         result = subprocess.run([str(ROOT / ".tools/deploy/bin/ansible-playbook"), "-i", "localhost,", str(file)],
                                 cwd=ROOT, env=adapter.clean_environment(), capture_output=True, text=True, timeout=20)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Refuse an unverified automatic rollback", result.stdout)
-        self.assertIn("Report framework state", result.stdout)
-        self.assertIn('"deployment_verified": false', result.stdout)
+        self.assertIn("Keep transaction failure visible", result.stdout)
+        self.assertIn("Clean only this command", result.stdout)
 
 
 class UpdatePolicyTests(unittest.TestCase):

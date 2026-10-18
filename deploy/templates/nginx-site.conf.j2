@@ -1,11 +1,12 @@
+# Managed by atoms deploy.sh; root={{ atoms_root }}
 # Standalone site inside the existing Nginx http context; never replace nginx.conf.
 server {
     listen {{ atoms_config.https_port }} ssl;
     server_name {{ ansible_host }};
-    ssl_certificate {{ atoms_config.tls_certificate }};
-    ssl_certificate_key {{ atoms_config.tls_key }};
+    ssl_certificate "{{ atoms_config.tls_certificate }}";
+    ssl_certificate_key "{{ atoms_config.tls_key }}";
     ssl_protocols TLSv1.2 TLSv1.3;
-    root {{ atoms_root }}/current/frontend;
+    root "{{ atoms_root }}/current/frontend";
     index index.html;
     client_max_body_size 32k;
 

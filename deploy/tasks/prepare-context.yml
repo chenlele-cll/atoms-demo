@@ -1,0 +1,55 @@
+- name: Create a private per-command target staging directory
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: atoms-deploy-
+  register: atoms_stage
+  changed_when: false
+  no_log: true
+
+- name: Transport the dependency-free verifier and target transaction
+  ansible.builtin.copy:
+    src: "{{ atoms_request.kit }}/"
+    dest: "{{ atoms_stage.path }}/kit/"
+    mode: '0600'
+    directory_mode: '0700'
+  changed_when: false
+  no_log: true
+
+- name: Transport literal private model patch without Ansible templating
+  ansible.builtin.copy:
+    src: "{{ atoms_request.environment_file }}"
+    dest: "{{ atoms_stage.path }}/environment.json"
+    mode: '0600'
+  become: true
+  changed_when: false
+  no_log: true
+
+- name: Write target context with paths and non-secret managed settings
+  ansible.builtin.copy:
+    content: "{{ atoms_target_context | to_nice_json }}"
+    dest: "{{ atoms_stage.path }}/context.json"
+    mode: '0600'
+  vars:
+    atoms_target_context:
+      root: "{{ atoms_root }}"
+      stage: "{{ atoms_stage.path }}"
+      run_id: "{{ atoms_request.run_id }}"
+      ip: "{{ ansible_host }}"
+      backend_port: "{{ atoms_config.backend_port | int }}"
+      https_port: "{{ atoms_config.https_port | int }}"
+      node: "{{ atoms_config.node_binary }}"
+      nginx: "{{ atoms_config.nginx_binary }}"
+      node_version: "{{ atoms_request.node_version }}"
+      pnpm_version: "{{ atoms_request.pnpm_version }}"
+      certificate: "{{ atoms_config.tls_certificate }}"
+      key: "{{ atoms_config.tls_key }}"
+      unit_path: /etc/systemd/system/atoms-backend.service
+      site_path: "{{ atoms_nginx_site_path | default('/etc/nginx/conf.d/atoms-demo.conf') }}"
+      bridge: "{{ atoms_stage.path }}/kit/deploy/artifact.mjs"
+      environment_file: "{{ atoms_stage.path }}/environment.json"
+      source_digest: "{{ atoms_request.source_digest }}"
+      release_id: "{{ atoms_request.release_id }}"
+      release_digest: "{{ atoms_request.release_digest }}"
+  become: true
+  changed_when: false
+  no_log: true

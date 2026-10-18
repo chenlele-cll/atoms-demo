@@ -1,7 +1,6 @@
 """Small control-node adapter; Ansible owns SSH and remote inspection."""
 
 import argparse
-from dataclasses import dataclass, field
 import importlib.metadata
 import ipaddress
 import json
@@ -12,70 +11,31 @@ import signal
 import stat
 import subprocess
 import sys
-from uuid import UUID
 import venv
 
 
 ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ROOT / ".tools/deploy"
+sys.path.insert(0, str(ROOT / "deploy"))
+from policy import InputError, DeploymentIdentity, decide_update
 HELP = """Usage: ./deploy.sh <command> [options]
 
   bootstrap  Install pinned local Ansible tools (Python 3.12–3.14).
   validate   Offline playbook syntax and template rendering; no private config.
   test       Local behavior tests; no real inventory or server connections.
-  plan       Offline Ansible phases and pending integrations; supports --json.
+  plan       Offline implementation/artifact readiness; target checks remain live.
   check      Read-only server prerequisites; missing items return nonzero.
-  status     Read current symlink/service states; does not certify health.
-  apply      Dependency-gated framework; fails before config or SSH access.
+  status     Inspect owned release, recovery journal and actual health.
+  apply      Verify/reuse a package, or build on Ubuntu, then apply transactionally.
 
 check/status default to server.local.yml (owner-only mode 0600).
-plan/apply accept --release <path> as a reserved input, not a verified package.
-plan/apply --json emits a bounded framework plan; canApply remains false.
-No command implicitly deploys, updates tools, or changes remote services.
+apply defaults to a matching target package or an isolated target-platform build.
+--release <directory> supplies an existing Linux artifact; --release-id <UUID>
+selects a retained target package (including a compatible rollback).
+--env-file <0600.yml> patches only documented optional model settings.
+plan/apply/status support --json. Only explicit apply changes managed state.
 See docs/engineering/deployment.md for setup and scope.
 """
-
-
-class InputError(Exception):
-    """Only fixed, credential-free messages may cross this boundary."""
-
-
-@dataclass(frozen=True)
-class DeploymentIdentity:
-    """Future trusted adapter output, never a second release manifest."""
-    release_id: str
-    content_digest: str = field(repr=False)
-    backend_config_digest: str = field(repr=False)
-    proxy_config_digest: str = field(repr=False)
-
-    def __post_init__(self):
-        try:
-            UUID(self.release_id)
-            for value in (self.content_digest, self.backend_config_digest, self.proxy_config_digest):
-                if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value):
-                    raise ValueError
-        except (ValueError, TypeError, AttributeError):
-            raise InputError("Invalid verified deployment identity; values suppressed.") from None
-
-
-def decide_update(current, desired, *, backend_healthy, proxy_healthy):
-    """Pure policy only. Observation, artifact verification and execution are adapters."""
-    if not isinstance(desired, DeploymentIdentity) or (current is not None and not isinstance(current, DeploymentIdentity)):
-        raise InputError("A verified deployment identity is required.")
-    if type(backend_healthy) is not bool or type(proxy_healthy) is not bool:
-        raise InputError("Health must be explicitly observed, not unknown.")
-    if current and current.release_id == desired.release_id and current.content_digest != desired.content_digest:
-        raise InputError("Immutable release ID has conflicting content; deployment refused.")
-    switch = current is None or current.release_id != desired.release_id
-    backend_changed = current is None or current.backend_config_digest != desired.backend_config_digest
-    proxy_changed = current is None or current.proxy_config_digest != desired.proxy_config_digest
-    mode = ("install" if current is None else "activate" if switch else "configure"
-            if backend_changed or proxy_changed else "repair" if not (backend_healthy and proxy_healthy) else "noop")
-    restart = switch or backend_changed or not backend_healthy
-    return {"mode": mode, "switch_release": switch, "restart_backend": restart,
-            "reload_proxy": switch or proxy_changed or not proxy_healthy,
-            "require_cold_backup_check": restart, "verify_health": True,
-            "build_release": False, "restore_database": False}
 
 
 def framework_plan(release_provided=False):
@@ -84,17 +44,19 @@ def framework_plan(release_provided=False):
 
     folder = ROOT / "deploy"
     try:
-        dependencies = yaml.safe_load((folder / "integrations.yml").read_text())["atoms_pending_integrations"]
+        dependencies = yaml.safe_load((folder / "integrations.yml").read_text())["atoms_integrations"]
         if not isinstance(dependencies, dict) or not dependencies:
             raise ValueError
         pending = []
         for key, value in dependencies.items():
             if (not re.fullmatch(r"[a-z_]+", key) or not isinstance(value, dict)
-                    or set(value) != {"owner", "contract"}
+                    or set(value) != {"owner", "contract", "status"}
                     or not re.fullmatch(r"[A-Z]{3}-[0-9]{3}", value["owner"])
+                    or value["status"] not in ("implemented", "pending")
                     or not isinstance(value["contract"], str) or not value["contract"].strip()):
                 raise ValueError
-            pending.append({"id": key, **value})
+            if value["status"] == "pending":
+                pending.append({"id": key, **value})
         plays = yaml.safe_load((folder / "apply.yml").read_text())
         if len(plays) != 1 or plays[0]["hosts"] != "atoms" or plays[0]["gather_facts"] is not False:
             raise ValueError
@@ -110,7 +72,11 @@ def framework_plan(release_provided=False):
                 if target.is_symlink() or not target.resolve().is_relative_to(folder.resolve()) or not target.is_file():
                     raise ValueError
                 phases[section].append({"name": name, "task_file": path})
-        return {"schemaVersion": 1, "mode": "framework", "canApply": False,
+        producer = all((ROOT / name).is_file() for name in ["scripts/release.mjs", "scripts/release/artifact.mjs", "scripts/verification/primitives.mjs"])
+        if not producer:
+            pending.append({"id": "release_producer", "owner": "GEN-009", "contract": "The real producer and validator must be present."})
+        return {"schemaVersion": 2, "mode": "deployment", "canApply": not pending,
+                "implementationReady": not pending, "targetVerified": False,
                 "deploymentVerified": False, "releaseProvided": release_provided,
                 "phases": phases, "pendingIntegrations": pending}
     except (OSError, ValueError, TypeError, KeyError, IndexError, yaml.YAMLError):
@@ -121,12 +87,12 @@ def print_framework_plan(plan, as_json):
     if as_json:
         print(json.dumps(plan, ensure_ascii=False, indent=2))
         return
-    print("Deployment framework plan: canApply=false, deploymentVerified=false")
+    print("Deployment plan: implementationReady=" + str(plan["implementationReady"]).lower() + ", targetVerified=false")
     for section, phases in plan["phases"].items():
         print(section + ":")
         for phase in phases:
             print("  " + phase["name"] + " (" + phase["task_file"] + ")")
-    print("Pending integrations:")
+    print("Pending integrations: " + ("none" if not plan["pendingIntegrations"] else ""))
     for item in plan["pendingIntegrations"]:
         print("  " + item["id"] + " [" + item["owner"] + "]: " + item["contract"])
 
@@ -181,10 +147,13 @@ def clean_environment():
     return env
 
 
-def run(command, timeout=90):
+def run(command, timeout=90, log_path=None):
     """Bounded process group; cancellation never leaves an SSH child running."""
+    log = open(log_path, "xb") if log_path else None
+    if log:
+        os.chmod(log_path, 0o600)
     process = subprocess.Popen(command, cwd=ROOT, env=clean_environment(),
-                               start_new_session=True)
+                               stdout=log, stderr=subprocess.STDOUT if log else None, start_new_session=True)
     try:
         return process.wait(timeout=timeout)
     except (subprocess.TimeoutExpired, KeyboardInterrupt, Cancelled) as error:
@@ -196,6 +165,9 @@ def run(command, timeout=90):
             process.wait()
         print("Deployment command cancelled or exceeded its time limit.", file=sys.stderr)
         return 128 + error.signum if isinstance(error, Cancelled) else 130 if isinstance(error, KeyboardInterrupt) else 124
+    finally:
+        if log:
+            log.close()
 
 
 def require_tools():
@@ -243,6 +215,7 @@ def inventory_path(value):
                    "ansible_ssh_private_key_file", "atoms_https_port", "atoms_backend_port",
                    "atoms_node_binary", "atoms_pnpm_binary", "atoms_nginx_binary",
                    "atoms_tls_certificate", "atoms_tls_key"}
+        allowed.add("atoms_nginx_site_path")
         if not isinstance(host, dict) or not set(host) <= allowed:
             raise InputError("Unsupported inventory fields; use the documented single-server schema.")
         if not isinstance(host["ansible_host"], str):
@@ -281,6 +254,8 @@ def main():
     parser.add_argument("command", nargs="?", default="help")
     parser.add_argument("--inventory")
     parser.add_argument("--release")
+    parser.add_argument("--release-id")
+    parser.add_argument("--env-file")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
     args, unknown = parser.parse_known_args()
@@ -291,16 +266,18 @@ def main():
         return 0
     if args.inventory and args.command not in ("check", "status", "apply"):
         raise InputError("--inventory is only accepted by check/status/apply.")
-    if (args.release or args.json) and args.command not in ("plan", "apply"):
-        raise InputError("--release and --json are only accepted by plan/apply.")
-    if args.command == "apply":
+    if (args.release or args.release_id) and args.command not in ("plan", "apply"):
+        raise InputError("Release selection is only accepted by plan/apply.")
+    if args.release and args.release_id or args.env_file and args.command != "apply":
+        raise InputError("Choose one release selection; --env-file is only accepted by apply.")
+    if args.json and args.command not in ("plan", "apply", "status"):
+        raise InputError("--json is only accepted by plan/apply/status.")
+    if args.release_id:
         try:
-            require_tools()
-        except InputError:
-            raise InputError("DEP-003 framework has pending integrations; run bootstrap and plan. No inventory or artifact was read.") from None
-        plan = framework_plan(bool(args.release))
-        print_framework_plan(plan, args.json)
-        raise InputError("DEP-003 pending integrations prevent apply; no inventory, artifact or server was accessed.")
+            if str(__import__('uuid').UUID(args.release_id)) != args.release_id:
+                raise ValueError
+        except (ValueError, AttributeError):
+            raise InputError("--release-id must be a canonical UUID.") from None
     if args.command == "bootstrap":
         if not (3, 12) <= sys.version_info[:2] <= (3, 14):
             raise InputError("Use control-node Python 3.12–3.14.")
@@ -316,18 +293,27 @@ def main():
                     "-r", str(ROOT / "deploy/requirements.txt")], timeout=300)
     require_tools()
     if args.command == "plan":
-        print_framework_plan(framework_plan(bool(args.release)), args.json)
+        from controller import explicit_release, node_binary
+        node_binary(ROOT)
+        plan = framework_plan(bool(args.release or args.release_id))
+        if args.release:
+            _, identity = explicit_release(ROOT, args.release)
+            plan["artifact"] = {key: identity[key] for key in ("releaseId", "releaseDigest", "platform", "arch", "modulesABI")}
+        print_framework_plan(plan, args.json)
         return 0
     if args.command == "test":
-        return run([sys.executable, "-B", "-m", "unittest", "discover", "-s", "deploy/tests", "-v"], timeout=180)
+        return run([sys.executable, "-B", "-m", "unittest", "discover", "-s", "deploy/tests", "-v"], timeout=600)
     playbook = str(TOOLS / "bin/ansible-playbook")
     if args.command == "validate":
-        for name in ("check", "status", "apply", "validate"):
+        for name in ("check", "status", "deployed-status", "apply", "validate"):
             code = run([playbook, "-i", "atoms,localhost,", "--syntax-check", f"deploy/{name}.yml"])
             if code:
                 return code
         return run([playbook, "-i", "localhost,", "deploy/validate.yml"])
     inventory = inventory_path(args.inventory or str(ROOT / "server.local.yml"))
+    if args.command in ("apply", "status"):
+        from controller import execute
+        return execute(ROOT, args, inventory, run, args.command)
     return run([playbook, "-i", str(inventory), "--limit", "atoms", f"deploy/{args.command}.yml"])
 
 
@@ -341,6 +327,9 @@ if __name__ == "__main__":
         sys.exit(2)
     except OSError:
         print("Local deployment tool could not run; check Python, tools and file permissions.", file=sys.stderr)
+        sys.exit(2)
+    except subprocess.SubprocessError:
+        print("Local deployment preparation failed or timed out; no target success is recorded.", file=sys.stderr)
         sys.exit(2)
     except Cancelled as error:
         sys.exit(128 + error.signum)
