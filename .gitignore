@@ -20,6 +20,7 @@ test-results/
 /output/playwright/
 /.tools/
 /.runtime/
+/frontend/public/template-assets/
 
 # Local-only assignment source material; do not publish.
 /docs/product/assignment.md

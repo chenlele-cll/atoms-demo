@@ -10,6 +10,7 @@
 | `backend/` | Fastify HTTP 服务，拥有自己的依赖、配置、启动入口和构建产物 |
 | 根目录 | workspace 命令、唯一 lockfile、公共开发工具配置与 Agent 入口 |
 | `scripts/` | 仓库级运行和验证脚本；包含端口预检、manager/setup、行为测试、官方安装器副本与浏览器冒烟脚本 |
+| `templates/` | 固定来源的公开模板资产；company-landing 保存适配源码/许可/清单，bundle.mjs 是准备使用的纯格式校验，不是 workspace 应用 |
 | `docs/` | 产品参考、技术决策和工程规范，按英文子目录组织 |
 | `.agents/skills/` | 所有仓库技能及资源的唯一目录；宿主通过原生发现或路径适配读取，来源和职责见 [skills.md](../engineering/skills.md) |
 
@@ -28,6 +29,7 @@
 - 在仓库根目录安装依赖，使用 frozen lockfile 验证可重复安装；依赖调整同时更新声明和唯一 lockfile。
 - TypeScript 的公共编译约束在 [tsconfig.base.json](../../tsconfig.base.json)，应用差异保留在各自配置中；ESLint 使用根目录统一入口。
 - 前后端产物分别写入各自的 `dist/`，生产后端构建排除测试。测试源码随项目维护；依赖目录、构建产物和本地运行产物不入库。
+- 前端 dev/build 先运行 scripts/prepare-company-template.mjs，从模板源生成忽略的 frontend/public/template-assets/company-landing.bundle.json；Vite 将它复制到 dist。模板源码不导入宿主 React 树，预览运行依赖与宿主安装依赖分开，样式提前编译。来源及改动见 [模板适配说明](../../templates/company-landing/ADAPTATIONS.md)。
 
 ## Adding shared code
 

@@ -29,11 +29,12 @@ async function fixture(name, { install = true, tools = true } = {}) {
   await mkdir(dest, { recursive: true });
   for (const file of ['manager.sh', '.nvmrc', '.process-compose-version', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.base.json', 'process-compose.yaml']) await cp(path.join(root, file), path.join(dest, file));
   await mkdir(path.join(dest, 'scripts'));
-  for (const file of ['manager.mjs', 'setup.mjs', 'check-dev-port.cjs']) await cp(path.join(root, 'scripts', file), path.join(dest, 'scripts', file));
+  for (const file of ['manager.mjs', 'setup.mjs', 'check-dev-port.cjs', 'prepare-company-template.mjs']) await cp(path.join(root, 'scripts', file), path.join(dest, 'scripts', file));
+  await cp(path.join(root, 'templates'), path.join(dest, 'templates'), { recursive: true });
   await cp(path.join(root, 'scripts/vendor'), path.join(dest, 'scripts/vendor'), { recursive: true });
   if (tools) await symlink(path.join(root, '.tools'), path.join(dest, '.tools'), 'dir');
   for (const app of ['backend', 'frontend']) {
-    await cp(path.join(root, app), path.join(dest, app), { recursive: true, filter: (source) => !['node_modules', 'dist', '.env'].includes(path.basename(source)) && !path.basename(source).startsWith('.env.') });
+    await cp(path.join(root, app), path.join(dest, app), { recursive: true, filter: (source) => !['node_modules', 'dist', '.env', 'template-assets'].includes(path.basename(source)) && !path.basename(source).startsWith('.env.') });
   }
   if (install) await exec('pnpm', ['install', '--offline', '--frozen-lockfile', '--ignore-scripts'], { cwd: dest, timeout: 60000, maxBuffer: 1024 * 1024 });
   return dest;
