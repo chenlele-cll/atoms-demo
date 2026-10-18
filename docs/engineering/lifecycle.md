@@ -42,7 +42,7 @@ Fastify preClose 先拒绝新生成并对所有活动 Controller 发 SERVER_SHUT
 
 首次 frozen install 后共享契约 dist 可以不存在。scripts/prepare-contracts.mjs 由独立 dev/build/typecheck/test、根 check 及源码 generation:smoke 自动调用；包 build/typecheck 也走该入口。它在同仓库 .runtime/contracts.lock 下以 proper-lockfile 串行准备，与数据库的 generation.lock 用途分开，构建总预算 60 秒；并发入口等待后重查缓存，普通重复不重建。
 
-包源、配置、依赖或同源纯模板规则改变会使缓存过期；输出缺失/内容变化同样重建。构建失败返回非零，不启动 Vite/Fastify；成功发布 ESM/声明和必要纯资产。需要重新运行准备或重启来消费契约源变化，不承诺正在运行的应用自动跨包热更新。生产安装必须分发共用包的 package.json/dist/运行依赖，应用服务不在生产启动时调用 TypeScript 编译器；构建检查和单机测试副本见 [Monorepo](../architecture/monorepo.md#shared-contract-build)。
+包源、配置、依赖或同源纯模板规则改变会使缓存过期；输出缺失/内容变化同样重建。构建失败返回非零，不启动 Vite/Fastify；成功原子发布 ESM/声明和必要纯资产。需要重新运行准备或重启来消费契约源变化，不承诺正在运行的应用自动跨包热更新。生产安装必须分发共用包的 package.json/dist/运行依赖，应用服务不在生产启动时调用 TypeScript 编译器；构建检查和单机测试副本见 [Monorepo](../architecture/monorepo.md#shared-contract-build)。
 
 ## Manager commands
 

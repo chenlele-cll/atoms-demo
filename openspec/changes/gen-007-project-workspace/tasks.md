@@ -64,24 +64,3 @@
 最终选定 change 严格校验、153 个本地文档目标、3 个锚点及 git diff --check 均通过。56 个实现/测试/配置摘要与验收时一致，所属服务已退出，3001/5173/4173 端口已释放；OpenSpec apply 状态为 all_done，12/12 完成。
 
 边界：以上端到端为 source=fixture，使用真实 SDK/工具/存储和外部真实预览验证明确测试输出；不承诺任意模型生成质量。既有真实模型记录独立保留，本轮未调用真实模型。默认 verify/CI 的整合、最终发布部署和真实模型业务验收分别继续由 GEN-008/009/010 完成，不能将本地工作台通过当作整个 Top 1 最终验收。
-
-## Scoped commit verification
-
-2026-10-18，在已有隔离 worktree `gen007-submit`、分支 `feat/gen-007-project-workspace` 上，以 `257321f` 为基线准备 GEN-006 必要基础与 GEN-007。原工作区的文件和 index 未修改；本次仅本地提交，不推送。以上 Implementation evidence 和 GEN-006 原任务证据保持历史原文，其报告路径属于原工作区，不能当成本次隔离树的新执行记录。
-
-范围排除 GEN-002 provider 改动、REV 历史集合接口/schema/迁移/测试、DEP、GEN-008 验证框架/适配器/CI 和本地 OpenCode 配置。保留单版本读取/条件采用、共用预览和完整工作台；共享文件中移除 listVersions 与 history schemas。现有 smoke 保留基线清理/报告逻辑，补共用包运行布局和诊断路由；新 smoke 内联相同的所属进程组清理，不依赖 scripts/verification。根 verify 仍为基线串行命令，新增候选/工作台专项独立执行。
-
-| 本次隔离检查 | 结果 |
-| --- | --- |
-| Node / pnpm | 22.22.2 / 12.11.2 |
-| pnpm install --frozen-lockfile | 通过，4 个 workspace |
-| pnpm check | 完整通过：lint、类型、契约准备 1 项、后端 169 项、前端 32 项，0 失败/取消/跳过；日志 test-results/scoped-check.log |
-| pnpm build | 通过，共用契约和两应用完整生产构建；Vite 保留大 chunk 提示 |
-| pnpm openspec validate gen-007-project-workspace --strict --no-interactive | 通过 |
-| pnpm smoke:workspace | 完整通过 26 个 dev/preview 场景；source=fixture、真实模型 0 次、受控上游 32 次，清理通过；报告 test-results/workspace/57728c93-effc-4f06-8cc6-05873c328b53/report.json |
-| pnpm smoke:candidate | 本轮未完整通过：所有 dev 11 项及 preview 前 4 项通过后被外层终端 120 秒期限取消，清理通过；报告 test-results/candidate-review/c1dd9933-b6e0-4b1c-a762-ba40f9b246e3/report.json |
-| 候选重跑 | 端口 3001 被另一隔离 worktree gen006-review 使用，预检拒绝并保留占用者；报告 test-results/candidate-review/0725db0e-5352-4d54-b7a4-580f8f653f89/report.json |
-
-首次 check 和首次 workspace 调用分别被外层工具的 60/10 秒期限中断；上表使用之后完整结束的执行，未将中断当作通过。候选后的诊断/项目/事件流/模板串行步骤因前项取消而未执行，不计为本轮通过；manager 未重跑。未修改源码的历史组件证据仅作补充，不能替代整个裁剪树验证；真实模型、最终部署和 hosted CI 未运行。
-
-与原 `test-results/gen-007/7f29aacc-ade9-42e2-b0bb-088c626ca6e1/report.json` 的 56 个 sourceHashes 比较，51 个一致，包括全部 36 个前端实现/测试/配置文件。变化为 backend/src/routes/projects.ts、backend/src/storage/store.ts、packages/contracts/src/index.ts（排除历史集合功能），package.json（恢复基线 verify 和最小命令差异），scripts/workspace-smoke.cjs（移除 GEN-008 adapter）。本次重新执行 check/build 和完整工作台专项覆盖裁剪后的应用组合；旧浏览器报告不作为这些变化文件的重新验收。所有新日志、报告与截图仅在本隔离树忽略的 test-results 中保留。

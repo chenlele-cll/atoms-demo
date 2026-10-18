@@ -73,7 +73,3 @@
 集成证据：`test-results/gen-004/5c95b987-2689-4985-9915-397d93be1baa/report.json` 及同目录 check/smoke/projects/live 日志，含实际源码 SHA-256。项目恢复报告：`test-results/project-persistence/d6cef616-82c1-4d43-9bb3-5a4429786766/report.json`，status/cleanup 均 passed；所属测试 HTTP 服务、浏览器、子进程和临时 CLI 构建目录已清理。独立 live 数据库按设计保留用于后续本地复核，未访问或修改生产项目。
 
 后续 GEN-005 接入公开运行/事件/取消/项目级并发与硬杀恢复，GEN-006 接入候选预览/采用，GEN-009/010 验证最终部署与真实交互；本轮不能描述为完整 Top 1 已通过。
-
-## Frozen GEN-004 scope
-
-This GEN-004-only snapshot retains the historical evidence above. The live quote used the separately pending GEN-002 compatible-provider configuration/client/probe changes; those changes are excluded here. This snapshot retains HEAD fixed official OpenAI configuration and cannot reproduce that compatible-provider acceptance until GEN-002 is included. Historical full-worktree check results do not establish results for this split snapshot. No tests, builds, install, lint, verification or live calls were run while preparing these frozen groups, as explicitly requested. GEN-003 task 6.1 completion and its pending evidence edits are excluded.

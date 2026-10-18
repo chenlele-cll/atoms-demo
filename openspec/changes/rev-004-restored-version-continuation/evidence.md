@@ -39,9 +39,3 @@
 ## REV-005 Handoff
 
 受控证据证明上下文、传输、存储和实际预览交互边界；不能证明真实供应商对恢复后需求的理解与生成质量。REV-005 仍需独立真实模型验收：从已明确恢复的版本续写、读取该快照、排除未来需求、检验业务交互、明确采用并重开；未知用量保持 null，不自动补跑或重计费。本次不修改 REV-005 的完成状态。
-
-## Frozen Frontend Selection Scope
-
-Prepared from fe75e5d on main. This second batch depends on the first history UI/API/controller batch, which includes the inherent REV-004 confirmed-GET continuation guards and frontend/test/restored-continuation.test.ts. The first batch must be committed before this batch is staged. With both batches committed, frontend integration is included rather than deferred; this note does not claim they have already been committed during preparation. Browser fixtures, smoke:history and scoped documentation are included in this second batch.
-
-All historical evidence and checked REV-004 tasks above are retained from the full mixed working tree on 2026-10-18, not accepted as results for this frozen selection. No tests, build, install, lint, typecheck, smoke, OpenSpec validation or other verification commands were run during preparation. REV-003 tasks remain unchecked; no live or deployment acceptance is asserted. The backend-only scope at fe75e5d remains in Git history; this note supersedes its frontend deferral only when both prepared batches are committed.

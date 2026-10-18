@@ -32,7 +32,7 @@
 
 - [x] 6.1 GEN-005 串行运行 frozen install、`pnpm check`、`pnpm test:manager`、`pnpm smoke`（含 build）、新增 `pnpm smoke:generation-stream` 和受影响的 GEN-003 项目恢复回归；相同源码已有有效结果时复用，不重复消耗真实模型额度。验证：记录命令/退出码、实际差异、首帧/中止/恢复观察，默认 check 与 CI 均无真实调用；执行 `pnpm openspec validate gen-005-generation-stream-control --strict --no-interactive`、链接检查和 `git diff --check`，区分已验证传输、未验证真实模型/预览/线上部署。
 
-## Implementation evidence (historical full-worktree record)
+## Implementation evidence
 
 2026-10-18，本轮完成公开生成/查询/取消、真实 SSE、准入及同库服务生命周期。实现位置：backend/src/contracts/generations.ts、routes/generations.ts、generation/manager.ts、generation/stream.ts、storage/ownership.ts，以及原 service/store/app/server 的组合接入；schema v2 仅增加查询索引。依赖固定 proper-lockfile 4.1.2 与开发类型 4.1.4。GEN-004 原 CLI/内核契约与候选不采用规则保留。
 
@@ -55,7 +55,3 @@
 README、Development、Lifecycle、Monorepo、Verification 与工作入口同步了接口、限制、关闭/重启及验收前提。严格校验本 change、150 个本地文档目标、6 个新增 generation 锚点与 git diff --check 均通过。测试所属进程已关闭，3001/5173/4173 无监听；其他任务的未提交改动及并行工作保持原状，本轮未执行提交、推送、归档或发布。
 
 边界：本轮 source=fixture；跨字节解码额外使用明确的中文/emoji SSE 注释夹具，不伪造产品活动。真实模型经公开接口、候选编译/交互、工作台 UI 和最终服务器反代未在本轮验收。GEN-004 既有真实模型证据独立保留，不重复消耗额度；GEN-005 完成不表示完整 Top 1 已完成。
-
-## Frozen GEN-005 scope
-
-This GEN-005-only snapshot is based on 4d9229013d07089ba766acaf606b9f0f4e9bc0cc. The checked items and implementation evidence above preserve the earlier full-worktree record, not acceptance of this split snapshot. GEN-006 candidate preview/adoption and shared-contract extraction, GEN-002 compatible-provider configuration/acceptance, deployment/preflight/REV work and GEN-003/004 task updates are excluded. HEAD already provides the generation service preparation/acceptance split, quota support, local request factory and run error codes; those files need no new changes. No tests, builds, install, lint, verification or live calls were run while preparing these frozen groups, as explicitly requested. Source/import inspection is the only dependency basis; this isolated snapshot and each intermediate commit remain execution-unverified.

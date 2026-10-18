@@ -59,7 +59,3 @@ full 的浏览器结果为 diagnostics 3、template 13、projects 6、generation
 边界：source=fixture，实际 SDK/工具/SQLite/外部 Sandpack/进程验证已运行，不能推断任意真实模型质量。真实模型、最终部署及 hosted CI 均为 not-run；本轮没有提交、推送、归档、发布或触发 GitHub Actions。
 
 最终选定 change 严格校验、全仓 28 项结构校验、112 个本地文档目标、2 个入口锚点及 git diff --check 均通过。两个运行均已确认所属清理成功，3001/5173/4173 已释放。OpenSpec apply 为 all_done，10/10 完成。
-
-## Commit preparation scope
-
-2026-10-18，本次仅按 GEN-008 范围准备冻结提交快照。以上 Implementation evidence 保留原执行记录；其源摘要、混合工作区测试数量和通过结果不代表本次筛选后的提交树已重新验证。本次没有运行安装、测试、构建、lint、OpenSpec、浏览器或其他验收命令。共享文件仅选 GEN-008 内容，排除 GEN-002、GEN-009/DEP 与 REV 实现及上游任务历史删除；input.mjs 不纳入 GEN-009 的 deploy/nginx.conf.template 输入规则。

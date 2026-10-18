@@ -31,9 +31,3 @@ REV-004：恢复确认后的版本续写。2026-10-18 已实施并完成受控 S
 
 - [x] 4.1 依赖就绪后串行运行 `pnpm smoke`（含 build）及届时已实现的 generation-stream/candidate/workspace 相关专项，覆盖恢复→确认→明确续写→实际预览交互→明确采用→重开，并记录 fixture、实际命令/结果和未通过项；仅在触及生命周期时增加对应回归。
 - [x] 4.2 向 REV-005 交付实际 SDK 历史/工具请求、parent/max+1、immutable old 数据、失败不改 current、恢复零生成和未知零新增计费的证据矩阵，以及真实模型待验范围；执行 scoped `pnpm openspec validate rev-004-restored-version-continuation --strict --no-interactive` 与 status，完整真实验收只由 REV-005 收口，不把规划/fixture 标为 live。
-
-## Frozen Frontend Selection Scope
-
-Prepared from fe75e5d on main. This second batch depends on the first history UI/API/controller batch, which includes the inherent REV-004 confirmed-GET continuation guards and frontend/test/restored-continuation.test.ts. The first batch must be committed before this batch is staged. With both batches committed, frontend integration is included rather than deferred; this note does not claim they have already been committed during preparation. Browser fixtures, smoke:history and scoped documentation are included in this second batch.
-
-All historical evidence and checked REV-004 tasks above are retained from the full mixed working tree on 2026-10-18, not accepted as results for this frozen selection. No tests, build, install, lint, typecheck, smoke, OpenSpec validation or other verification commands were run during preparation. REV-003 tasks remain unchecked; no live or deployment acceptance is asserted. The backend-only scope at fe75e5d remains in Git history; this note supersedes its frontend deferral only when both prepared batches are committed.

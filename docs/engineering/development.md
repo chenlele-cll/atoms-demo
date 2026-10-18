@@ -77,7 +77,7 @@ prepareGeneration 负责归属、重放、基线/布局/配置预检；acceptPre
 
 ## Project persistence
 
-@atoms/contracts 是前后端共用会话/目录/项目/消息/版本/快照/采用/run/SSE/安全错误的 Zod 契约来源，类型由 schema 推导；backend/src/contracts/projects.ts 保留可信模板限制并重导出公开契约。项目路由局部设置 Fastify validatorCompiler / serializerCompiler；请求 strict 拒绝额外字段，输出经显式 DTO 和 schema 投影，不返回 ownerSessionId、token 摘要、SQL 行或原始异常。健康契约保持独立，禁止浏览器导入后端实现。
+@atoms/contracts 是前后端共用会话/目录/项目/消息/版本/快照/采用/run/SSE/安全错误的 Zod 契约来源，类型由 schema 推导；backend/src/contracts/projects.ts 只保留可信模板 ID 等后端限制并重导出公开契约。项目路由局部设置 Fastify validatorCompiler / serializerCompiler；请求 strict 拒绝额外字段，输出经显式 DTO 和 schema 投影，不返回 ownerSessionId、token 摘要、SQL 行或原始异常。健康契约保持独立。GEN-006 的实际浏览器消费者已提前提取公开契约，禁止复制规则或导入后端实现。
 
 中立 templates/bundle.mjs 的纯文件规则随准备复制到后端部署资产；Zod 快照校验调用相同规则并重算 SHA-256，限制规范化虚拟路径、入口/样式/许可/运行配置、精确依赖版本、64 文件和总 UTF-8 2 MiB。新建项目核对当前可信目录；历史快照按自身身份验证，读取不依赖当前模板。保存候选须匹配基础版本的来源、入口和依赖，不改变 currentVersionId；结构合法不证明编译通过。
 
@@ -143,23 +143,14 @@ UI 规范由 [DESIGN.md](../../DESIGN.md) 导航到现有设计 skill；在该�
 
 按 [Verification](./verification.md) 收集实际结果；版本控制操作遵循 [Git workflow](./git-workflow.md)。
 
-## History workspace
-
-REV-003 uses the existing workspace controller, version API client and SnapshotPreview. History loads 20 entries on demand and uses exclusive beforeSequence pages; failures retain the cursor and entries, refresh changes the list epoch, and project GET calibrates current badges. Current, inspected history and candidate identities remain separate. Complete validated snapshots supply both source and preview; immutable detail metadata never overrides newer project facts.
-
-Restore and adoption share the controller operation lock with generation. Restore confirmation freezes project/activation/target/expected/digest/attempt and requires this preview attempt to be compiled without a known error. Identity, current, task or preview changes invalidate confirmation. Only expectedCurrentVersionId is posted; restore eligibility is independent of adoption parent rules. An acknowledged POST survives a failed calibration GET; an uncertain POST performs one GET and then offers manual queries, with no automatic write replay. 401 clears private state, while 404 removes inaccessible content.
-
-The dependent REV-004 continuation guard waits for a successful current GET after acknowledged restoration. Unknown operations and failed fact reads prevent new generation; a different current preserves draft and inspected selection. Original unknown generation retries keep their request payload. No view, preview, restore or refresh starts generation automatically. This section describes selected implementation, not new validation evidence.
-
-## Generation duration
-
-2026-10-18 按用户要求修订：MODEL_TIMEOUT_MS 默认 0，不建立模型操作/生成服务的累计截止或定时器；本地显式配置也为 0。正值 1000–2147483647ms 为主动选择的有限总期限，最大值仅防止 Node timer 整数溢出；0 不受该时长约束。模型请求、工具执行、提交检查仍使用同一取消信号；用户取消、原连接断开、服务关闭和所有权丢失可中止活动请求，禁止迟到保存。步骤、token、文件/上下文、并发/配额限制保持不变。
-
-前端 SSE 不再默认为 150 秒累计截止，持续收到 10 秒心跳的长任务可一直等待。10 秒首响应、25 秒无数据和 Nginx 相邻读取期限是连接故障检测，不是任务累计时长。状态查询和 iframe 编译是各自独立操作，仍有故障期限。live 验收同样不再用 10 分钟全局计时器终止真实生成；无总期限时需明确取消或 SIGINT/SIGTERM 结束，清理继续有界。
-
 ## Model invocation observations
 
 GEN-010 的 model/observation.ts 维护服务端私有观测白名单。生产真实 fetch 的调用边界记录 dispatch，原样返回响应时只读取允许的 HTTP status/x-request-id 元数据，SDK 结束时记录可得的 responseModel 与 token usage；不克隆/消费正文，不增加请求、重试或超时预算。每个 attempt 使用独立 UUID，与 generation runId/projectId/requestId 和 1–6 step 关联，三个请求标识不混用。
 
 app.ts 通过既有结构化 logger 写 modelObservation；观察失败不会改变产品结果，也不进入公开 SSE/HTTP 契约或数据库迁移。允许字段为事件、关联 ID、配置/响应模型、HTTP 状态、受限 req_ 请求标识、耗时、nullable 用量与安全错误分类。原始 headers/body/cause、提示词、工具正文、文件、推理与认证值均禁止；字段缺失为 null。x-request-id 只供排查，不能证明业务或预览成功，依据见 [OpenAI 官方请求追踪](https://developers.openai.com/api/reference/overview#debugging-requests)。
 
+## Generation duration
+
+2026-10-18 按用户要求修订：MODEL_TIMEOUT_MS 默认 0，不建立模型操作/生成服务的累计截止或定时器；本地显式配置也为 0。正值 1000–2147483647ms 为主动选择的有限总期限，最大值仅防止 Node timer 整数溢出；0 不受该时长约束。模型请求、工具执行、提交检查仍使用同一取消信号；用户取消、原连接断开、服务关闭和所有权丢失可中止活动请求，禁止迟到保存。步骤、token、文件/上下文、并发/配额限制保持不变。
+
+前端 SSE 不再默认为 150 秒累计截止，持续收到 10 秒心跳的长任务可一直等待。10 秒首响应、25 秒无数据和 Nginx 相邻读取期限是连接故障检测，不是任务累计时长。状态查询和 iframe 编译是各自独立操作，仍有故障期限。live 验收同样不再用 10 分钟全局计时器终止真实生成；无总期限时需明确取消或 SIGINT/SIGTERM 结束，清理继续有界。
