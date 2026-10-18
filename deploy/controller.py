@@ -157,7 +157,7 @@ def prepare(root, options, action="apply"):
     run_id = str(uuid4())
     work = private_directory(root, [".runtime", "deploy", "runs", run_id])
     kit = work / "kit"
-    files = ["deploy/artifact.mjs", "scripts/release/artifact.mjs", "scripts/verification/primitives.mjs",
+    files = ["deploy/artifact.mjs", "scripts/release/artifact.mjs", "scripts/verification/primitives.mjs", "templates/bundle.mjs",
              "deploy/policy.py", "deploy/storage.py", "deploy/system.py", "deploy/runtime.py", "deploy/remote.py"]
     for name in files:
         destination = kit / name

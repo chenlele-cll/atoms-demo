@@ -16,7 +16,41 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "deploy"))
 import controller
 from policy import InputError
-from test_transaction import package
+
+
+def package(stage):
+    folder = stage / ("package-" + str(uuid4()))
+    files = {"backend/package.json": json.dumps({"name": "@atoms/backend", "type": "module"}),
+             "backend/dist/server.js": "// fixture", "backend/dist/app.js": "// fixture",
+             "backend/node_modules/.pnpm/contracts/dist/index.js": "export const snapshotSchema={};",
+             "frontend/index.html": "fixture", "deploy/nginx.conf.template": "fixture"}
+    for name, value in files.items():
+        target = folder / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(value)
+    (folder / "backend/node_modules/@atoms").mkdir()
+    (folder / "backend/node_modules/@atoms/contracts").symlink_to("../.pnpm/contracts")
+    script = """
+import {prepareBackendTemplate} from './scripts/prepare-company-template.mjs';
+import {sealRelease} from './scripts/release/artifact.mjs';
+import {copyFile, mkdir, readFile, writeFile, chmod, readdir} from 'node:fs/promises';
+const folder=process.argv[1], assets=folder+'/backend/dist/template-assets';
+await prepareBackendTemplate({outputDirectory:assets,sourceDirectory:'templates/company-landing'});
+// Match the historical generated module's single-identity export.
+const runtime=await readFile(assets+'/bundle.mjs','utf8');
+const {companyTemplateIdentity}=await import('file://'+assets+'/bundle.mjs');
+await writeFile(assets+'/bundle.mjs',runtime.slice(0,runtime.indexOf('export const templateIdentities'))+'export const companyTemplateIdentity = '+JSON.stringify(companyTemplateIdentity)+';\\n');
+await mkdir(folder+'/frontend/template-assets');
+await copyFile(assets+'/company-landing.bundle.json',folder+'/frontend/template-assets/company-landing.bundle.json');
+async function modes(dir){await chmod(dir,0o755);for(const item of await readdir(dir,{withFileTypes:true})){if(item.isDirectory())await modes(dir+'/'+item.name);else if(item.isFile())await chmod(dir+'/'+item.name,0o644);}}
+await modes(folder);
+await sealRelease(folder,JSON.parse(process.argv[2]));
+"""
+    identity = {"releaseId": str(uuid4()), "sourceDigest": "2" * 64, "lockDigest": "3" * 64,
+                "buildDigest": "4" * 64, "pnpm": "pnpm@12.11.2"}
+    subprocess.run([controller.node_binary(ROOT), "--input-type=module", "-e", script,
+                    str(folder), json.dumps(identity)], cwd=ROOT, check=True, capture_output=True, text=True, timeout=30)
+    return folder
 
 
 class ControllerTests(unittest.TestCase):
@@ -61,7 +95,7 @@ class ControllerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
             for name in (".nvmrc", "package.json", "deploy/artifact.mjs", "scripts/release/artifact.mjs",
-                         "scripts/verification/primitives.mjs", "deploy/policy.py", "deploy/storage.py",
+                         "scripts/verification/primitives.mjs", "templates/bundle.mjs", "deploy/policy.py", "deploy/storage.py",
                          "deploy/system.py", "deploy/runtime.py", "deploy/remote.py"):
                 destination = root / name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -81,6 +115,14 @@ class ControllerTests(unittest.TestCase):
                 self.assertEqual(json.loads((work / "environment.json").read_text()), {})
                 local.assert_not_called()
                 explicit.assert_not_called()
+            release = package(root)
+            manifest = (release / "release.json").read_bytes()
+            for action in ("metadata", "verify"):
+                result = subprocess.run([controller.node_binary(root), str(work / "kit/deploy/artifact.mjs"),
+                                         action, str(release)], cwd=temporary, capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertTrue(json.loads(result.stdout)["ok"])
+            self.assertEqual((release / "release.json").read_bytes(), manifest)
 
     def test_portable_archive_does_not_synthesize_metadata_and_preserves_manifest_inputs(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -110,7 +152,7 @@ class ControllerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             for name in (".nvmrc", "package.json", "deploy/artifact.mjs", "scripts/release/artifact.mjs",
-                         "scripts/verification/primitives.mjs", "deploy/policy.py", "deploy/storage.py",
+                         "scripts/verification/primitives.mjs", "templates/bundle.mjs", "deploy/policy.py", "deploy/storage.py",
                          "deploy/system.py", "deploy/runtime.py", "deploy/remote.py"):
                 target = root / name
                 target.parent.mkdir(parents=True, exist_ok=True)
