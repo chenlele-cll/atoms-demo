@@ -99,15 +99,19 @@ iframe 固定跨源、sandbox="allow-scripts allow-same-origin"、空 allow、no
 
 ## Project workspace
 
-GEN-007 的 `/` 创建，`/projects/:projectId` 读取私有工作台，连接检查迁至 `/diagnostics/connection`，未知路由报错。首页会话初始化 single-flight；私有直达先 GET，不自动初始化会话。401 清除私有内存、草稿、消息与待确认信封并停止请求，回首页后由用户明确重新开始。
+GEN-007 的 `/` 明确创建，`/projects/:projectId` 读取私有工作台；未知路径明确报错，旧连接检查在 `/diagnostics/connection`。私有直达先 GET，不自动初始化会话。首页 session Promise single-flight；401 清空私有内存、草稿、已加载消息与待确认信封，停止旧请求；本次应用内返回首页后由用户明确重新开始。新会话 201 也清理旧身份数据。原生链接保留新标签/修饰键，SPA 导航使用 pushState/popstate 与 activation 隔离。
 
-原消息 `afterSequence` 协议保持 `{items,nextAfterSequence}`；新增 `direction=backward&limit=50&beforeSequence=N`，before 为可选正安全整数、排他 `<N`，与 after 互斥。同事务读取 latestSequence，返回 `{items,nextBeforeSequence,latestSequence}`，items 始终升序。客户端按持久 ID 去重并按序号合并，不伪造历史工具活动。
+消息读取兼容原 `afterSequence` 响应 `{items,nextAfterSequence}`。新增 `direction=backward&limit=50&beforeSequence=N`，before 为可选正安全整数、排他 `<N`，与 after 互斥；同一读取事务取最新序号，items 始终升序，返回 `{items,nextBeforeSequence,latestSequence}`，无更早页为 null。客户端按持久 ID 去重、sequence 排序，最新页与已加载更早页合并；受理气泡只用于暂时校准，不伪造历史工具活动。`latestRun` 含恢复用 request/base/status/result 元数据，不含需求或工具正文。
 
-POST SSE 使用 eventsource-parser 4.1.2，缓冲 8192 字符，业务帧最多 8 KiB/128 帧，总传输 320 KiB（含心跳）；首响应/空闲/总期限分别 10/25/150 秒。fatal UTF-8 解码并校验 accepted 首帧、项目/request/base/run 关联、连续 seq、唯一终态及内部关联。拒绝 id/retry/未知字段、截断、双终态；JSON running/terminal 分支独立校验。EOF/200 不等于完成，不自动重连 POST。
+JSON 客户端复用 GEN-006 的 10 秒期限、16 MiB 成功/64 KiB 错误正文上限、UTF-8/JSON/schema/摘要验证；任务 JSON 上限 256 KiB。平台错误仅使用固定分类说明，丢弃原始网络或未知服务消息。创建没有幂等协议，未知响应只保留原输入并刷新真实列表，不自动重发或按名称猜项目。创建响应在离页后到达也不得跳回或开始生成；模型配置失败时保留已创建项目和原需求。
 
-控制器由应用拥有，StrictMode 订阅重放和聊天/预览/源码切换不取消任务，真实离页中止旧 activation。202 取消只表示请求，已提交成功优先。丢帧或未知状态只查原 requestId，每 2 秒、最多 75 次/150 秒；隐藏暂停、离页结束、429 尊重 Retry-After。只有明确手动重试复用原 payload，新尝试才分配新 ID。
+POST SSE 使用 eventsource-parser 4.1.2：parser 缓冲 8192 字符，业务帧 UTF-8 8 KiB，业务最多 128 帧，总传输最多 320 KiB（含心跳），首响应 10 秒/空闲 25 秒/总计 150 秒。逐块 fatal UTF-8 解码，同步校验 accepted 首帧、项目/request/base/run 关联、严格连续 seq、唯一终态及终态内部关联；拒绝 id/retry/未知字段、截断与双终态。200 terminal JSON 与 202 running JSON 独立验证，200/EOF 不构成成功。不自动重连 POST；截止时间和离页清除 reader/计时器/监听，迟到事件不能修改其他 activation。
 
-sessionStorage 仅保存项目/request/base/prompt/时间信封，最多 20 项/24 小时，先限原串再解析；不可用时仅内存并显示限制。草稿、阅读位置和已加载消息按项目保存在内存，不承诺刷新恢复草稿。新生成始终基于已采用版本；工作台复用 GEN-006 采用状态。源码来自所选完整快照，仅 select/pre/code 文本，只读、不注入 HTML、不执行源码。
+控制器由应用拥有，StrictMode 订阅重放和聊天/预览/源码切换不取消任务；真实离页关闭最初连接，服务端按 GEN-005 取消未完成运行。202 取消仅表示请求，提交后的成功优先。丢帧或未知状态只查询原 requestId，每 2 秒、最多 75 次/150 秒，隐藏暂停、离页结束，429 尊重 Retry-After；限额/404/503 保持待确认，只有明确手动重试复用原 payload，新尝试才分配新 ID。另一个标签页的 latestRun 不能替换本地原请求。
+
+sessionStorage 仅存项目/request/base/prompt/时间信封，最多 20 项、24 小时，先限制原串再解析；不可用时仅内存并显示恢复限制。草稿、已加载消息和阅读位置按项目保存在当前应用内存，不承诺刷新恢复草稿，也不持久化整个对话或代码。恢复以服务端事实为准。候选与当前双重身份、编译与采用独立，工作台复用 GEN-006 的 useCandidateReview；所选未采用候选不能被误用为下一条基线。
+
+源码来自所选版本完整快照，只读 select/pre/code 文本，不用 HTML 注入，不执行源码，不实现编辑/保存。切换版本同步文件映射；长源码仅在 pre 内横向滚动。iframe 只接收代码和依赖，平台会话、提示词与后端凭据不得传入。输入与响应式规则由 owning design skill 维护。
 
 ## UI and handoff
 
