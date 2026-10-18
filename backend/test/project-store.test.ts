@@ -14,7 +14,7 @@ test('real file migrations are idempotent, WAL/foreign keys enabled and future s
   const session = f.store.createSession();
   const sql = new Database(f.filename);
   t.after(() => sql.close());
-  assert.equal(sql.pragma('user_version', { simple: true }), 1);
+  assert.equal(sql.pragma('user_version', { simple: true }), 2);
   assert.equal(sql.pragma('journal_mode', { simple: true }), 'wal');
   migrate(sql); migrate(sql);
   const row = sql.prepare('SELECT token_hash FROM sessions').get();

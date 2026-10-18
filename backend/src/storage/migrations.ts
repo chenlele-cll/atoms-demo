@@ -41,6 +41,9 @@ CREATE TABLE messages (
 );
 CREATE INDEX project_owner_order ON projects(owner_session_id,updated_at DESC,id DESC);
 CREATE INDEX run_project_order ON generation_runs(project_id,started_at DESC,id DESC);
+` }, { version: 2, sql: `
+CREATE INDEX run_started ON generation_runs(started_at,project_id);
+CREATE INDEX run_active_project ON generation_runs(project_id) WHERE status='running';
 ` }] as const;
 
 export function migrate(db: Database.Database, definitions: readonly { version: number; sql: string }[] = migrations) {

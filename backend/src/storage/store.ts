@@ -51,6 +51,25 @@ export class ProjectStore {
   // One connection belongs to one application; no module-level database.
   constructor(private readonly db: Database.Database) {}
   close() { if (this.db.open) this.db.close(); }
+  setBusyTimeout(milliseconds: number) { this.db.pragma(`busy_timeout = ${Math.max(0, Math.floor(milliseconds))}`); }
+  recoverRunning() {
+    return storageOperation(() => this.db.transaction(() => this.db.prepare(
+      "UPDATE generation_runs SET status='interrupted',error_code='PROCESS_RESTARTED',finished_at=max(started_at,?) WHERE status='running'"
+    ).run(new Date().toISOString()).changes).immediate());
+  }
+  generationState(ownerId: string, projectId: string, requestId: string) {
+    return storageOperation(() => {
+      this.owned(ownerId, projectId);
+      const row: unknown = this.db.prepare(`SELECT ${runColumns} FROM generation_runs WHERE project_id=? AND request_id=?`).get(projectId, requestId);
+      if (row === undefined) throw new ProjectError('NOT_FOUND');
+      const run = parse(runSchema, row);
+      return { run, baseVersion: this.version(projectId, run.baseVersionId),
+        candidateVersion: run.resultVersionId ? this.version(projectId, run.resultVersionId) : null };
+    });
+  }
+  hasRunning(projectId: string) {
+    return storageOperation(() => Boolean(this.db.prepare("SELECT 1 FROM generation_runs WHERE project_id=? AND status='running' LIMIT 1").get(projectId)));
+  }
 
   createSession(now = Date.now()) {
     return storageOperation(() => {
