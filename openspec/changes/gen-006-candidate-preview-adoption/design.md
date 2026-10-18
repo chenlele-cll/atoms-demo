@@ -65,7 +65,7 @@ GEN-001 已规划完整文件集合和 Sandpack 基线；GEN-004/005 的 succeed
 
 复用 GEN-001 锁定的 sandpack-react，而非引入第二种执行环境。此次已核对 2.20.0 发布包：实际编译完成使用 `done` 与拼写为 `compilatonError` 的字段，`connected` 还可能清空库内 error，因此不能只读取库的 idle/error 状态判断成功。使用当前 client 作用域的 SDK 监听，严格要求 `done` 且 compilatonError===false，并结合本轮已知错误。文档中的 [client hook](https://sandpack.codesandbox.io/docs/advanced-usage/hooks#usesandpackclient) 提供实例级监听与卸载方式。
 
-构造受控 iframe，预先设置 sandbox="allow-scripts allow-same-origin"、空的额外权限 allow、no-referrer 和说明性 title，保留运行所需能力，不开放弹窗、顶层导航、下载和硬件访问。已核对关联 client 发布包：仅在未提供 sandbox 属性时才添加其宽权限默认值，实施仍以实际 lockfile 解析版本及浏览器属性验收为准。bundler 来源为平台固定的外部来源，拒绝与平台同源或来自候选配置的任意地址。
+构造受控 iframe，预先设置 sandbox="allow-scripts allow-same-origin allow-forms"、空的额外权限 allow、no-referrer 和说明性 title，保留运行所需能力，不开放弹窗、顶层导航、下载和硬件访问。2026-10-18 真实 OpenCode 端到端测试发现普通表单提交被原 sandbox 阻止，因此补充 allow-forms；历史验收结果不改写。已核对关联 client 发布包：仅在未提供 sandbox 属性时才添加其宽权限默认值，实施仍以实际 lockfile 解析版本及浏览器属性验收为准。bundler 来源为平台固定的外部来源，拒绝与平台同源或来自候选配置的任意地址。
 
 跨源 iframe、平台 SameSite/HttpOnly cookie、Origin 与私有 API 校验共同保护平台。只向预览传代码/依赖，不传会话、对话或后端配置；预览 postMessage 永远不能触发采用。SDK 消息限当前 client，其他窗口及旧 client 的反馈不消费；同一预览中的消息仍属浏览器观察，不能成为后端信任根。
 

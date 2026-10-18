@@ -105,7 +105,7 @@ storage/store.ts 管理 sessions、projects、versions、messages、generation_r
 
 SnapshotPreview 供模板与候选页复用，仅接收已校验的快照和项目/版本/摘要/attempt 键，使用固定外部 bundler 与快照依赖，不补默认示例。useSandpackClient 作用域内的实际 done 且 compilatonError=false 才成为 compiled；load/connected 不成功。状态机拒绝旧键事件，编译/运行错误及 60 秒超时锁定该轮，文档重载使旧成功无效；主动重试才新实例。已 compiled 后 runtimeError 禁用采用。卸载清除 timer/监听，晚到的异步 client 被销毁；每次切换最多一个 iframe。
 
-iframe 固定跨源、sandbox="allow-scripts allow-same-origin"、空 allow、no-referrer；不传平台凭据/对话，不由 postMessage 触发采用。编译结果不是服务端信任根，采用接口不接收 verified/compiled 字段。页面把 loadingSnapshot/loadError/compiling/compiled/compileError/runtimeError/timeout 与 idle/submitting/confirmed/conflict/unknown/error 分开。用户点击且收到有效确认才声明采用；丢响应后查询当前事实，旧版本仍当前保持 unknown，其他选择为 conflict，不自动改 expected 重发。刷新与采用共用同步互斥保护，刷新期间禁用首次采用及手动重试，避免迟到的旧读取覆盖确认结果。手动同载荷重试依赖服务端幂等和 CAS；运行错误不回写旧版本。
+iframe 固定跨源、sandbox="allow-scripts allow-same-origin allow-forms"、空 allow、no-referrer；allow-forms 支持生成应用内普通表单的 submit 事件与浏览器校验，顶层导航和弹窗仍未授权。不传平台凭据/对话，不由 postMessage 触发采用。编译结果不是服务端信任根，采用接口不接收 verified/compiled 字段。页面把 loadingSnapshot/loadError/compiling/compiled/compileError/runtimeError/timeout 与 idle/submitting/confirmed/conflict/unknown/error 分开。用户点击且收到有效确认才声明采用；丢响应后查询当前事实，旧版本仍当前保持 unknown，其他选择为 conflict，不自动改 expected 重发。刷新与采用共用同步互斥保护，刷新期间禁用首次采用及手动重试，避免迟到的旧读取覆盖确认结果。手动同载荷重试依赖服务端幂等和 CAS；运行错误不回写旧版本。
 
 ## Project workspace
 

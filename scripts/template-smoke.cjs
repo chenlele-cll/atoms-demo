@@ -222,7 +222,7 @@ async function normal(origin, mode) {
       try {
         await page.goto(`${origin}/templates/company-landing`);
         let frame = await ready(page);
-        assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts allow-same-origin');
+        assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts allow-same-origin allow-forms');
         assert.equal(await page.locator('iframe').getAttribute('referrerpolicy'), 'no-referrer');
         await noOverflow(page);
         const child = page.frames().find((item) => item.parentFrame() === page.mainFrame() && item.url().includes('sandpack.codesandbox.io'));

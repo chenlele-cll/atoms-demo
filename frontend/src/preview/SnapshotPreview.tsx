@@ -51,7 +51,7 @@ function SnapshotFrame({ instanceKey, title, onState, baseline }: { instanceKey:
       data-preview-state={baseline ? failed ? 'error' : state.status === 'compiled' ? 'ready' : 'compiling' : state.status}>
       {state.message}
     </p>
-    <iframe src={BUNDLER_URL} ref={iframe} title={title} sandbox="allow-scripts allow-same-origin" allow="" referrerPolicy="no-referrer"
+    <iframe src={BUNDLER_URL} ref={iframe} title={title} sandbox="allow-scripts allow-same-origin allow-forms" allow="" referrerPolicy="no-referrer"
       className={styles.frame} aria-busy={state.status === 'compiling'} hidden={failed}
       onLoad={() => transition({ key: instanceKey, type: 'load' })} />
   </>;

@@ -190,7 +190,10 @@ async function mode(name, port) {
       await frame.locator('header').getByRole('link', { name: 'FAQ', exact: true }).click();
       const faq = frame.getByRole('button', { name: 'Is this template free?', exact: true }); await faq.focus(); await faq.press('Space');
       assert.equal(await faq.getAttribute('aria-expanded'), 'true');
-      assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts allow-same-origin');
+      assert.equal(await page.locator('iframe').getAttribute('sandbox'), 'allow-scripts allow-same-origin allow-forms');
+      await frame.getByLabel('表单测试值', { exact: true }).fill('confirmed');
+      await frame.getByRole('button', { name: '提交表单测试', exact: true }).click();
+      assert.equal(await frame.getByTestId('preview-form-result').textContent(), 'confirmed');
       assert.equal(await page.locator('iframe').getAttribute('allow'), ''); assert.equal(await page.locator('iframe').getAttribute('referrerpolicy'), 'no-referrer');
       const previewDocument = page.frames().find(frame => frame.parentFrame() === page.mainFrame() && frame.url().includes('sandpack.codesandbox.io'));
       assert.notEqual(new URL(previewDocument.url()).origin, origin);
