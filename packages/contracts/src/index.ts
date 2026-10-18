@@ -121,7 +121,10 @@ const integerQuery = (fallback: string, max: number, min: number) => z.string().
   .transform(Number).pipe(z.number().int().min(min).max(max));
 const cursorSchema = z.string().max(256).refine(value => { try { decodeCursor(value); return true; } catch { return false; } }, 'Invalid cursor');
 export const listQuerySchema = z.strictObject({ limit: integerQuery('20', 50, 1), cursor: cursorSchema.optional() });
-export const messageQuerySchema = z.strictObject({ limit: integerQuery('20', 50, 1), afterSequence: integerQuery('0', Number.MAX_SAFE_INTEGER, 0) });
+export const messageQuerySchema = z.union([
+  z.strictObject({ direction: z.literal('backward'), limit: integerQuery('50', 50, 1), beforeSequence: z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)).optional() }),
+  z.strictObject({ limit: integerQuery('20', 50, 1), afterSequence: integerQuery('0', Number.MAX_SAFE_INTEGER, 0) }),
+]);
 export const projectParamsSchema = z.strictObject({ projectId: idSchema });
 export const projectListSchema = z.object({ items: z.array(projectSchema), nextCursor: cursorSchema.nullable() });
 export const messageListSchema = z.object({ items: z.array(messageSchema), nextAfterSequence: z.number().int().nonnegative().nullable() });
