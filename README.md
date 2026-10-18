@@ -4,7 +4,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 项目目标是让用户通过自然语言生成和修改网页应用，交互预览结果，并保存项目与代码版本。
 
-当前已建立工程骨架、健康接口与前端连通检查。尚未实现应用生成、模型调用、数据库持久化和生成应用预览。
+当前已有健康接口、前端连通检查和企业官网模板的隔离基线预览。尚未实现真实项目生成、数据库持久化、生成候选采用和完整工作台，Top 1 尚未完成。
 
 ## 环境
 
@@ -36,6 +36,7 @@ pnpm dev:frontend
 ```
 
 - 前端：<http://127.0.0.1:5173>。
+- 企业官网模板基线：<http://127.0.0.1:5173/templates/company-landing>，也可从首页进入；不需要后端或模型密钥。
 - 后端健康接口：<http://127.0.0.1:3001/api/health>。
 - 前端请求相对路径 `/api/health`，Vite 将 `/api` 原样代理到后端。
 - 页面上的“检查后端连接”按钮验证 HTTP 状态与响应结构；后端不可用时显示失败反馈。
@@ -63,6 +64,21 @@ pnpm dev:frontend
 
 当前三个命令均明确返回“未配置外部基础设施”（JSON 为 `not_configured`），重复执行成功，不安装工具或启动服务。真实服务在需要时通过 `INF-002` 接入 Docker Compose；检测到尚未接入的 Compose 配置时明确失败，见 [基础设施约定](./docs/engineering/lifecycle.md#infrastructure-contract)。
 
+## 企业官网模板基线
+
+复用固定提交的 MIT 开源模板 `leoMirandaa/shadcn-landing-page`，在与宿主不同源的 Sandpack iframe 中运行 React 18；宿主仍使用 React 19 和 CSS Modules。基线保留导航、价格展示、FAQ、主题和手机菜单，明确标注样例内容；没有注册、支付、订阅或咨询发送服务。来源、逐文件校验值和适配记录见 [模板说明](./templates/company-landing/ADAPTATIONS.md)。
+
+前端 dev/build 自动从本地固定源码预编译 Tailwind、内嵌图片并准备文件集合，普通启动不拉取上游分支。也可在根目录单独运行：
+
+```sh
+pnpm prepare:template
+pnpm test:template
+pnpm build
+pnpm smoke:template
+```
+
+`smoke:template` 需要已构建产物、Chrome、空闲的 5173/4173 端口及外部 Sandpack/依赖下载网络，自行管理所属 dev/preview 服务，不启动上游应用。模板源、纯格式校验与生成资产分开维护；生成 JSON 被忽略并随前端构建复制到 dist。预览按实际编译结果显示状态，资源/格式/编译/超时故障可主动重新加载；重新加载重置预览临时状态。完整覆盖与实际证据见 [Verification](./docs/engineering/verification.md#template-baseline)。
+
 ## 配置
 
 默认值无需创建 `.env` 即可运行。如需覆盖，可参考各应用的 `.env.example` 在对应目录创建 `.env`：
@@ -75,11 +91,11 @@ pnpm dev:frontend
 
 通过 pnpm 启动后端时，其工作目录为 `backend/`；原生 Node 环境加载器读取其中的 `.env`，进程已有变量优先。修改配置后重启对应进程。
 
-前端不配置任何秘密。将来接入模型与数据库时，只在后端添加相应配置与校验。`API_PROXY_TARGET` 不会自动配置服务器上的生产反向代理。
+前端不配置任何秘密。`API_PROXY_TARGET` 不会自动配置服务器上的生产反向代理。
 
 ## 验证
 
-完整本地验收统一运行：
+既有工程与生命周期验收运行；模板专项另按上节执行：
 
 ```sh
 pnpm verify
@@ -157,6 +173,8 @@ frontend/              React + Vite 前端应用
     App.module.css     页面样式
     main.tsx           浏览器入口
     styles.css         全局基础样式
+    templates/         公开模板资源加载与解析
+    template-baseline/ 企业官网模板基线页及隔离预览
   vite.config.ts       开发与预览代理
 backend/               Fastify 后端应用
   AGENTS.md            后端任务路由与局部边界
@@ -182,6 +200,10 @@ docs/
     core-paths.md      核心路径、模板生成策略、范围与验收目标
     assignment.md     原始题目整理稿，仅本地保留
 scripts/
+  prepare-company-template.mjs    模板样式/资源准备与原子输出
+  prepare-company-template.test.mjs 模板准备与边界行为测试
+  template-smoke.cjs              模板真实浏览器回归
+  template-smoke-control.test.mjs  模板验收的端口归属与信号清理检查
   check-dev-port.cjs   托管服务启动前检查固定端口，不终止占用者
   manager.mjs          短时运行的生命周期命令，调用 Process Compose
   setup.mjs            无需 node_modules 的 bootstrap / doctor / infra 入口
@@ -190,6 +212,7 @@ scripts/
   vendor/process-compose/         原样固定的官方安装器及许可证
   smoke.cjs            浏览器端到端冒烟脚本（pnpm smoke）
 manager.sh            本地 bootstrap/doctor/start/stop/restart/status/logs/infra 入口
+templates/            中立模板文件集合校验及固定来源的 company-landing 资产
 process-compose.yaml  原生本地开发进程与就绪、退出、日志配置
 .process-compose-version        固定 Process Compose 工具版本
 AGENTS.md              开发与交付约定

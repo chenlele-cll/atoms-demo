@@ -15,7 +15,7 @@
 - `@/` 改为可解析的相对导入；main 仅加载合并编译后的 styles.css，显式检查 root，保留 React 18 入口。Tailwind 配置改为 .cjs，由仓库准备脚本执行；保留上游样式与主题。
 - 五张 PNG 和本地 SVG 在准备时转换为 data URI 虚拟模块，替换 GitHub/pravatar 远程头像，不依赖外部图片请求。未使用运行时 Tailwind CDN。
 - 删除 Newsletter，不保留无服务的订阅表单或 `Subscribed!` 日志。套餐/CTA 改为真实的价格、FAQ、特点等页内导航，Footer 明确样例价格、团队和评价及未连接服务。
-- 预览中的外部社交占位链接改为样例团队说明/页内导航，避免受限 iframe 中伪装可用的外部跳转。
+- 预览中的外部社交占位链接改为样例团队说明/页内导航，源代码和许可入口放在宿主页面，避免受限 iframe 中伪装可用的外部跳转。
 - 主题改为预览实例内存，监听系统主题变化并清理监听，不读写 `vite-ui-theme` 或其他 localStorage 键。
 - 手机菜单和关闭/回到顶部控件有可访问名称，补充对话框说明；使用 Radix 的键盘/焦点恢复行为。回到顶部清理滚动监听。
 - 保留 HeroCards 布局，宽度从固定 700px 改为容器内自适应；手机端缩小 Hero/标识字号，价格使用单列零最小宽度轨道、徽章可换行及简短按钮，避免窄屏溢出。补充 44px 控件、焦点和 reduced-motion。没有新增报价、筛选或其他应由后续模型生成的功能。
@@ -26,4 +26,4 @@
 
 纯数据格式/校验与 SHA-256 内容标识由 [bundle.mjs](../bundle.mjs) 统一维护，限制 64 个文件、正文合计 2 MiB；虚拟源码位于 /src/，其他文件仅为固定的 package.json、HTML 和 LICENSE，不接受宿主路径。digest 是内容标识，不是安全签名。新 Tailwind 类不会自动存在于基线 CSS；后续生成应按 GEN-004 的文件策略使用普通 CSS。
 
-运行 `pnpm test:template` 检查准备与文件集合边界。隔离预览及浏览器验收将在后续提交接入。
+通过 `/templates/company-landing` 查看隔离基线。运行依赖下载与 Sandpack bundler 仍需要外部网络；这不是离线交付或完整 Top 1。实际验收范围和结果记录在 [GEN-001 tasks](../../openspec/changes/gen-001-company-template-baseline/tasks.md) 与 [Verification](../../docs/engineering/verification.md)。

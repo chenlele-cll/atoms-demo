@@ -25,6 +25,8 @@
 .panel button:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .status { color: var(--muted); }
 .error { color: var(--error); }
+.templateLink { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); }
+.templateLink:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
 @media (max-width: 600px) {
   .page { padding: var(--space-3); }

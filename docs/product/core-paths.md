@@ -58,7 +58,7 @@ Top 1 优先获得开发与验证时间。Top 2 和 Top 3 复用同一套项目�
 | 品牌电商独立站 | [jefercort e-commerce](https://github.com/jefercort/e-commerce/tree/ec492d15f5614fa7f297714352e5c001f3daddd1)，[MIT](https://github.com/jefercort/e-commerce/blob/ec492d15f5614fa7f297714352e5c001f3daddd1/LICENSE)，React、Vite，包含商品浏览和购物车 | 核对筛选、详情和总额计算；商品来源依赖外部 API，接入时评估改为本地样例数据；订单与账号页面不能作为真实交易或认证能力 |
 | 个人作品集与个人主页 | [veldig react-engineer-portfolio](https://github.com/veldig/react-engineer-portfolio/tree/d859a81d974fc276943f0c398991746b75a1a413)，[MIT](https://github.com/veldig/react-engineer-portfolio/blob/d859a81d974fc276943f0c398991746b75a1a413/LICENSE)，React、Vite，配置驱动个人介绍与项目展示 | 核对作品交互、移动端、图片与简历资源，以及 Tailwind 和动画依赖的预览兼容性 |
 
-上述来源已核对许可证和依赖清单，尚未完成运行及预览适配验证，属于初筛候选。所列建站平台用于判断场景覆盖和交互方向，不作为其中模板已获得代码复用授权的依据。选定模板时保存仓库地址、固定提交、许可证与改动说明，先完成预览接入及浏览器验收，再将其列为可用模板。
+企业官网来源已由 GEN-001 引入固定资产并接入隔离基线页；逐文件来源与预览适配见 [模板说明](../../templates/company-landing/ADAPTATIONS.md)，实际验收范围见 [GEN-001 记录](../../openspec/changes/gen-001-company-template-baseline/tasks.md)。品牌电商和作品集仍是未接入的初筛候选。所列建站平台用于判断场景覆盖和交互方向，不作为其中模板已获得代码复用授权的依据。选定模板时保存仓库地址、固定提交、许可证与改动说明，运行验收通过后再将其列为可用模板；这不代表真实模型改造已通过。
 
 Atoms 项目可通过 [Remix](https://help.atoms.dev/en/articles/12129575-remix-a-project) 继续构建；官方 [Export](https://help.atoms.dev/en/articles/12129574-share-a-project) 可下载代码 ZIP，当前需要 Pro。若使用这一来源，先确认具体项目的导出权限和复用授权；平台内可 Remix 不作为代码具有开源许可证的依据。首轮不依赖取得 Atoms 账号或导出能力。
 

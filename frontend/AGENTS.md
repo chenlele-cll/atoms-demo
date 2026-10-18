@@ -17,7 +17,8 @@ An HTTP-client-only change does not require loading the UI design contract unles
 
 ## Source map and local boundaries
 
-- `src/main.tsx` initializes the browser application. `src/App.tsx` currently composes the connection-check screen.
+- `src/main.tsx` initializes the browser application. `src/App.tsx` keeps the connection-check home and routes `/templates/company-landing` to the isolated template baseline.
+- `src/templates/` loads the public template bundle through the neutral `templates/bundle.mjs` contract; `src/template-baseline/` owns host UI and actual Sandpack compile/error/retry states. Do not import template React components into the host tree.
 - `src/api/` contains HTTP clients and response parsing. Reuse the boundary pattern in `src/api/health.ts` for timeouts, HTTP failures, and unknown response data.
 - Component styles use CSS Modules; `src/styles.css` contains global foundations. Keep detailed tokens and interaction rules in the design contract. Update that contract when introducing tokens or patterns; keep `DESIGN.md` as navigation.
 - Browser source uses browser APIs and relative `/api` paths for platform requests. It must not import backend source, database code, Node-only APIs, or server secrets.
@@ -33,6 +34,6 @@ pnpm --filter @atoms/frontend typecheck
 pnpm --filter @atoms/frontend build
 ```
 
-These scoped commands help local development and diagnosis. Final checks follow the central verification guide; UI changes need running-browser checks at narrow widths and in error states. There is currently no frontend unit-test script, and passing backend tests alone does not verify UI behavior.
+The dev/build scripts prepare the fixed template asset before Vite. Root `pnpm test:template` checks preparation and bundle boundaries; `pnpm smoke:template` requires a prior build and exercises actual preview/browser behavior. These scoped commands help local development and diagnosis. Final checks follow the central verification guide; UI changes need running-browser checks at narrow widths and in error states. There is currently no frontend unit-test script, and passing backend tests alone does not verify UI behavior.
 
 When frontend commands or configuration change, update the owning configuration, environment template where applicable, and README; do not duplicate their details here.

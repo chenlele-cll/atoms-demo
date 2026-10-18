@@ -21,7 +21,8 @@
     "verify": "./manager.sh doctor && pnpm check && pnpm test:infra && pnpm test:manager && pnpm smoke && pnpm openspec validate --all --strict --no-interactive",
     "smoke": "pnpm build && node scripts/smoke.cjs",
     "prepare:template": "node scripts/prepare-company-template.mjs",
-    "test:template": "node --test scripts/prepare-company-template.test.mjs"
+    "test:template": "node --test scripts/prepare-company-template.test.mjs",
+    "smoke:template": "node scripts/template-smoke.cjs && node --test scripts/template-smoke-control.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

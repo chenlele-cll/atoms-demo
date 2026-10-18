@@ -1,8 +1,13 @@
 import { useState } from 'react';
 import { checkBackend } from './api/health';
 import styles from './App.module.css';
+import { TemplateBaseline } from './template-baseline/TemplateBaseline';
 
 export function App() {
+  return window.location.pathname === '/templates/company-landing' ? <TemplateBaseline /> : <ConnectionCheck />;
+}
+
+function ConnectionCheck() {
   const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState('尚未检查后端连接。');
   const [failed, setFailed] = useState(false);
@@ -33,6 +38,7 @@ export function App() {
       <p className={styles.intro}>
         React 前端与 Fastify 后端已分别建立。当前页面用于验证工程和服务连接，应用生成功能将在后续实现。
       </p>
+      <p><a className={styles.templateLink} href="/templates/company-landing">打开企业官网模板 →</a></p>
       <section className={styles.panel} aria-labelledby="connection-title">
         <h2 id="connection-title">服务连接</h2>
         <p>通过 <code>GET /api/health</code> 检查后端。</p>

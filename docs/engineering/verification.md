@@ -94,6 +94,32 @@ Node 读取 .nvmrc，pnpm 读取 package.json，依赖使用唯一 lockfile 执�
 
 交互式浏览器验收复用仓库内官方 Playwright Skill，通过 `pnpm playwright` 使用独立具名会话。调用、Chrome 前提与固定版本见 [Browser verification](./skills.md#browser-verification)；先读快照再引用元素，覆盖相关状态、窄屏与错误路径，记录实际观察，不能只凭截图命令成功就声称布局正确。交互产物写入忽略的 `output/playwright/`，不替代上述固定 smoke 回归。
 
+## Template baseline
+
+`GEN-001` 的企业官网基线入口为 `/templates/company-landing`，保留首页连接检查，不需要后端或模型配置。它是固定开源模板预览，不是模型成果；来源、许可和改动见 [模板说明](../../templates/company-landing/ADAPTATIONS.md)。
+
+```sh
+pnpm test:template
+pnpm smoke
+pnpm smoke:template
+```
+
+`test:template` 使用 Node 测试器和隔离目录，覆盖重复准备内容一致、预编译样式/内嵌图片、来源/许可/入口缺失、非法路径/符号链接、未声明或无法解析的导入、数量/UTF-8 字节限制、依赖漂移、digest 篡改及失败时保留上一完整输出。源码准备命令为 `pnpm prepare:template`，前端 dev/build 自动执行；删除生成 JSON 后正常构建会重新准备。
+
+`smoke:template` 不自行 build；先完成 `pnpm build` 或带构建的 `pnpm smoke`，确保公开资源与 dist 的标识一致。需要系统 Chrome、5173/4173 空闲和外部 Sandpack/包下载网络。它串行启动自己的 dev/preview，从新浏览器上下文直接访问/刷新基线并检查：
+
+- 开发与构建产物的 1280/320/375px 交互、宿主/iframe 实测宽度和溢出；导航、FAQ、主题与宿主隔离、手机菜单、键盘与焦点恢复。
+- 实际 SDK 对应实例的编译完成/失败，不用 iframe load 或定时器报告成功；不依赖远程头像，页面没有未连接的订阅表单。
+- 延迟实际 SDK runtime 模块、在初始化期间快速重试；新预览正常运行，旧实例没有遗留 message 监听器。
+- 资源 404、非法 JSON、结构/路径错误、内容标识正确但有实际语法错误，以及新上下文中阻断 bundler 后的截止时间错误；移除每个故障后主动重试恢复。
+- 成功场景无宿主/frame 未捕获异常，预期故障单独归类；端口冲突非零且不停止占用者，退出/信号只清理本次所属进程和浏览器。
+
+同一命令随后运行 template-smoke-control.test.mjs：真实 HTTP 占用者保持可用，SIGINT/SIGTERM 在浏览器和前端启动后中断，分别检查 130/143 退出码、最终取消报告、十秒内清理和端口释放。Chrome 的默认信号退出交由 runner 接管，避免提前终止而漏写报告。
+
+产物在忽略的 `test-results/template-baseline/<runId>/`，包含本次 digest、用例结果、清理状态、截图及私有诊断；交互复核使用独立 `gen-001` Playwright 会话，截图在 output/playwright/。外部 SDK 的非关键统计请求失败不代表模板交互通过或失败，真实编译和控件断言仍分别检查。
+
+当前 `pnpm verify` 和既有 CI 保留原工程/生命周期/连通覆盖，不自动执行新增模板专项；完整模板验收需显式运行上述命令，后续 GEN-008 再整合。manager 的隔离副本补充模板源/准备脚本并排除旧生成资产，以验证独立 dev 命令不依赖原工作目录缓存。实际结果和未验证范围见 [GEN-001 任务记录](../../openspec/changes/gen-001-company-template-baseline/tasks.md)，模板通过不能替代模型、持久化、完整 Top 1 或公网部署验收。
+
 ## Lifecycle scenarios
 
 `OPS-001` 的原生配置验收使用真实进程，检查双服务与单服务启动、HTTP readiness、健康响应及前端 API 代理、所属进程故障恢复、就绪持续失败、外部端口冲突和停止后的进程清理。核对状态时同时检查是否运行、就绪、退出码与重试次数，不把 `process list` 命令成功当作项目健康；注意 [原生状态及就绪限制](./lifecycle.md#behavior-and-limits)，退出码可能属于前一轮进程。原生记录见 [OPS-001](../../openspec/changes/ops-001-process-compose/tasks.md)。
