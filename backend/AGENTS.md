@@ -23,9 +23,10 @@ For changes to a public HTTP contract, also read the [frontend guide](../fronten
 - `src/config.ts` parses configuration at the boundary. Pass validated values to application behavior instead of scattering unparsed environment reads through handlers.
 - `src/model/config.ts` validates model settings lazily at explicit invocation; `client.ts` owns bounded single-step Responses calls, deadlines, cancellation and safe failures. `probe-cases.ts` contains public in-memory examples; runner/CLI report capability evidence without an HTTP endpoint. See [model verification](../docs/engineering/verification.md#model-access).
 - `src/routes/` owns HTTP routing and contracts. Keep generated-file work, model execution, and database access in concrete modules when those features are first implemented.
+- `src/contracts/projects.ts` owns Zod project/session/snapshot/DTO contracts. `src/storage/` owns file migrations and synchronous short transactions; `src/templates/` loads the backend's prepared catalog. Project route tests explicitly inject a store/catalog; bare buildApp does not open a database. The application owns and closes an injected store.
 - `test/` contains Node test-runner behavior tests using Fastify injection. Preserve the production build's exclusion of test sources and the existing NodeNext `.js` import convention.
 - Use the backend's structured logger and the logging contract. Untrusted input and provider output require runtime validation; compiler types are insufficient.
-- Generated code must execute outside the host backend process and receive no backend credentials. AI SDK/OpenAI/Zod are backend dependencies; probe files are validated in memory and never executed. Database and project-generation behavior remain unimplemented.
+- Generated code must execute outside the host backend process and receive no backend credentials. AI SDK/OpenAI/Zod and SQLite/cookie/rate-limit libraries are backend dependencies. Project persistence is implemented; actual model generation and candidate adoption remain future work. Never turn internal fixture records into claimed model activity.
 
 ## Available commands
 

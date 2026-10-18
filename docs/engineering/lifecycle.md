@@ -18,6 +18,10 @@
 
 后端读取自身目录下的 `.env`，进程已有变量优先，配置经过解析后监听。前端开发及 preview 的代理目标来自其配置；生产反向代理由部署环境提供。
 
+GEN-003 正式后端先验证 DATABASE_PATH / APP_ORIGINS，加载相对 server 模块的 template-assets，再打开 SQLite 并迁移，最后监听。数据库默认相对 backend cwd 为 ../data/atoms.sqlite，不在 dist 中；启用外键、WAL、5000ms busy_timeout，迁移事务取得写锁后重读 user_version。高于支持版本、迁移/文件/资产/监听失败均安全报错且释放连接，不删库或切换内存；正常 SIGINT/SIGTERM 关闭 Fastify 与所属连接并保留数据。
+
+buildApp 无参数仍不打开磁盘数据库；项目测试显式传入 store/catalog，应用 onClose 负责关闭。后端 dev/typecheck/test 准备 src/template-assets，build 同时准备自身 dist 资源；运行 start 需要完整 backend/dist、平台依赖及可写持久目录。项目读写不调用模型。
+
 模型探针通过 workspace 使用 backend 工作目录及同样的原生环境加载规则，帮助不读取 `.env`。模型配置仅在显式探针或未来生成请求边界解析，manager、健康检查、默认自动化入口不触发模型。一次样例的全部请求共用截止时间；SIGINT/SIGTERM 中止底层请求、停止后续样例、输出脱敏最终报告并退出 130/143。构建入口为 `backend/dist/model/probe.js`；配置、请求上限与报告含义见 [README](../../README.md#模型能力探针) 和 [Model access](./verification.md#model-access)。
 
 当前已有 manager 的七个开发命令、infra 空配置入口和 Process Compose 配置。本地编排不接管生产服务器。

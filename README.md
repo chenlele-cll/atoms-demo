@@ -4,7 +4,7 @@ React + Vite 前端与 Fastify 后端，同一仓库、独立启动、独立构�
 
 项目目标是让用户通过自然语言生成和修改网页应用，交互预览结果，并保存项目与代码版本。
 
-当前已有健康接口、前端连通检查、企业官网模板的隔离基线预览，以及后端模型客户端与独立能力探针。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。尚未实现真实项目生成、数据库持久化、生成候选采用和完整工作台，Top 1 尚未完成。
+当前已有健康接口、前端连通检查、企业官网隔离模板预览、后端模型能力探针，以及匿名会话下的 SQLite 项目保存与读取接口。模型协议和失败处理使用本地替身测试；真实 OpenAI 能力仍待 API 配置与显式验收。真实项目生成、候选采用和完整工作台尚未实现，Top 1 尚未完成。
 
 ## 环境
 
@@ -87,6 +87,8 @@ pnpm smoke:template
 | --- | --- | --- | --- |
 | `backend/.env` | `HOST` | `127.0.0.1` | 后端监听地址 |
 | `backend/.env` | `PORT` | `3001` | 后端端口，范围 1–65535 |
+| `backend/.env` | `DATABASE_PATH` | `../data/atoms.sqlite` | 相对 backend 工作目录解析的持久数据文件；禁止内存/空路径及 backend/dist 内路径 |
+| `backend/.env` | `APP_ORIGINS` | `http://127.0.0.1:5173,http://127.0.0.1:4173` | 逗号分隔的精确来源；公网必须 HTTPS，不与开发 HTTP 混用 |
 | `backend/.env` | `OPENAI_API_KEY` | 无；仅模型调用时必填 | 独立 OpenAI Platform 项目的服务端凭据 |
 | `backend/.env` | `MODEL_ID` | 无；模板建议 `gpt-6.1-sol` | 显式指定模型；无权限时失败，不自动切换 |
 | `backend/.env` | `MODEL_TIMEOUT_MS` | `60000` | 每项完整能力样例的时限，整数 1000–120000ms |
@@ -96,6 +98,23 @@ pnpm smoke:template
 通过 pnpm 启动后端时，其工作目录为 `backend/`；原生 Node 环境加载器读取其中的 `.env`，进程已有变量优先。修改配置后重启对应进程。
 
 模型配置延迟到显式调用边界校验；后端启动、健康检查和模板预览不需要密钥。前端不配置任何秘密。`API_PROXY_TARGET` 不会自动配置服务器上的生产反向代理。
+
+## 项目数据 API
+
+按以下顺序，通过同源 `/api` 请求使用；目前没有项目工作台 UI。所有 POST 必须为 JSON，并带 APP_ORIGINS 中的 Origin。脚本调用需显式提供 Origin，并保存/回传 cookie；浏览器 fetch 使用同源默认凭据。
+
+| 请求 | 请求内容与响应 |
+| --- | --- |
+| POST /api/session | `{}`；201 新会话，200 复用；`{expiresAt}` |
+| GET /api/templates | 公开 `{items:[{id,version,digest,name,category,source}]}`，不返回代码或设置会话 |
+| POST /api/projects | `{templateId,templateVersion,templateDigest,title}`；201 `{project,currentVersion,latestRun:null}` |
+| GET /api/projects?limit=20&cursor=… | 当前会话的 `{items,nextCursor}`；最多 50 条元数据，不含代码 |
+| GET /api/projects/:projectId | `{project,currentVersion,latestRun}`，当前版本含完整 snapshot |
+| GET /api/projects/:projectId/messages?afterSequence=0&limit=20 | `{items,nextAfterSequence}`，按序号升序，最多 50 条 |
+
+新项目原子保存服务端可信模板 v0，消息为空、没有生成记录；模板冲突返回 409，客户端不能注入文件或所有者。匿名 cookie 为 HttpOnly、SameSite=Strict、Path=/api，有效期 30 天，复用不延长；HTTPS 配置启用 Secure。数据库只保存 token 摘要。清理 cookie 或到期后会失去旧项目入口，没有找回或认领接口；数据不会自动删除。有效会话访问他人的项目与不存在项目均为 404，无会话为 401。
+
+会话初始化默认每 IP 每分钟 30 次，创建项目 10 次；每会话最多 20 个项目。超限分别返回带 Retry-After 的 429 或项目配额 409；请求体最多 8 KiB。错误统一 `{error:{code,message},requestId}`，私有响应 no-store。当前只提供内部消息/run/候选存储操作，不提供公开写入、版本采用或分享接口；候选保存保持当前版本不变。契约与限制见 [Development](./docs/engineering/development.md#project-persistence)，真实验证见 [Verification](./docs/engineering/verification.md#project-persistence)。
 
 ## 模型能力探针
 
@@ -150,6 +169,10 @@ pnpm --filter @atoms/backend build
 
 ## 服务器运行
 
+后端 dev/typecheck/test 在执行前准备 src/template-assets，build 先准备 src，再编译并准备 dist/template-assets；三个目标从同一中立模板源产生一致内容，前后端构建各写自己的目标。后端部署包含整个 backend/dist 及在目标平台安装的运行依赖，不需要 frontend 源码或 public 目录。better-sqlite3 13.0.3 自带 N-API 原生预构建文件；安装后仍需验证实际打开/读写，不跨系统复制 node_modules。
+
+后端监听前加载自身模板目录并迁移真实 SQLite 文件；初始化、缺资产、不支持 schema 或监听失败均非零退出。正常停止保留数据库，启动不清库、不回退到内存，不自动降级高版本数据。数据库应放在 dist 之外的持久目录。
+
 在目标服务器安装相同工具链并执行安装、检查和构建。不要将本机的 node_modules 直接复制到不同操作系统。
 
 启动生产后端：
@@ -202,6 +225,10 @@ backend/               Fastify 后端应用
     server.ts          环境加载、监听与退出
     config.ts          服务配置解析
     routes/health.ts   健康接口
+    routes/projects.ts 匿名会话、目录和项目 API
+    contracts/         Zod 输入/输出与快照契约
+    storage/           SQLite 迁移、事务和内部写入
+    templates/         后端可信模板目录
   test/                接口与配置行为测试
 docs/
   README.md            文档索引与目录约定
