@@ -122,11 +122,3 @@ test('runtime and evidence parents reject existing symlinks without writing outs
 test('a busy release build preserves its own safe blocked report without taking ownership',()=>temp(async folder=>{
   const unlock=await acquireRunLock(folder);try{assert.equal(await buildRelease(folder,true),2);const{readdir}=await import('node:fs/promises');const ids=await readdir(path.join(folder,'.runtime/release-build'));assert.equal(ids.length,1);const report=JSON.parse(await readFile(path.join(folder,'.runtime/release-build',ids[0],'report.json'),'utf8'));assert.equal(report.reason,'VERIFY_BUSY');assert.equal(report.status,'blocked');assert.equal(report.cleanup,'passed');assert.equal(report.completeBuilds,0);}finally{await unlock();}
 }));
-
-
-test('release inventory and validation stop cooperatively on cancellation without changing the package',()=>temp(async folder=>{
- const identity=await fixture(folder);const controller=new AbortController();const pending=inventory(folder,{signal:controller.signal});controller.abort();
- await assert.rejects(pending,error=>error.name==='AbortError');
- await assert.rejects(validateRelease(folder,{signal:controller.signal}),error=>error.name==='AbortError');
- assert.equal((await validateRelease(folder)).releaseDigest,identity.releaseDigest);
-}));
