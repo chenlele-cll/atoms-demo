@@ -1,0 +1,31 @@
+schema: spec-driven
+
+context: |
+  Language: zh-CN
+  All artifacts must be written in zh-CN.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  Atoms Demo uses independent React/Vite and Fastify/Node TypeScript apps over /api.
+  Run OpenSpec CLI examples from the repository root as pnpm openspec <arguments>;
+  this uses the pinned project CLI and checked-in project-scoped CLI settings.
+  Read AGENTS.md for task routing, README.md for current capabilities, and the
+  affected application's AGENTS.md before changing it. Documentation owners are
+  listed in docs/README.md; architecture, development, verification, lifecycle,
+  Git operations, and skill provenance remain in their existing documents.
+  Preserve unrelated pending changes and the user's existing authorization scope.
+  Keep docs/product/assignment.md, secrets, and local tool output out of public artifacts.
+
+rules:
+  proposal:
+    - State the requested outcome, bounded scope, and non-goals; distinguish observed behavior from proposed capability.
+  design:
+    - Reuse existing architecture and documentation owners; justify each new dependency with a current need.
+  specs:
+    - Use observable scenarios and English OpenSpec structural headings; do not equate schema validation with runtime correctness.
+  tasks:
+    - Preserve the user's task code and three-digit number, using schema-local numbering for subtasks; do not create a parallel task tracker.
+    - Include concrete acceptance checks chosen from docs/engineering/verification.md; check off work only after it actually happens.
+
+operations:
+  apply:
+    guidance:
+      - Use the existing verification and Git workflow documents; report actual results and preserve unrelated changes.

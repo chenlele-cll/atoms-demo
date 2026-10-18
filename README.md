@@ -20,6 +20,8 @@ pnpm install --frozen-lockfile
 
 依赖安装共用根目录 lockfile。框架依赖分别声明在前后端的 package.json 中，不需要分别执行安装。
 
+OpenSpec 使用仓库固定版本，通过 `pnpm openspec` 运行；安装的工作流和变更使用方式见 [OpenSpec 指南](./docs/engineering/openspec.md)。该入口使用项目范围的 CLI 设置，不改变个人全局配置。
+
 ## 本地开发
 
 在两个终端分别启动：
@@ -136,6 +138,7 @@ docs/
     lifecycle.md      起停行为与后续接口约定
     git-workflow.md   Git 工作流
     skills.md         技能来源与使用范围
+    openspec.md       OpenSpec 入口、工件和配置归属
   product/
     assignment.md     原始题目整理稿，仅本地保留
 scripts/
@@ -143,7 +146,10 @@ scripts/
 AGENTS.md              开发与交付约定
 DESIGN.md              平台设计入口，链接到详细设计 skill 与现有启动页约定
 .opencode/skills/atoms-frontend-design/   已确认的 Lovable 风格及工作台设计规范
-.agents/skills/        固定上游 Git 技能
+.opencode/skills/openspec-*/     官方生成的 OpenCode 工作流入口
+.agents/skills/        固定上游 Git 技能与官方生成的 OpenSpec 技能
+.config/openspec/      项目范围的官方 OpenSpec CLI 设置
+openspec/              项目上下文与变更工件
 README.md              本文件
 package.json           workspace 根：命令、工具链版本、共享开发依赖
 pnpm-workspace.yaml    workspace 成员声明与 pnpm 设置
@@ -164,6 +170,7 @@ Skills 的完整文件保存在本仓库中：复用上游的 Git 技能位于 `
 | [atoms-frontend-design](./.opencode/skills/atoms-frontend-design/SKILL.md) | 前端设计、实现与评审，约束平台配色、组件、工作台布局、交互状态、响应式与可访问性 | 基于 awesome-design-md 和 open-design 中的 Lovable 设计分析，按 Atoms 场景编写；来源链接与适配说明见 skill 正文 |
 | [git-commit](./.agents/skills/git-commit/SKILL.md) | 用户请求提交时分析差异、按范围暂存并生成 Conventional Commit | 复用 `github/awesome-copilot` 原版，固定上游提交 |
 | [yeet](./.agents/skills/yeet/SKILL.md) | 用户明确请求暂存、提交、推送并创建 PR 时使用 | 复用 `openai/skills` 原版；执行前遵循仓库 Git 工作流 |
+| [OpenSpec workflows](./docs/engineering/openspec.md#skill-entry-points) | 规划、实施、修订、同步、验证与归档 | 固定 CLI `1.14.3`，官方 Codex/OpenCode 适配生成同一组七个工作流入口 |
 
 进行平台 UI 开发前，先阅读 [DESIGN.md](./DESIGN.md)，再加载对应 skill；工具无法自动发现时，直接读取仓库内的 `SKILL.md`。该设计 skill 已用于建立设计规范，产品工作台尚未实现。
 
@@ -171,6 +178,7 @@ Skills 的完整文件保存在本仓库中：复用上游的 Git 技能位于 `
 
 - [Agent 工作入口](./AGENTS.md)：按任务选择文档、Skills 与检查；前后端细则分别见 [前端指南](./frontend/AGENTS.md) 和 [后端指南](./backend/AGENTS.md)。
 - [Git 工作流](./docs/engineering/git-workflow.md)：任务编号、分支命名、提交格式、验证及合并约定。
+- [OpenSpec 指南](./docs/engineering/openspec.md)：项目 CLI、上下文、技能与变更工件。
 - [Skills 说明](./docs/engineering/skills.md)：上游技能来源、固定版本、触发条件和升级方式。
 - [生命周期指南](./docs/engineering/lifecycle.md)：Process Compose 开发编排、现有起停入口与后续 manager、基础设施契约。
 - [文档索引](./docs/README.md)：产品参考、技术决策及 Monorepo、开发、验证和生命周期规范的职责与阅读时机。

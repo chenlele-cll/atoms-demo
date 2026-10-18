@@ -9,6 +9,7 @@
   "scripts": {
     "dev:frontend": "pnpm --filter @atoms/frontend dev",
     "dev:backend": "pnpm --filter @atoms/backend dev",
+    "openspec": "XDG_CONFIG_HOME=\"$PWD/.config\" openspec",
     "build": "pnpm -r build",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "pnpm -r typecheck",
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@fission-ai/openspec": "1.14.3",
     "eslint": "10.12.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.7",

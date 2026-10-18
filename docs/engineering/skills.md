@@ -2,6 +2,8 @@
 
 Git 技能复用上游实现，直接保存在 `.agents/skills/`。该目录可由 Codex 和 OpenCode 读取；工具未自动显示或存在同名全局技能时，按 `AGENTS.md` 中的仓库路径读取 `SKILL.md`。现有设计 skill 继续保存在 `.opencode/skills/atoms-frontend-design/`。
 
+OpenSpec 的七个工作流由固定版本的官方 CLI 为 Codex 和 OpenCode 分别生成入口，位于 `.agents/skills/openspec-*` 与 `.opencode/skills/openspec-*`。配置、同名技能处理、刷新方式及 MIT 来源见 [OpenSpec 指南](./openspec.md)，不修改生成内容。
+
 ## Installed upstream skills
 
 | Skill | 来源与固定提交 | 职责 | 许可证 |

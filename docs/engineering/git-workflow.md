@@ -97,7 +97,7 @@ docs(design): add Lovable workspace skill and DESIGN.md navigation (DOC-001)
 Validation: reviewed local links and skill metadata; git diff --check passed.
 ```
 
-OpenSpec 尚待接入；既有任务沿用原编号和交接记录，不另建平行清单，也不将旧工作补写成已经由 OpenSpec 执行。
+OpenSpec 变更中的需求、设计、任务状态和验收记录统一维护在对应 change 中，入口见 [OpenSpec 指南](./openspec.md)。既有任务沿用原编号和交接记录，不另建平行清单，也不将旧工作补写成已经由 OpenSpec 执行。
 
 ## Verification
 

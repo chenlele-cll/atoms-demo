@@ -11,6 +11,7 @@
 | `engineering/` | [lifecycle.md](./engineering/lifecycle.md) | 起停行为与计划中的进程、工具和基础设施契约；调整命令、进程或基础设施时阅读并更新 |
 | `engineering/` | [git-workflow.md](./engineering/git-workflow.md) | 任务编号、分支、提交、推送与合并约定；开展版本控制操作时阅读，流程变化时更新 |
 | `engineering/` | [skills.md](./engineering/skills.md) | 上游技能来源、固定版本与触发范围；使用或更新项目技能时阅读 |
+| `engineering/` | [openspec.md](./engineering/openspec.md) | OpenSpec CLI、上下文、工件和技能入口；创建、推进或更新变更时阅读，接入方式变化时更新 |
 | `product/` | `assignment.md`（仅本地） | 原始题目参考材料；存在时可供本地查阅，由 `.gitignore` 排除，不能复制到公开文档 |
 
 公开项目的目标、当前实现状态与运行命令见根目录 [README.md](../README.md)。原始题目材料不随仓库发布，克隆后不存在属于预期情况。
