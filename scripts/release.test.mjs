@@ -18,13 +18,13 @@ const exec=promisify(execFile);const root=path.resolve(import.meta.dirname,'..')
 const templateIds=['company-landing','brand-store','personal-portfolio'];
 async function temp(work){const folder=await mkdtemp(path.join(os.tmpdir(),'atoms release control '));try{return await work(folder);}finally{await rm(folder,{recursive:true,force:true});}}
 async function file(folder,name,value='control'){const target=path.join(folder,name);await mkdir(path.dirname(target),{recursive:true});await writeFile(target,value);}
-async function fixture(folder){
+async function fixture(folder, ids=templateIds, legacy=false){
   await file(folder,'backend/package.json',JSON.stringify({name:'@atoms/backend',type:'module'}));
   for(const name of ['backend/dist/server.js','backend/dist/app.js','backend/node_modules/.pnpm/contracts/dist/index.js','frontend/index.html','deploy/nginx.conf.template'])await file(folder,name);
   await mkdir(path.join(folder,'backend/node_modules/@atoms'),{recursive:true});await symlink('../.pnpm/contracts',path.join(folder,'backend/node_modules/@atoms/contracts'));
   const identities=[];
   const license=await readFile(path.join(root,'templates/company-landing/LICENSE'),'utf8');
-  for(const id of templateIds){
+  for(const id of ids){
     const identity={id,version:1,name:id,category:'website',entry:'/src/main.tsx',source:{repository:`https://github.com/fixture/${id}`,commit:'a'.repeat(40),license:'MIT'},dependencies:{react:'18.3.1'}};
     identities.push(identity);
     const content={...identity,files:{'/LICENSE':license, '/src/main.tsx':'export default function App(){return null;}', '/src/styles.css':'body { margin: 0; }', '/public/index.html':'<div id="root"></div>', '/package.json':JSON.stringify({main:identity.entry,dependencies:identity.dependencies})}};
@@ -32,7 +32,7 @@ async function fixture(folder){
     await file(folder,`backend/dist/template-assets/${id}.bundle.json`,bundle);await file(folder,`frontend/template-assets/${id}.bundle.json`,bundle);
   }
   const runtime=await readFile(path.join(root,'templates/bundle.mjs'),'utf8');
-  await file(folder,'backend/dist/template-assets/bundle.mjs',`${runtime}\nexport const templateIdentities = ${canonicalJSON(identities)};\nexport const companyTemplateIdentity = templateIdentities[0];\n`);
+  await file(folder,'backend/dist/template-assets/bundle.mjs',`${runtime}\n${legacy ? `export const companyTemplateIdentity = ${canonicalJSON(identities[0])};` : `export const templateIdentities = ${canonicalJSON(identities)};\nexport const companyTemplateIdentity = templateIdentities[0];`}\n`);
   return sealRelease(folder,{releaseId:randomUUID(),sourceDigest:'2'.repeat(64),lockDigest:'3'.repeat(64),buildDigest:'4'.repeat(64),pnpm:'pnpm@12.11.2'});
 }
 test('fixed release/deployment CLI: help and malformed arguments never build or start',async()=>{
@@ -51,6 +51,30 @@ test('release seal detects changed bytes, file modes, missing assets, manifest e
   await chmod(app,0o755);await assert.rejects(validateRelease(folder),/RELEASE_CHANGED/);await chmod(app,0o644);
   const json=path.join(folder,'release.json');const text=await readFile(json,'utf8');await writeFile(json,text.replace('company-landing','tampered'));await assert.rejects(validateRelease(folder),/RELEASE_MANIFEST/);await writeFile(json,text);
   await rm(path.join(folder,'frontend/index.html'));await assert.rejects(validateRelease(folder),/RELEASE_CHANGED/);
+}));
+for(const legacy of [true,false])test(`retained one-template schema-1 release validates with ${legacy?'historical':'array'} catalog without changing its manifest`,()=>temp(async folder=>{
+  const identity=await fixture(folder,['company-landing'],legacy);
+  const manifest=await readFile(path.join(folder,'release.json'),'utf8');
+  assert.equal(identity.schemaVersion,1);
+  assert.equal((await validateRelease(folder)).releaseDigest,identity.releaseDigest);
+  assert.equal(await readFile(path.join(folder,'release.json'),'utf8'),manifest);
+  await file(folder,'frontend/template-assets/company-landing.bundle.json','tampered');
+  await assert.rejects(validateRelease(folder),/RELEASE_CHANGED/);
+}));
+for(const fault of ['duplicate identity','unsafe identity','empty catalog','invalid catalog','missing company','company mismatch'])test(`release rejects package catalog with ${fault}`,()=>temp(async folder=>{
+  await fixture(folder);await rm(path.join(folder,'release.json'));
+  const filename=path.join(folder,'backend/dist/template-assets/bundle.mjs');
+  const runtime=await readFile(filename,'utf8');
+  const change={
+    'duplicate identity':'templateIdentities.push(templateIdentities[0]);',
+    'unsafe identity':"templateIdentities[1].id='../brand-store';",
+    'empty catalog':'templateIdentities.length=0;',
+    'invalid catalog':null,
+    'missing company':"templateIdentities.splice(0,1);",
+    'company mismatch':"templateIdentities[0]={...templateIdentities[0],version:2};",
+  }[fault];
+  await writeFile(filename,change===null?runtime.replace('export const templateIdentities =','export const templateIdentities = null; const unused ='):`${runtime}\n${change}\n`);
+  await assert.rejects(sealRelease(folder,{releaseId:randomUUID()}),/MISSING_ASSET/);
 }));
 test('release refuses external/dangling links, secrets, self source/dev dependencies and partial packages',()=>temp(async folder=>{
   await fixture(folder);await symlink(os.tmpdir(),path.join(folder,'outside'));await assert.rejects(inventory(folder),/UNSAFE_RELEASE/);await rm(path.join(folder,'outside'));

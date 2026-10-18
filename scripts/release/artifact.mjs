@@ -5,7 +5,6 @@ import { verifyTemplateBundle } from '../../templates/bundle.mjs';
 import { sha256, inside } from '../verification/primitives.mjs';
 const HASH = /^[a-f0-9]{64}$/;
 const UUID = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
-const TEMPLATE_IDS = ['company-landing', 'brand-store', 'personal-portfolio'];
 export async function inventory(folder, { signal } = {}) {
   signal?.throwIfAborted();
   const root = await realpath(folder); const entries = [];
@@ -35,7 +34,7 @@ export async function assertLayout(folder, entries) {
     if (/^backend\/(?:src|test)(?:\/|$)/.test(item.path) || /^backend\/(?!node_modules\/|dist\/|package.json$|pnpm-lock.yaml$|pnpm-workspace.yaml$)[^/]+\//.test(item.path)) throw Error('RELEASE_LAYOUT');
     if (/^backend\/node_modules\/(?:tsx|typescript|vite|eslint)$/.test(item.path)) throw Error('RELEASE_DEV_DEPENDENCY');
   }
-  for (const key of ['backend/dist/server.js','backend/dist/app.js','backend/dist/template-assets/bundle.mjs','backend/package.json','frontend/index.html','deploy/nginx.conf.template', ...TEMPLATE_IDS.flatMap(id => [`backend/dist/template-assets/${id}.bundle.json`, `frontend/template-assets/${id}.bundle.json`])]) {
+  for (const key of ['backend/dist/server.js','backend/dist/app.js','backend/dist/template-assets/bundle.mjs','backend/package.json','frontend/index.html','deploy/nginx.conf.template']) {
     if (!entries.some(item => item.path === key && item.type === 'file')) throw Error('MISSING_ASSET');
   }
   const own = JSON.parse(await readFile(path.join(folder,'backend/package.json'),'utf8'));
@@ -44,14 +43,27 @@ export async function assertLayout(folder, entries) {
   try {
     const runtime = path.join(folder, 'backend/dist/template-assets/bundle.mjs');
     const url = pathToFileURL(runtime); url.searchParams.set('digest', sha256(await readFile(runtime)));
-    const { templateIdentities } = await import(url.href);
-    if (!Array.isArray(templateIdentities) || templateIdentities.length !== TEMPLATE_IDS.length || new Set(templateIdentities.map(item => item.id)).size !== TEMPLATE_IDS.length) throw Error('MISSING_ASSET');
-    for (const id of TEMPLATE_IDS) {
-      const expected = templateIdentities.find(item => item.id === id);
+    const catalog = await import(url.href);
+    // Immutable schema-1 packages before the multi-template catalog export only
+    // companyTemplateIdentity. Use the package's own inventoried identities.
+    const templateIdentities = Object.hasOwn(catalog, 'templateIdentities') ? catalog.templateIdentities : [catalog.companyTemplateIdentity];
+    if (!Array.isArray(templateIdentities) || !templateIdentities.length || templateIdentities.some(item => typeof item?.id !== 'string' || !/^[a-z0-9-]+$/.test(item.id)) || new Set(templateIdentities.map(item => item.id)).size !== templateIdentities.length || !templateIdentities.some(item => item.id === 'company-landing')) throw Error('MISSING_ASSET');
+    const assets = new Set(templateIdentities.flatMap(({ id }) => [`backend/dist/template-assets/${id}.bundle.json`, `frontend/template-assets/${id}.bundle.json`]));
+    for (const item of entries) {
+      if (/^(?:backend\/dist|frontend)\/template-assets\/.*\.bundle\.json$/.test(item.path) && !assets.has(item.path)) throw Error('MISSING_ASSET');
+    }
+    for (const key of assets) {
+      if (!entries.some(item => item.path === key && item.type === 'file')) throw Error('MISSING_ASSET');
+    }
+    for (const expected of templateIdentities) {
+      const { id } = expected;
       const bundle = await verifyTemplateBundle(JSON.parse(await readFile(path.join(folder, `backend/dist/template-assets/${id}.bundle.json`), 'utf8')), expected);
       const frontend = await verifyTemplateBundle(JSON.parse(await readFile(path.join(folder, `frontend/template-assets/${id}.bundle.json`), 'utf8')), expected);
       if (bundle.digest !== frontend.digest) throw Error('MISSING_ASSET');
-      if (id === 'company-landing') company = { id: bundle.id, version: bundle.version, digest: bundle.digest };
+      if (id === 'company-landing') {
+        await verifyTemplateBundle(bundle, catalog.companyTemplateIdentity);
+        company = { id: bundle.id, version: bundle.version, digest: bundle.digest };
+      }
     }
   } catch { throw Error('MISSING_ASSET'); }
   const contractRoot = await realpath(path.join(folder,'backend/node_modules/@atoms/contracts'));
